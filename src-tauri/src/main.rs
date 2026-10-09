@@ -140,7 +140,8 @@ async fn recognize(
         .start("已有识别任务在进行，请等待完成或先取消。")?;
     let samples = std::mem::take(&mut *pending_audio(&jobs)?);
     if samples.is_empty() {
-        return Err("音频数据无效，请重新导入音频。".into());
+        // `cancel_recognition` discards the audio when it arrives before recognition starts.
+        return Err(jobs::CANCELLED.into());
     }
     let model = models::installed_path(&models_dir(&app)?, &model_id)?;
     let cancel = job.cancel.clone();
@@ -153,8 +154,10 @@ async fn recognize(
 }
 
 #[tauri::command]
-fn cancel_recognition(jobs: State<'_, Jobs>) {
+fn cancel_recognition(jobs: State<'_, Jobs>) -> Result<(), String> {
     jobs.recognition.cancel();
+    pending_audio(&jobs)?.clear();
+    Ok(())
 }
 
 fn main() {

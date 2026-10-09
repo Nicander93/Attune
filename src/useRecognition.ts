@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { sentencesToSegments, type Material, type Segment } from './domain';
 import {
   CANCELLED,
@@ -29,7 +29,6 @@ export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
   const [settings, setSettings] = useState(loadSettings),
     [models, setModels] = useState<ModelStatus[]>([]),
     [task, setTask] = useState<Task | undefined>();
-  const cancelled = useRef(false);
 
   function changeSettings(next: RecognitionSettings) {
     setSettings(next);
@@ -86,9 +85,9 @@ export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
   }
   function start(material: Material) {
     if (task) return;
-    cancelled.current = false;
+    const controller = new AbortController();
     const stop = () => {
-      cancelled.current = true;
+      controller.abort();
       void cancelRecognition();
     };
     void run(async () => {
@@ -96,10 +95,13 @@ export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
       if (!model) throw new Error('请先在识别设置中选择模型。');
       if (!model.installed) await download(model);
       setTask({ label: '正在解码音频…', cancel: stop });
-      const sentences = await recognize(material.audio, model.id, (percent) =>
-        setTask({ label: `正在识别：${percent}%`, percent, cancel: stop }),
+      const sentences = await recognize(
+        material.audio,
+        model.id,
+        (percent) => setTask({ label: `正在识别：${percent}%`, percent, cancel: stop }),
+        controller.signal,
       );
-      if (cancelled.current) throw CANCELLED;
+      if (controller.signal.aborted) throw CANCELLED;
       const segments = sentencesToSegments(sentences, material.duration);
       if (!segments.length) {
         onNotice('没有识别出英文语音，片段保持不变。');

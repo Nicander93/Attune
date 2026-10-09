@@ -81,17 +81,49 @@ async function decodeForRecognition(audio: Blob): Promise<Float32Array> {
   );
 }
 
+function throwIfCancelled(signal: AbortSignal): void {
+  if (signal.aborted) throw CANCELLED;
+}
+
+/** Rejects with CANCELLED as soon as `signal` aborts. */
+function whenCancelled(signal: AbortSignal): Promise<never> {
+  return new Promise((_, reject) => {
+    if (signal.aborted) reject(CANCELLED);
+    signal.addEventListener('abort', () => reject(CANCELLED), { once: true });
+  });
+}
+
+async function uploadAudio(samples: Float32Array, signal: AbortSignal): Promise<void> {
+  await invoke('clear_audio');
+  try {
+    for (let i = 0; i < samples.length; i += UPLOAD_CHUNK_SAMPLES) {
+      throwIfCancelled(signal);
+      const chunk = samples.subarray(i, i + UPLOAD_CHUNK_SAMPLES);
+      await invoke(
+        'append_audio',
+        new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength),
+      );
+    }
+    throwIfCancelled(signal);
+  } catch (err) {
+    await invoke('clear_audio').catch(() => undefined);
+    throw err;
+  }
+}
+
+/**
+ * Recognizes `audio`. Aborting `signal` stops at once while decoding or uploading;
+ * once recognition runs, `cancelRecognition` stops it.
+ */
 export async function recognize(
   audio: Blob,
   modelId: string,
   onProgress: (percent: number) => void,
+  signal: AbortSignal,
 ): Promise<RecognizedSentence[]> {
-  const samples = await decodeForRecognition(audio);
-  await invoke('clear_audio');
-  for (let i = 0; i < samples.length; i += UPLOAD_CHUNK_SAMPLES) {
-    const chunk = samples.subarray(i, i + UPLOAD_CHUNK_SAMPLES);
-    await invoke('append_audio', new Uint8Array(chunk.buffer, chunk.byteOffset, chunk.byteLength));
-  }
+  const samples = await Promise.race([decodeForRecognition(audio), whenCancelled(signal)]);
+  if (!samples.length) throw new Error('音频里没有可识别的内容，请重新导入音频。');
+  await uploadAudio(samples, signal);
   const stop = await listen<number>('recognition-progress', (e) => onProgress(e.payload));
   try {
     return await invoke<RecognizedSentence[]>('recognize', { modelId });
