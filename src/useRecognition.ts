@@ -42,7 +42,7 @@ export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
   async function download(model: ModelStatus): Promise<void> {
     setTask({ label: `正在下载模型 ${model.label}…`, cancel: () => void cancelDownload() });
     try {
-      await downloadModel(model.id, settings.mirror, (p) =>
+      await downloadModel(model.id, settings.modelUrl, (p) =>
         setTask({
           label: `正在下载模型：${megabytes(p.downloadedBytes)} / ${megabytes(p.totalBytes)} MB`,
           percent: (p.downloadedBytes / p.totalBytes) * 100,

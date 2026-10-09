@@ -347,6 +347,9 @@ footer {
   border: 1px solid var(--line);
   border-radius: 6px;
 }
+.settings .invalid {
+  color: #a23b1b;
+}
 .settings .row {
   margin-bottom: 14px;
 }

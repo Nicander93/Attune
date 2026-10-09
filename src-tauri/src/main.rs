@@ -53,13 +53,13 @@ async fn download_model(
     app: AppHandle,
     jobs: State<'_, Jobs>,
     model_id: String,
-    mirror: String,
+    url_template: String,
 ) -> Result<(), String> {
     let job = jobs
         .download
         .start("已有模型正在下载，请等待完成或先取消。")?;
     let spec = models::find_spec(&model_id)?;
-    let url = models::model_url(&mirror, spec)?;
+    let url = models::model_url(&url_template, spec)?;
     let dir = models_dir(&app)?;
     let cancel = job.cancel.clone();
     run_blocking(move || {

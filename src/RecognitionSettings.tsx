@@ -1,4 +1,9 @@
-import { MIRRORS, type ModelStatus, type RecognitionSettings as Settings } from './recognition';
+import {
+  MODEL_SOURCES,
+  modelUrlProblem,
+  type ModelStatus,
+  type RecognitionSettings as Settings,
+} from './recognition';
 
 function modelState(model: ModelStatus): string {
   if (model.installed) return '已就绪';
@@ -18,6 +23,7 @@ export function RecognitionSettings(props: {
 }) {
   const { settings, models, busy, onChange } = props;
   const selected = models.find((m) => m.id === settings.modelId);
+  const urlProblem = modelUrlProblem(settings.modelUrl);
   return (
     <section className="settings">
       <h2>识别设置</h2>
@@ -25,23 +31,27 @@ export function RecognitionSettings(props: {
         识别在本机离线运行。模型首次识别时自动下载，下载完成并校验通过后才会启用。
       </p>
       <label>
-        下载镜像地址
+        模型下载地址
         <input
           type="url"
-          aria-label="下载镜像地址"
-          value={settings.mirror}
-          onChange={(e) => onChange({ ...settings, mirror: e.target.value })}
+          aria-label="模型下载地址"
+          aria-invalid={Boolean(urlProblem)}
+          value={settings.modelUrl}
+          onChange={(e) => onChange({ ...settings, modelUrl: e.target.value })}
         />
       </label>
+      <p className={urlProblem ? 'muted invalid' : 'muted'} role={urlProblem ? 'alert' : undefined}>
+        {urlProblem ?? '{file} 会替换成模型文件名，例如 ggml-base.en.bin。'}
+      </p>
       <div className="row">
-        {MIRRORS.map((m) => (
+        {MODEL_SOURCES.map((source) => (
           <button
-            key={m.url}
+            key={source.template}
             className="quiet"
-            aria-pressed={settings.mirror === m.url}
-            onClick={() => onChange({ ...settings, mirror: m.url })}
+            aria-pressed={settings.modelUrl === source.template}
+            onClick={() => onChange({ ...settings, modelUrl: source.template })}
           >
-            {m.label}
+            {source.label}
           </button>
         ))}
       </div>
@@ -60,7 +70,10 @@ export function RecognitionSettings(props: {
         </select>
       </label>
       <div className="row">
-        <button disabled={busy || !selected || selected.installed} onClick={props.onDownload}>
+        <button
+          disabled={busy || !selected || selected.installed || Boolean(urlProblem)}
+          onClick={props.onDownload}
+        >
           {selected && selected.downloadedBytes > 0 && !selected.installed
             ? '继续下载'
             : '下载模型'}

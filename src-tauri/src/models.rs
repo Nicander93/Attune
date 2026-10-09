@@ -44,7 +44,8 @@ pub const CATALOG: &[ModelSpec] = &[
 
 const LOCAL_PREFIX: &str = "local:";
 const LOCAL_DIR: &str = "local";
-const REPOSITORY_PATH: &str = "ggerganov/whisper.cpp/resolve/main";
+/// Placeholder for the model file name in a download URL template.
+pub const FILE_PLACEHOLDER: &str = "{file}";
 
 #[derive(Debug, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -123,12 +124,16 @@ pub fn installed_path(dir: &Path, id: &str) -> Result<PathBuf, String> {
     }
 }
 
-pub fn model_url(mirror: &str, spec: &ModelSpec) -> Result<String, String> {
-    let base = mirror.trim().trim_end_matches('/');
-    if !(base.starts_with("https://") || base.starts_with("http://")) {
-        return Err("镜像地址需要以 https:// 或 http:// 开头。".into());
+/// Expands a download URL template such as `https://host/.../resolve/main/{file}`.
+pub fn model_url(template: &str, spec: &ModelSpec) -> Result<String, String> {
+    let template = template.trim();
+    if !(template.starts_with("https://") || template.starts_with("http://")) {
+        return Err("下载地址需要以 https:// 或 http:// 开头。".into());
     }
-    Ok(format!("{base}/{REPOSITORY_PATH}/{}", spec.file))
+    if !template.contains(FILE_PLACEHOLDER) {
+        return Err("下载地址需要包含 {file}，下载时会替换成模型文件名。".into());
+    }
+    Ok(template.replace(FILE_PLACEHOLDER, spec.file))
 }
 
 fn part_path(dir: &Path, spec: &ModelSpec) -> PathBuf {
@@ -313,6 +318,10 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use std::thread;
 
+    /// The frontend's default download source (ModelScope).
+    const DEFAULT_URL_TEMPLATE: &str =
+        "https://www.modelscope.cn/models/cjc1887415157/whisper.cpp/resolve/master/{file}";
+
     struct TempDir(PathBuf);
     impl TempDir {
         fn new(name: &str) -> Self {
@@ -495,28 +504,43 @@ mod tests {
     }
 
     #[test]
-    fn builds_mirror_urls_and_rejects_other_schemes() {
+    fn expands_url_templates() {
         let spec = find_spec("base.en").unwrap();
         assert_eq!(
-            model_url(" https://hf-mirror.com/ ", spec).unwrap(),
-            "https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
+            model_url(DEFAULT_URL_TEMPLATE, spec).unwrap(),
+            "https://www.modelscope.cn/models/cjc1887415157/whisper.cpp/resolve/master/ggml-base.en.bin"
         );
-        assert!(model_url("ftp://example.com", spec).is_err());
+        assert_eq!(
+            model_url(
+                " https://huggingface.co/ggerganov/whisper.cpp/resolve/main/{file} ",
+                spec
+            )
+            .unwrap(),
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin"
+        );
+        assert!(model_url("https://hf-mirror.com", spec)
+            .unwrap_err()
+            .contains("{file}"));
+        assert!(model_url("ftp://example.com/{file}", spec).is_err());
     }
 
     /// Real network check: `ATTUNE_MODELS_DIR=... cargo test -- --ignored real_download`.
-    /// Cancels the first attempt after a few seconds, then resumes it to completion.
+    /// Cancels the first attempt after `ATTUNE_CANCEL_AFTER_SECS` (default 8), then resumes it.
     #[test]
     #[ignore]
     fn real_download_resumes_from_the_mirror() {
         let dir = PathBuf::from(std::env::var("ATTUNE_MODELS_DIR").unwrap());
-        let mirror = std::env::var("ATTUNE_MIRROR").unwrap_or("https://hf-mirror.com".into());
-        let spec = find_spec("tiny.en").unwrap();
-        let url = model_url(&mirror, spec).unwrap();
+        let template = std::env::var("ATTUNE_MODEL_URL").unwrap_or(DEFAULT_URL_TEMPLATE.into());
+        let model = std::env::var("ATTUNE_REAL_MODEL").unwrap_or("tiny.en".into());
+        let spec = find_spec(&model).unwrap();
+        let url = model_url(&template, spec).unwrap();
+        println!("downloading {url}");
+        let cancel_after =
+            std::env::var("ATTUNE_CANCEL_AFTER_SECS").map_or(8, |s| s.parse().unwrap());
         let cancel = Arc::new(AtomicBool::new(false));
         let timer = cancel.clone();
         thread::spawn(move || {
-            thread::sleep(Duration::from_secs(8));
+            thread::sleep(Duration::from_secs(cancel_after));
             timer.store(true, std::sync::atomic::Ordering::Relaxed);
         });
         assert_eq!(
@@ -534,6 +558,6 @@ mod tests {
         .unwrap();
         println!("resumed from {first_progress:?}");
         assert_eq!(first_progress, Some(partial));
-        assert!(installed_path(&dir, "tiny.en").is_ok());
+        assert!(installed_path(&dir, spec.id).is_ok());
     }
 }
