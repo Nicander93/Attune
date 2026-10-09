@@ -8,7 +8,7 @@
 - 词格输入：Space 进入下一个词，空词 Backspace 返回，点击修改、整句粘贴、留空。
 - 可选轻柔输入音效，播放音频时静音；播放控制恢复输入焦点。
 - 桌面版本机离线识别原文（whisper.cpp）：后台运行、显示进度、可取消；识别完成后一次性生成带起止时间的句子片段，并保留词级时间。取消或失败不改动已有片段。
-- 识别模型首次使用时下载：镜像地址可在“识别设置”里修改（默认 hf-mirror.com，可切回 Hugging Face 官方），支持断点续传，下载后按 SHA-256 校验，校验不过不启用；离线时可导入本地 ggml 模型文件。
+- 识别模型首次使用时下载（默认 base.en）：下载地址可在“识别设置”里修改，格式为带 `{file}` 的地址模板，下载时 `{file}` 换成模型文件名。预设有 ModelScope（国内，默认）、HF-Mirror 和 Hugging Face 官方。支持断点续传，下载后按 SHA-256 校验，校验不过不启用；离线时可导入本地 ggml 模型文件，导入同名模型前会先确认是否替换。
 - 导出 SRT（UTF-8、`HH:MM:SS,mmm`），导出的文件可以再导入，句子和时间保持一致。
 - 导入 SRT 自动建立片段；可手动编辑片段起止时间、参考原文，在播放位置拆分空白片段。
 - 核对前不展示原文或单词数量，核对后按词对齐差异，忽略大小写与标点。
@@ -39,7 +39,7 @@ npm run test:rust   # Rust 单元测试，需要下文的桌面构建环境
 
 需要 Rust stable、Visual Studio Build Tools（勾选 C++ 桌面开发与 Windows SDK）、WebView2。若此前没有 Rust，请通过 rustup 安装。
 
-识别模块会编译 whisper.cpp，另外需要：
+识别模块会编译 whisper.cpp，所以**从源码构建时**另外需要下面两项。它们只在编译时用到；用安装包安装的用户不需要安装 CMake 或 libclang。
 
 - **CMake**：PATH 里有就用；没有时自动使用 VS Build Tools 自带的 CMake。
 - **libclang**（生成 whisper.cpp 绑定）：安装 LLVM，或执行 `pip install libclang`；也可以自己设置 `LIBCLANG_PATH`。

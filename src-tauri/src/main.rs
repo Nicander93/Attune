@@ -92,13 +92,18 @@ fn cancel_download(jobs: State<'_, Jobs>) {
 }
 
 #[tauri::command]
-async fn import_model(app: AppHandle, path: String) -> Result<models::ModelStatus, String> {
+async fn import_model(
+    app: AppHandle,
+    path: String,
+    replace: bool,
+) -> Result<models::ModelStatus, String> {
     let dir = models_dir(&app)?;
     run_blocking(move || {
         models::import(
             Path::new(&path),
             &dir,
             models::CATALOG,
+            replace,
             transcribe::load_test,
         )
     })

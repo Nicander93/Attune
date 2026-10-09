@@ -46,6 +46,8 @@ const LOCAL_PREFIX: &str = "local:";
 const LOCAL_DIR: &str = "local";
 /// Placeholder for the model file name in a download URL template.
 pub const FILE_PLACEHOLDER: &str = "{file}";
+/// Returned by `import` when a different local model with the same name is already installed.
+pub const MODEL_EXISTS: &str = "同名模型已存在";
 
 #[derive(Debug, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -273,18 +275,27 @@ fn sanitized_file_name(source: &Path) -> String {
 
 /// Copies a model file the user already has into `dir`. A file matching a catalog checksum
 /// becomes that catalog model; any other file must pass `load_test` before it is enabled.
+/// An installed local model with the same name is only replaced when `replace` is true.
 pub fn import(
     source: &Path,
     dir: &Path,
     catalog: &[ModelSpec],
+    replace: bool,
     load_test: impl FnOnce(&Path) -> Result<(), String>,
 ) -> Result<ModelStatus, String> {
     let hash = sha256_file(source).map_err(|e| format!("无法读取所选文件：{e}"))?;
     if let Some(spec) = catalog.iter().find(|s| s.sha256 == hash) {
-        copy_then_rename(source, &dir.join(spec.file))?;
+        let target = dir.join(spec.file);
+        // An installed catalog model was verified against the same checksum.
+        if !target.is_file() {
+            copy_then_rename(source, &target)?;
+        }
         return Ok(catalog_status(dir, spec));
     }
     let target = dir.join(LOCAL_DIR).join(sanitized_file_name(source));
+    if target.is_file() && !replace {
+        return Err(MODEL_EXISTS.into());
+    }
     let staging = target.with_extension("importing");
     copy_to(source, &staging)?;
     if let Err(error) = load_test(&staging) {
@@ -480,10 +491,12 @@ mod tests {
         fs::write(&source, &data).unwrap();
         let catalog = [spec_for(&data)];
         let models = dir.0.join("models");
-        let status = import(&source, &models, &catalog, |_| panic!("not needed")).unwrap();
+        let status = import(&source, &models, &catalog, false, |_| panic!("not needed")).unwrap();
         assert_eq!(status.id, "test");
         assert!(status.installed);
         assert_eq!(fs::read(models.join("ggml-test.bin")).unwrap(), data);
+        let again = import(&source, &models, &catalog, false, |_| panic!("not needed"));
+        assert!(again.unwrap().installed);
     }
 
     #[test]
@@ -493,14 +506,38 @@ mod tests {
         fs::write(&source, b"not a model").unwrap();
         let models = dir.0.join("models");
 
-        let rejected = import(&source, &models, CATALOG, |_| Err("bad magic".into()));
+        let rejected = import(
+            &source,
+            &models,
+            CATALOG,
+            false,
+            |_| Err("bad magic".into()),
+        );
         assert!(rejected.unwrap_err().contains("bad magic"));
         assert_eq!(list(&models).len(), CATALOG.len());
 
-        let accepted = import(&source, &models, CATALOG, |_| Ok(())).unwrap();
+        let accepted = import(&source, &models, CATALOG, false, |_| Ok(())).unwrap();
         assert_eq!(accepted.id, "local:my_model.bin");
         assert!(installed_path(&models, "local:my_model.bin").is_ok());
         assert!(installed_path(&models, "local:../secret.bin").is_err());
+    }
+
+    #[test]
+    fn replaces_a_local_model_with_the_same_name_only_when_asked() {
+        let dir = TempDir::new("import-same-name");
+        let source = dir.0.join("mine.bin");
+        let models = dir.0.join("models");
+        fs::write(&source, b"first").unwrap();
+        import(&source, &models, CATALOG, false, |_| Ok(())).unwrap();
+
+        fs::write(&source, b"second").unwrap();
+        let refused = import(&source, &models, CATALOG, false, |_| Ok(()));
+        assert_eq!(refused.unwrap_err(), MODEL_EXISTS);
+        let installed = installed_path(&models, "local:mine.bin").unwrap();
+        assert_eq!(fs::read(&installed).unwrap(), b"first");
+
+        import(&source, &models, CATALOG, true, |_| Ok(())).unwrap();
+        assert_eq!(fs::read(&installed).unwrap(), b"second");
     }
 
     #[test]

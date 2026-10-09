@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { open } from '@tauri-apps/plugin-dialog';
+import { ask, open } from '@tauri-apps/plugin-dialog';
 import type { RecognizedSentence } from './domain';
 export { isDesktop } from './desktop';
 
@@ -32,6 +32,8 @@ export const MODEL_SOURCES = [
   },
 ];
 export const CANCELLED = '已取消';
+/** Must match `MODEL_EXISTS` in src-tauri/src/models.rs. */
+const MODEL_EXISTS = '同名模型已存在';
 const SAMPLE_RATE = 16000;
 /** Larger single IPC payloads (tens of MB) crash the WebView2 renderer. */
 const UPLOAD_CHUNK_SAMPLES = 1 << 20;
@@ -101,7 +103,22 @@ export const pickModelFile = () =>
     filters: [{ name: 'whisper 模型（ggml）', extensions: ['bin'] }],
   });
 
-export const importModel = (path: string) => invoke<ModelStatus>('import_model', { path });
+/** Imports a model file; asks before replacing an imported model with the same name. */
+export async function importModel(path: string): Promise<ModelStatus> {
+  try {
+    return await invoke<ModelStatus>('import_model', { path, replace: false });
+  } catch (err) {
+    if (String(err) !== MODEL_EXISTS) throw err;
+    const replace = await ask('已经导入过同名的模型文件。要用所选文件替换它吗？', {
+      title: '替换模型',
+      kind: 'warning',
+      okLabel: '替换',
+      cancelLabel: '取消',
+    });
+    if (!replace) throw CANCELLED;
+    return invoke<ModelStatus>('import_model', { path, replace: true });
+  }
+}
 
 export function mixToMono(channels: Float32Array[]): Float32Array {
   if (channels.length === 1) return channels[0];
