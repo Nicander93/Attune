@@ -1,4 +1,15 @@
-export type Segment = { id: string; start: number; end: number; reference: string };
+/** Word-level timing from speech recognition; empty for SRT or manual segments. */
+export type WordTiming = { text: string; start: number; end: number };
+/** `id` stays stable for the life of a segment so dictation records can refer to it. */
+export type Segment = {
+  id: string;
+  start: number;
+  end: number;
+  reference: string;
+  words: WordTiming[];
+};
+/** Sentence returned by the desktop speech recognizer. */
+export type RecognizedSentence = { text: string; start: number; end: number; words: WordTiming[] };
 export type Attempt = {
   id: string;
   createdAt: string;
@@ -88,6 +99,7 @@ export function parseSrt(text: string, duration: number): Segment[] {
         id: uid(),
         start,
         end: Math.min(end, duration),
+        words: [],
         reference: lines
           .slice(timeIndex + 1)
           .join(' ')
@@ -108,6 +120,8 @@ export const formatTime = (seconds: number) =>
     .padStart(2, '0')}:${Math.floor(seconds % 60)
     .toString()
     .padStart(2, '0')}`;
+export const hasDictation = (material: Material) =>
+  material.attempts.some((a) => Object.values(a.drafts).some((w) => w.some(Boolean)));
 export function checkSegment(attempt: Attempt, segment: Segment): Attempt {
   if (attempt.checked[segment.id]) return attempt;
   const first = [...(attempt.drafts[segment.id] || [])];
@@ -115,4 +129,47 @@ export function checkSegment(attempt: Attempt, segment: Segment): Attempt {
     ...attempt,
     checked: { ...attempt.checked, [segment.id]: { first, reference: segment.reference } },
   };
+}
+const pad = (value: number, length = 2) => value.toString().padStart(length, '0');
+function srtTimestamp(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds * 1000));
+  return `${pad(Math.floor(total / 3_600_000))}:${pad(Math.floor(total / 60_000) % 60)}:${pad(
+    Math.floor(total / 1000) % 60,
+  )},${pad(total % 1000, 3)}`;
+}
+/** SubRip text for segments that have reference text; UTF-8 BOM and CRLF suit most players. */
+export function toSrt(segments: Segment[]): string {
+  const blocks = segments
+    .filter((s) => s.reference.trim())
+    .map(
+      (s, i) =>
+        `${i + 1}\r\n${srtTimestamp(s.start)} --> ${srtTimestamp(s.end)}\r\n${s.reference
+          .trim()
+          .replace(/\s*\n\s*/g, ' ')}\r\n`,
+    );
+  return blocks.length ? `\uFEFF${blocks.join('\r\n')}` : '';
+}
+export function sentencesToSegments(sentences: RecognizedSentence[], duration: number): Segment[] {
+  return sentences
+    .map((s) => ({
+      id: uid(),
+      start: Math.max(0, s.start),
+      end: Math.min(s.end, duration),
+      reference: s.text.trim(),
+      words: s.words,
+    }))
+    .filter((s) => s.reference && s.end > s.start);
+}
+/** Brings materials saved by older versions up to the current shape. */
+export function migrateMaterial(material: Material): Material {
+  const seen = new Set<string>();
+  const segments = material.segments.map((s) => {
+    const id = s.id && !seen.has(s.id) ? s.id : uid();
+    seen.add(id);
+    return { ...s, id, words: s.words ?? [] };
+  });
+  const segmentId = segments.some((s) => s.id === material.segmentId)
+    ? material.segmentId
+    : (segments[0]?.id ?? '');
+  return { ...material, segments, segmentId };
 }

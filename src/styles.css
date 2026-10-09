@@ -330,6 +330,26 @@ footer {
   margin-bottom: 20px;
   line-height: 1.7;
 }
+.task {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.task progress {
+  width: 200px;
+}
+.settings input[type='url'] {
+  display: block;
+  width: 100%;
+  margin: 6px 0 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.settings .row {
+  margin-bottom: 14px;
+}
 .attempt {
   border-top: 1px solid var(--line);
   padding: 22px 0;
