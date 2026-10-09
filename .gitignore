@@ -5,3 +5,4 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 .env*
+src-tauri/gen/schemas/
