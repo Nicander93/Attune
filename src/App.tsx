@@ -17,6 +17,7 @@ import {
 } from './domain';
 import { loadMaterials, saveMaterial } from './storage';
 import { SentenceEditor } from './SentenceEditor';
+import { IntensiveListening } from './IntensiveListening';
 import { keySound } from './sound';
 import { isDesktop, saveTextFile } from './desktop';
 import { RecognitionSettings } from './RecognitionSettings';
@@ -74,6 +75,9 @@ export default function App() {
     audioInput = useRef<HTMLInputElement>(null),
     subtitleInput = useRef<HTMLInputElement>(null);
   const sentenceField = useRef<HTMLTextAreaElement>(null);
+  const intensivePrev = useRef<{ speed: number; loop: boolean; mode: 'segment' | 'full' } | null>(
+    null,
+  );
   const lastField = useRef<{ node: HTMLTextAreaElement; start: number; end: number } | undefined>(
     undefined,
   );
@@ -302,7 +306,38 @@ export default function App() {
       setError(`导出失败：${String(err)}`);
     }
   }
+
+  function leaveIntensive() {
+    const prev = intensivePrev.current;
+    if (!prev) return;
+    intensivePrev.current = null;
+    setSpeed(prev.speed);
+    setLoop(prev.loop);
+    setMode(prev.mode);
+  }
+  function enterIntensive(rate?: number, enableLoop?: boolean) {
+    if (!intensivePrev.current) intensivePrev.current = { speed, loop, mode };
+    setMode('segment');
+    if (rate !== undefined) setSpeed(rate);
+    if (enableLoop === true) setLoop(true);
+    void play(true);
+  }
+  function handleIntensiveLoop(next: boolean) {
+    if (next) enterIntensive(undefined, true);
+    else {
+      setLoop(false);
+      leaveIntensive();
+    }
+  }
+  function seekWord(start: number) {
+    if (!intensivePrev.current) intensivePrev.current = { speed, loop, mode };
+    setMode('segment');
+    seekTo(start);
+    void play();
+  }
+
   function selectSegment(s: Segment, seek = true) {
+    if (segment && s.id !== segment.id) leaveIntensive();
     if (seek && audio.current) {
       audio.current.pause();
       audio.current.currentTime = s.start;
@@ -484,17 +519,6 @@ export default function App() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  function renderDiff(words: ReturnType<typeof compareWords>) {
-    return words.map((w, i) =>
-      w.kind === 'extra' ? (
-        <del key={i}>{w.text} </del>
-      ) : w.kind === 'missing' ? (
-        <ins key={i}>{w.text} </ins>
-      ) : (
-        <span key={i}>{w.text} </span>
-      ),
-    );
-  }
   function renderDictation(s: Segment, index: number) {
     if (!attempt || !material) return null;
     const checked = attempt.checked[s.id];
@@ -545,32 +569,30 @@ export default function App() {
           <button onClick={() => check(s)}>核对原文</button>
         </div>
         {checked && (
-          <div className="comparison">
-            <div className="caption">参考原文</div>
-            <p className="english">{checked.reference}</p>
-            <div className="caption">首次稿对照 · 忽略大小写与标点 · 数字与英文可互认</div>
-            <p className="english">{renderDiff(compareWords(checked.first, checked.reference))}</p>
-            <div className="editor-actions">
-              <span className="muted">删除线：多写／不同的词 · 下划线：缺少的词</span>
-              <button
-                onClick={() => {
-                  updateAttempt((a) => ({
-                    ...a,
-                    checked: {
-                      ...a.checked,
-                      [s.id]: {
-                        ...a.checked[s.id],
-                        revision: draftWords(draftText(a.drafts[s.id])),
-                      },
-                    },
-                  }));
-                  setNotice('修订稿已保存，首次稿保持不变。');
-                }}
-              >
-                保存修订稿
-              </button>
-            </div>
-          </div>
+          <IntensiveListening
+            segment={s}
+            checked={checked}
+            position={position}
+            rate={speed}
+            loop={loop}
+            onReplay={() => enterIntensive()}
+            onRateAndReplay={(rate) => enterIntensive(rate)}
+            onLoopChange={handleIntensiveLoop}
+            onSeekWord={seekWord}
+            onSaveRevision={() => {
+              updateAttempt((a) => ({
+                ...a,
+                checked: {
+                  ...a.checked,
+                  [s.id]: {
+                    ...a.checked[s.id],
+                    revision: draftWords(draftText(a.drafts[s.id])),
+                  },
+                },
+              }));
+              setNotice('修订稿已保存，首次稿保持不变。');
+            }}
+          />
         )}
       </section>
     );
@@ -662,6 +684,34 @@ export default function App() {
           event.preventDefault();
           goAdjacent(1);
           return;
+        }
+        if (
+          event.altKey &&
+          !mod &&
+          segment &&
+          view === 'dictation' &&
+          attempt?.checked[segment.id]
+        ) {
+          if (event.code === 'Digit1') {
+            event.preventDefault();
+            enterIntensive(1);
+            return;
+          }
+          if (event.code === 'Digit2') {
+            event.preventDefault();
+            enterIntensive(0.75);
+            return;
+          }
+          if (event.code === 'Digit3') {
+            event.preventDefault();
+            enterIntensive(0.5);
+            return;
+          }
+          if (event.code === 'KeyL') {
+            event.preventDefault();
+            handleIntensiveLoop(!loop);
+            return;
+          }
         }
         if (mod && event.key === 'Enter' && segment && view === 'dictation') {
           event.preventDefault();
@@ -1172,7 +1222,7 @@ export default function App() {
                   <footer>
                     <span>
                       Ctrl/⌘+Space 播放暂停 · Ctrl/⌘+Shift+Space 重播 · Ctrl/⌘+↑↓ 上/下一句 · Enter
-                      核对
+                      核对 · Alt+1/2/3 精听 1×/0.75×/0.5× · Alt+L 单句循环
                     </span>
                   </footer>
                 </div>

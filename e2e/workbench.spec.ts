@@ -178,3 +178,52 @@ test('migrates version 1 data, exports SRT and re-imports it unchanged', async (
   await expect(page.locator('.sentence-sidebar__item')).toHaveCount(2);
   expect(errors).toEqual([]);
 });
+test('intensive listening rates, loop and SRT without invented word timings', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: '导入第一篇音频' })).toBeEnabled();
+  await page
+    .locator('input[type=file]')
+    .first()
+    .setInputFiles({ name: 'intensive.wav', mimeType: 'audio/wav', buffer: wav(4) });
+  await page
+    .locator('input[type=file]')
+    .nth(1)
+    .setInputFiles({
+      name: 'intensive.srt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('1\n00:00:00,000 --> 00:00:02,000\nHello world\n'),
+    });
+  const field = page.getByRole('textbox', { name: '第 1 句听写', exact: true });
+  await field.fill('Hello word');
+  await page.getByRole('button', { name: '核对原文', exact: true }).click();
+  await expect(page.getByLabel('精听本句')).toBeVisible();
+  await expect(page.getByLabel('核对对照')).toBeVisible();
+  await expect(page.locator('ins')).toContainText('world');
+  await expect(page.locator('del')).toContainText('word');
+  await expect(page.getByText('无词级时间', { exact: false })).toBeVisible();
+  await expect(page.locator('.intensive__token--seek')).toHaveCount(0);
+  await page.getByRole('button', { name: '0.5×', exact: true }).click();
+  await expect
+    .poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.playbackRate))
+    .toBe(0.5);
+  await expect
+    .poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => !a.paused))
+    .toBe(true);
+  await page.locator('.intensive label').filter({ hasText: '单句循环' }).locator('input').check();
+  await expect(page.getByLabel('精听本句').locator('input[type=checkbox]')).toBeChecked();
+  await page.getByRole('button', { name: '再听本句', exact: true }).click();
+  await expect
+    .poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.playbackRate))
+    .toBe(0.5);
+  await page.keyboard.press('Alt+Digit1');
+  await expect
+    .poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.playbackRate))
+    .toBe(1);
+  await expect(page.getByLabel('精听速度').getByRole('button', { name: '1×' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  expect(errors).toEqual([]);
+});

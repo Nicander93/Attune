@@ -567,3 +567,42 @@ summary {
     transition: none !important;
   }
 }
+
+.intensive {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+}
+.intensive__controls {
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+}
+.intensive__hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+.intensive__token {
+  border-radius: 3px;
+}
+.intensive__token--seek {
+  display: inline;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  padding: 0 2px;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+}
+.intensive__token--seek:hover {
+  background: #e7eddf;
+}
+.intensive__token--active {
+  background: #dfe8d2;
+  box-shadow: inset 0 -2px 0 #7a8f65;
+}
+.intensive__token--seek del,
+.intensive__token--seek ins {
+  background: inherit;
+}

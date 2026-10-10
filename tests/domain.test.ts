@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  activeWordIndex,
   checkSegment,
   compareWords,
   draftText,
@@ -8,6 +9,7 @@ import {
   newAttempt,
   parseSrt,
   sentencesToSegments,
+  timingIndexByDiff,
   toSrt,
   type Material,
   type Segment,
@@ -157,4 +159,22 @@ describe('audio preparation', () => {
     expect(Array.from(mixToMono([new Float32Array([1, 0]), new Float32Array([0, 1])]))).toEqual([
       0.5, 0.5,
     ]));
+});
+
+describe('intensive listening timings', () => {
+  const words = [
+    { text: 'Hello', start: 0, end: 0.4 },
+    { text: 'world', start: 0.4, end: 0.9 },
+  ];
+  it('finds the active word by playback position', () => {
+    expect(activeWordIndex(words, 0.2)).toBe(0);
+    expect(activeWordIndex(words, 0.4)).toBe(1);
+    expect(activeWordIndex(words, 1)).toBe(-1);
+    expect(activeWordIndex([], 0.2)).toBe(-1);
+  });
+  it('maps comparison tokens to timings without inventing times for SRT', () => {
+    const diff = compareWords(['Hello', 'there'], 'Hello world');
+    expect(timingIndexByDiff(diff, [])).toEqual([null, null, null]);
+    expect(timingIndexByDiff(diff, words)).toEqual([0, 1, null]);
+  });
 });

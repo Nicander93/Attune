@@ -83,6 +83,25 @@ export function draftText(words: string[] | undefined): string {
 export function draftWords(text: string): string[] {
   return tokenize(text);
 }
+/** Index of the word timing that covers position, or -1 when none / no timings. */
+export function activeWordIndex(words: WordTiming[], position: number): number {
+  if (!words.length) return -1;
+  return words.findIndex((w) => position >= w.start && position < w.end);
+}
+/**
+ * Maps each comparison token to a word-timing index for reference-side words
+ * (same / missing). extra tokens and empty timings yield null — never invent times.
+ */
+export function timingIndexByDiff(diff: DiffWord[], words: WordTiming[]): Array<number | null> {
+  if (!words.length) return diff.map(() => null);
+  let ref = 0;
+  return diff.map((token) => {
+    if (token.kind === 'extra') return null;
+    const index = ref < words.length ? ref : null;
+    ref += 1;
+    return index;
+  });
+}
 export function compareWords(draft: string[], reference: string): DiffWord[] {
   const a = draft.filter(Boolean),
     b = tokenize(reference);
