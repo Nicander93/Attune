@@ -3,8 +3,10 @@ import {
   checkSegment,
   compareWords,
   formatTime,
+  hasDictation,
   newAttempt,
   parseSrt,
+  toSrt,
   uid,
   type Attempt,
   type Material,
@@ -13,6 +15,12 @@ import {
 import { loadMaterials, saveMaterial } from './storage';
 import { WordEditor } from './WordEditor';
 import { keySound } from './sound';
+import { isDesktop, saveTextFile } from './desktop';
+import { RecognitionSettings } from './RecognitionSettings';
+import { useRecognition } from './useRecognition';
+
+const DICTATION_EXISTS = '该材料已有听写记录。请重新导入音频后再替换片段，以免改变旧记录的片段。';
+const DESKTOP_ONLY = '识别需要在 Attune 桌面版中使用';
 
 async function audioDuration(file: File): Promise<number> {
   const url = URL.createObjectURL(file),
@@ -44,7 +52,8 @@ export default function App() {
     [position, setPosition] = useState(0),
     [speed, setSpeed] = useState(1),
     [loop, setLoop] = useState(false),
-    [sound, setSound] = useState(false);
+    [sound, setSound] = useState(false),
+    [recognitionSettings, setRecognitionSettings] = useState(false);
   const [editing, setEditing] = useState(false),
     [start, setStart] = useState(0),
     [end, setEnd] = useState(0),
@@ -65,6 +74,20 @@ export default function App() {
   const materialRef = useRef(material);
   materialRef.current = material;
   const [audioUrl, setAudioUrl] = useState('');
+  const recognition = useRecognition({
+    onRecognized: (id, segments) => {
+      const target = all.current.find((m) => m.id === id);
+      if (!target) return;
+      if (hasDictation(target)) {
+        setError(DICTATION_EXISTS);
+        return;
+      }
+      replaceSegments(segments, id);
+      setNotice(`识别完成，共 ${segments.length} 句。原文在核对前保持隐藏。`);
+    },
+    onError: setError,
+    onNotice: setNotice,
+  });
 
   function flush() {
     clearTimeout(saveTimer.current);
@@ -167,7 +190,7 @@ export default function App() {
       const duration = await audioDuration(file),
         id = uid(),
         first = newAttempt(),
-        initial: Segment = { id: uid(), start: 0, end: duration, reference: '' };
+        initial: Segment = { id: uid(), start: 0, end: duration, reference: '', words: [] };
       const item: Material = {
         id,
         name: file.name,
@@ -185,7 +208,7 @@ export default function App() {
       setMaterials(all.current);
       setSelected(id);
       setSaveStatus('已保存');
-      setNotice('音频已导入。可导入 SRT 字幕，或在“片段与原文”中手动拆分。');
+      setNotice('音频已导入。可识别原文、导入 SRT 字幕，或在“片段与原文”中手动拆分。');
     } catch (err) {
       setError(String(err));
       setNotice('');
@@ -195,13 +218,21 @@ export default function App() {
     if (!file || !material) return;
     try {
       const segments = parseSrt(await file.text(), material.duration);
-      if (material.attempts.some((a) => Object.values(a.drafts).some((w) => w.some(Boolean)))) {
-        setError('该材料已有听写记录。请重新导入音频后添加字幕，以免改变旧记录的片段。');
+      if (hasDictation(material)) {
+        setError(DICTATION_EXISTS);
         return;
       }
-      audio.current?.pause();
-      const next = newAttempt();
-      update((m) => ({
+      replaceSegments(segments, material.id);
+      setNotice('字幕已导入，原文在核对前保持隐藏。');
+    } catch (err) {
+      setError(String(err));
+    }
+  }
+  /** Swaps in a complete new timeline in one update, starting a fresh attempt. */
+  function replaceSegments(segments: Segment[], id: string) {
+    const next = newAttempt();
+    update(
+      (m) => ({
         ...m,
         segments,
         segmentId: segments[0].id,
@@ -209,12 +240,42 @@ export default function App() {
         attemptId: next.id,
         review: [],
         position: segments[0].start,
-      }));
-      if (audio.current) audio.current.currentTime = segments[0].start;
-      setNotice('字幕已导入，原文在核对前保持隐藏。');
-      setEditing(false);
+      }),
+      id,
+    );
+    if (materialRef.current?.id === id && audio.current) {
+      audio.current.pause();
+      audio.current.currentTime = segments[0].start;
+    }
+    setEditing(false);
+  }
+  function startRecognition() {
+    if (!material) return;
+    if (hasDictation(material)) {
+      setError(DICTATION_EXISTS);
+      return;
+    }
+    setError('');
+    audio.current?.pause();
+    recognition.start(material);
+  }
+  function openRecognitionSettings() {
+    setRecognitionSettings(true);
+    recognition.refreshModels().catch((err) => setError(`无法读取模型列表：${String(err)}`));
+  }
+  async function exportSrt() {
+    if (!material) return;
+    const text = toSrt(material.segments);
+    if (!text) {
+      setNotice('还没有原文，无法导出 SRT。请先识别原文或导入字幕。');
+      return;
+    }
+    try {
+      const name = `${material.name.replace(/\.[^.]+$/, '')}.srt`;
+      if (await saveTextFile(name, text, 'application/x-subrip;charset=utf-8'))
+        setNotice('SRT 已导出。');
     } catch (err) {
-      setError(String(err));
+      setError(`导出失败：${String(err)}`);
     }
   }
   function selectSegment(s: Segment, seek = true) {
@@ -304,7 +365,19 @@ export default function App() {
     update((m) => ({
       ...m,
       segments: m.segments
-        .map((s) => (s.id === segment.id ? { ...s, start, end, reference } : s))
+        .map((s) =>
+          s.id === segment.id
+            ? {
+                ...s,
+                start,
+                end,
+                reference,
+                // Word timings no longer match once the span or text is edited by hand.
+                words:
+                  s.start === start && s.end === end && s.reference === reference ? s.words : [],
+              }
+            : s,
+        )
         .sort((a, b) => a.start - b.start),
     }));
     setEditing(false);
@@ -326,7 +399,13 @@ export default function App() {
       setError('有原文或听写内容的片段暂不支持拆分。请先在新材料中设置片段。');
       return;
     }
-    const second: Segment = { id: uid(), start: point, end: segment.end, reference: '' };
+    const second: Segment = {
+      id: uid(),
+      start: point,
+      end: segment.end,
+      reference: '',
+      words: [],
+    };
     update((m) => ({
       ...m,
       segments: m.segments.flatMap((s) =>
@@ -783,6 +862,25 @@ export default function App() {
                   <button className="quiet" onClick={() => subtitleInput.current?.click()}>
                     导入 SRT
                   </button>
+                  <button
+                    className="quiet"
+                    disabled={!isDesktop() || !!recognition.task}
+                    title={isDesktop() ? undefined : DESKTOP_ONLY}
+                    onClick={startRecognition}
+                  >
+                    识别原文
+                  </button>
+                  <button
+                    className="quiet"
+                    disabled={!isDesktop()}
+                    title={isDesktop() ? undefined : DESKTOP_ONLY}
+                    onClick={openRecognitionSettings}
+                  >
+                    识别设置
+                  </button>
+                  <button className="quiet" onClick={exportSrt}>
+                    导出 SRT
+                  </button>
                 </div>
                 <label className="muted">
                   <input
@@ -793,6 +891,28 @@ export default function App() {
                   输入音效 · 播放时静音
                 </label>
               </div>
+              {recognition.task && (
+                <div className="notice task" role="status">
+                  <span>{recognition.task.label}</span>
+                  {recognition.task.percent !== undefined && (
+                    <progress max={100} value={recognition.task.percent} />
+                  )}
+                  {recognition.task.cancel && (
+                    <button onClick={recognition.task.cancel}>取消</button>
+                  )}
+                </div>
+              )}
+              {recognitionSettings && (
+                <RecognitionSettings
+                  settings={recognition.settings}
+                  models={recognition.models}
+                  busy={!!recognition.task}
+                  onChange={recognition.changeSettings}
+                  onDownload={recognition.downloadSelected}
+                  onImport={recognition.importLocal}
+                  onClose={() => setRecognitionSettings(false)}
+                />
+              )}
               {editing && segment && (
                 <section className="settings">
                   <h2>编辑当前片段</h2>

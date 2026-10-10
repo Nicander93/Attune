@@ -104,3 +104,72 @@ test('layout and blank-word input fit a narrow viewport', async ({ page }) => {
     true,
   );
 });
+test('migrates version 1 data, exports SRT and re-imports it unchanged', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript((audio: number[]) => {
+    if (sessionStorage.getItem('seeded')) return;
+    sessionStorage.setItem('seeded', '1');
+    const request = indexedDB.open('attune', 1);
+    request.onupgradeneeded = () => {
+      const store = request.result.createObjectStore('materials', { keyPath: 'id' });
+      store.put({
+        id: 'old',
+        name: 'old lesson.wav',
+        audio: new Blob([new Uint8Array(audio)], { type: 'audio/wav' }),
+        duration: 4,
+        segments: [
+          { id: 'same', start: 0, end: 1.5, reference: 'Hello world.' },
+          { id: 'same', start: 1.5, end: 3.25, reference: 'Listen again.' },
+        ],
+        attempts: [{ id: 't', createdAt: new Date(0).toISOString(), drafts: {}, checked: {} }],
+        attemptId: 't',
+        segmentId: 'same',
+        position: 0,
+        review: [],
+      });
+    };
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => db.close();
+    };
+  }, Array.from(wav()));
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: '听写练习', exact: true })).toBeVisible();
+  await expect(page.getByRole('combobox', { name: '选择片段' }).locator('option')).toHaveCount(2);
+  const stored = await page.evaluate(
+    () =>
+      new Promise<{ ids: string[]; words: boolean }>((resolve) => {
+        const request = indexedDB.open('attune');
+        request.onsuccess = () => {
+          const get = request.result.transaction('materials').objectStore('materials').get('old');
+          get.onsuccess = () =>
+            resolve({
+              ids: get.result.segments.map((s: { id: string }) => s.id),
+              words: get.result.segments.every((s: { words: unknown }) => Array.isArray(s.words)),
+            });
+        };
+      }),
+  );
+  expect(new Set(stored.ids).size).toBe(2);
+  expect(stored.words).toBe(true);
+  await expect(page.getByRole('button', { name: '识别原文' })).toBeDisabled();
+
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: '导出 SRT' }).click();
+  const file = await download;
+  expect(file.suggestedFilename()).toBe('old lesson.srt');
+  const srt = (await (await file.createReadStream()).toArray()).join('');
+  expect(srt).toBe(
+    '\uFEFF1\r\n00:00:00,000 --> 00:00:01,500\r\nHello world.\r\n\r\n' +
+      '2\r\n00:00:01,500 --> 00:00:03,250\r\nListen again.\r\n',
+  );
+  await page
+    .locator('input[type=file]')
+    .nth(1)
+    .setInputFiles({ name: 'old lesson.srt', mimeType: 'text/plain', buffer: Buffer.from(srt) });
+  await expect(page.getByText('字幕已导入')).toBeVisible();
+  const options = page.getByRole('combobox', { name: '选择片段' }).locator('option');
+  await expect(options).toHaveText(['1 · 00:00—00:01', '2 · 00:01—00:03']);
+  expect(errors).toEqual([]);
+});

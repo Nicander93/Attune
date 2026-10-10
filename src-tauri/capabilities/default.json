@@ -2,5 +2,11 @@
   "identifier": "default",
   "description": "Main window capability",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "dialog:allow-ask",
+    "dialog:allow-open",
+    "dialog:allow-save",
+    "fs:allow-write-text-file"
+  ]
 }
