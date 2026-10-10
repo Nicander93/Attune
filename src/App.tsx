@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import {
   checkSegment,
   compareWords,
+  draftText,
+  draftWords,
   formatTime,
   hasDictation,
   newAttempt,
@@ -11,9 +13,10 @@ import {
   type Attempt,
   type Material,
   type Segment,
+  type WordTiming,
 } from './domain';
 import { loadMaterials, saveMaterial } from './storage';
-import { WordEditor } from './WordEditor';
+import { SentenceEditor } from './SentenceEditor';
 import { keySound } from './sound';
 import { isDesktop, saveTextFile } from './desktop';
 import { RecognitionSettings } from './RecognitionSettings';
@@ -54,6 +57,15 @@ export default function App() {
     [loop, setLoop] = useState(false),
     [sound, setSound] = useState(false),
     [recognitionSettings, setRecognitionSettings] = useState(false);
+  const [sentenceSidebar, setSentenceSidebar] = useState(true),
+    [view, setView] = useState<'dictation' | 'readalong'>('dictation'),
+    [revealReference, setRevealReference] = useState(() => {
+      try {
+        return localStorage.getItem('attune-reveal-reference') === '1';
+      } catch {
+        return false;
+      }
+    });
   const [editing, setEditing] = useState(false),
     [start, setStart] = useState(0),
     [end, setEnd] = useState(0),
@@ -61,7 +73,8 @@ export default function App() {
   const audio = useRef<HTMLAudioElement>(null),
     audioInput = useRef<HTMLInputElement>(null),
     subtitleInput = useRef<HTMLInputElement>(null);
-  const lastWord = useRef<{ node: HTMLInputElement; start: number; end: number } | undefined>(
+  const sentenceField = useRef<HTMLTextAreaElement>(null);
+  const lastField = useRef<{ node: HTMLTextAreaElement; start: number; end: number } | undefined>(
     undefined,
   );
   const all = useRef<Material[]>([]),
@@ -168,12 +181,23 @@ export default function App() {
   useEffect(() => {
     const remember = (event: FocusEvent) => {
       const node = event.target;
-      if (node instanceof HTMLInputElement && node.closest('.word-editor'))
-        lastWord.current = { node, start: node.selectionStart ?? 0, end: node.selectionEnd ?? 0 };
+      if (node instanceof HTMLTextAreaElement && node.closest('.sentence-editor'))
+        lastField.current = {
+          node,
+          start: node.selectionStart ?? 0,
+          end: node.selectionEnd ?? 0,
+        };
     };
     document.addEventListener('focusout', remember);
     return () => document.removeEventListener('focusout', remember);
   }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem('attune-reveal-reference', revealReference ? '1' : '0');
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }, [revealReference]);
   useEffect(() => {
     audio.current?.pause();
     setPlaying(false);
@@ -287,14 +311,28 @@ export default function App() {
     update((m) => ({ ...m, segmentId: s.id, ...(seek ? { position: s.start } : {}) }));
     setEditing(false);
   }
+  function goAdjacent(delta: number) {
+    if (!material || !segment) return;
+    const index = material.segments.indexOf(segment) + delta;
+    const target = material.segments[index];
+    if (target) selectSegment(target);
+  }
+  function seekTo(seconds: number) {
+    if (!audio.current) return;
+    audio.current.currentTime = seconds;
+    setPosition(seconds);
+    update((m) => ({ ...m, position: seconds }));
+  }
   async function play(restart = false) {
     const player = audio.current;
     if (!player || !material) return;
     const restoreFocus = () => {
-      const word = lastWord.current;
-      if (word?.node.isConnected) {
-        word.node.focus({ preventScroll: true });
-        word.node.setSelectionRange(word.start, word.end);
+      const field = lastField.current;
+      if (field?.node.isConnected) {
+        field.node.focus({ preventScroll: true });
+        field.node.setSelectionRange(field.start, field.end);
+      } else {
+        sentenceField.current?.focus({ preventScroll: true });
       }
     };
     if (!restart && !player.paused) {
@@ -322,13 +360,20 @@ export default function App() {
       setNotice('当前片段还没有参考原文，请先在“片段与原文”中添加。');
       return;
     }
-    if (!(attempt.drafts[s.id] || []).some((w) => w.trim())) {
+    if (!draftText(attempt.drafts[s.id]).trim()) {
       setNotice('先写一点内容，再核对。');
       return;
     }
     try {
-      compareWords(attempt.drafts[s.id] || [], s.reference);
-      updateAttempt((a) => checkSegment(a, s));
+      const words = draftWords(draftText(attempt.drafts[s.id]));
+      compareWords(words, s.reference);
+      updateAttempt((a) => {
+        const withDraft = {
+          ...a,
+          drafts: { ...a.drafts, [s.id]: words },
+        };
+        return checkSegment(withDraft, s);
+      });
       setNotice('首次稿已保留，可以继续修改并保存修订稿。');
     } catch (err) {
       setError(String(err));
@@ -439,18 +484,25 @@ export default function App() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  function renderEditor(s: Segment, index: number) {
+  function renderDiff(words: ReturnType<typeof compareWords>) {
+    return words.map((w, i) =>
+      w.kind === 'extra' ? (
+        <del key={i}>{w.text} </del>
+      ) : w.kind === 'missing' ? (
+        <ins key={i}>{w.text} </ins>
+      ) : (
+        <span key={i}>{w.text} </span>
+      ),
+    );
+  }
+  function renderDictation(s: Segment, index: number) {
     if (!attempt || !material) return null;
     const checked = attempt.checked[s.id];
-    const isPlaying = position >= s.start && position < s.end;
     return (
-      <section
-        key={s.id}
-        className={`segment-editor ${mode === 'full' && isPlaying ? 'playing-segment' : ''}`}
-      >
+      <section key={s.id} className="segment-editor">
         <div className="section-heading">
           <label>
-            片段 {index + 1}
+            第 {index + 1} 句
             <span className="muted">
               {' '}
               · {formatTime(s.start)} — {formatTime(s.end)}
@@ -471,36 +523,33 @@ export default function App() {
             {material.review.includes(s.id) ? '★ 已标记重听' : '☆ 标记重听'}
           </button>
         </div>
-        <WordEditor
-          label={`片段 ${index + 1} 听写`}
-          words={attempt.drafts[s.id] || []}
-          onChange={(words) =>
-            updateAttempt((a) => ({ ...a, drafts: { ...a.drafts, [s.id]: words } }))
+        <SentenceEditor
+          label={`第 ${index + 1} 句听写`}
+          text={draftText(attempt.drafts[s.id])}
+          inputRef={sentenceField}
+          onChange={(value) =>
+            updateAttempt((a) => ({
+              ...a,
+              // Keep free text as one entry so spaces while typing are preserved;
+              // older word-array drafts still render via draftText().
+              drafts: { ...a.drafts, [s.id]: value ? [value] : [] },
+            }))
           }
+          onCheck={() => check(s)}
           onKeySound={() => {
             if (sound && !playing) keySound();
           }}
         />
         <div className="editor-actions">
-          <span className="muted">Space 下一个词 · 空词按 Backspace 返回 · 支持粘贴整句</span>
+          <span className="muted">Enter 核对 · Shift+Enter 换行 · 播放快捷键见页脚</span>
           <button onClick={() => check(s)}>核对原文</button>
         </div>
         {checked && (
           <div className="comparison">
             <div className="caption">参考原文</div>
             <p className="english">{checked.reference}</p>
-            <div className="caption">首次稿对照 · 忽略大小写与标点</div>
-            <p className="english">
-              {compareWords(checked.first, checked.reference).map((w, i) =>
-                w.kind === 'extra' ? (
-                  <del key={i}>{w.text} </del>
-                ) : w.kind === 'missing' ? (
-                  <ins key={i}>{w.text} </ins>
-                ) : (
-                  <span key={i}>{w.text} </span>
-                ),
-              )}
-            </p>
+            <div className="caption">首次稿对照 · 忽略大小写与标点 · 数字与英文可互认</div>
+            <p className="english">{renderDiff(compareWords(checked.first, checked.reference))}</p>
             <div className="editor-actions">
               <span className="muted">删除线：多写／不同的词 · 下划线：缺少的词</span>
               <button
@@ -509,7 +558,10 @@ export default function App() {
                     ...a,
                     checked: {
                       ...a.checked,
-                      [s.id]: { ...a.checked[s.id], revision: [...(a.drafts[s.id] || [])] },
+                      [s.id]: {
+                        ...a.checked[s.id],
+                        revision: draftWords(draftText(a.drafts[s.id])),
+                      },
                     },
                   }));
                   setNotice('修订稿已保存，首次稿保持不变。');
@@ -523,25 +575,97 @@ export default function App() {
       </section>
     );
   }
+  function renderReadAlong() {
+    if (!material || !attempt) return null;
+    return (
+      <div className="readalong" aria-label="跟读原文">
+        {material.segments.map((s, index) => {
+          const active = position >= s.start && position < s.end;
+          const dictated = !!attempt.checked[s.id];
+          const showText = revealReference || dictated;
+          const words = s.words.length
+            ? s.words
+            : draftWords(s.reference).map((text): WordTiming => ({
+                text,
+                start: s.start,
+                end: s.end,
+              }));
+          return (
+            <div
+              key={s.id}
+              role="button"
+              tabIndex={0}
+              className={`readalong__sentence${active ? ' readalong__sentence--active' : ''}${
+                showText ? '' : ' readalong__sentence--hidden'
+              }`}
+              onClick={() => {
+                selectSegment(s);
+                void play(true);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  selectSegment(s);
+                  void play(true);
+                }
+              }}
+            >
+              <span className="readalong__index">{index + 1}</span>
+              <span className="readalong__text">
+                {showText
+                  ? words.map((w, i) => (
+                      <button
+                        type="button"
+                        key={`${s.id}-${i}`}
+                        className="readalong__word quiet"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          selectSegment(s, false);
+                          seekTo(w.start);
+                          void play();
+                        }}
+                      >
+                        {w.text}
+                      </button>
+                    ))
+                  : '（尚未听写，原文已隐藏）'}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+  const practicing = !!material && !history;
   return (
     <div
-      className="app"
+      className={`app${practicing ? ' app--workbench' : ''}`}
       onKeyDown={(event) => {
-        if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.code === 'Space') {
+        if (event.nativeEvent.isComposing || history) return;
+        const mod = event.ctrlKey || event.metaKey;
+        if (mod && event.shiftKey && event.code === 'Space') {
           event.preventDefault();
           void play(true);
+          return;
         }
-        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !history) {
+        if (mod && event.code === 'Space' && !event.shiftKey) {
           event.preventDefault();
-          const input = event.target as HTMLElement;
-          const wrapper = input.closest('.segment-editor');
-          const index = wrapper
-            ? Array.from(wrapper.parentElement!.children)
-                .filter((el) => el.classList.contains('segment-editor'))
-                .indexOf(wrapper)
-            : 0;
-          const target = mode === 'segment' ? segment : material?.segments[index];
-          if (target) check(target);
+          void play();
+          return;
+        }
+        if (mod && event.key === 'ArrowUp') {
+          event.preventDefault();
+          goAdjacent(-1);
+          return;
+        }
+        if (mod && event.key === 'ArrowDown') {
+          event.preventDefault();
+          goAdjacent(1);
+          return;
+        }
+        if (mod && event.key === 'Enter' && segment && view === 'dictation') {
+          event.preventDefault();
+          check(segment);
         }
       }}
     >
@@ -579,8 +703,8 @@ export default function App() {
           e.target.value = '';
         }}
       />
-      <div className="shell">
-        <aside>
+      <div className={`shell${practicing ? ' shell--workbench' : ''}`}>
+        <aside className="materials-aside">
           <div className="caption">本地材料</div>
           {materials.map((m) => (
             <button
@@ -718,272 +842,341 @@ export default function App() {
             </>
           ) : (
             <>
-              <div className="page-heading">
-                <div>
-                  <div className="caption">{material.name}</div>
-                  <h1>听写练习</h1>
-                </div>
-                <div className="mode" aria-label="播放模式">
-                  <button
-                    aria-pressed={mode === 'segment'}
-                    onClick={() => {
-                      setMode('segment');
-                      audio.current?.pause();
-                    }}
-                  >
-                    按片段
-                  </button>
-                  <button
-                    aria-pressed={mode === 'full'}
-                    onClick={() => {
-                      setMode('full');
-                      audio.current?.pause();
-                    }}
-                  >
-                    整篇听
-                  </button>
-                </div>
-              </div>
-              <audio
-                ref={audio}
-                src={audioUrl}
-                onLoadedMetadata={() => {
-                  if (audio.current) {
-                    audio.current.currentTime = material.position;
-                    audio.current.playbackRate = speed;
-                    setPosition(material.position);
-                  }
-                }}
-                onPlay={() => setPlaying(true)}
-                onPause={() => {
-                  setPlaying(false);
-                  const player = audio.current,
-                    current = materialRef.current;
-                  if (player && current)
-                    update((m) => ({ ...m, position: player.currentTime }), current.id);
-                }}
-                onEnded={() => {
-                  setPlaying(false);
-                  if (mode === 'full' && loop) void play(true);
-                }}
-                onError={() => setError('音频无法解码。请尝试 MP3 或 WAV 格式。')}
-                onTimeUpdate={() => {
-                  const player = audio.current;
-                  if (!player) return;
-                  setPosition(player.currentTime);
-                  if (
-                    mode === 'segment' &&
-                    segment &&
-                    !player.paused &&
-                    player.currentTime >= segment.end - 0.025
-                  ) {
-                    if (loop) player.currentTime = segment.start;
-                    else {
-                      player.pause();
-                      player.currentTime = segment.end;
-                    }
-                  }
-                }}
-              />
-              <div className="player">
-                <div className="row">
-                  <button className="primary" onClick={() => void play()}>
-                    {playing ? '暂停' : '播放'}
-                  </button>
-                  <button onClick={() => void play(true)}>
-                    重播{mode === 'segment' ? '当前段' : '整篇'}
-                  </button>
-                  <label>
-                    速度{' '}
-                    <select
-                      aria-label="播放速度"
-                      value={speed}
-                      onChange={(e) => setSpeed(Number(e.target.value))}
+              <div className="workbench">
+                <aside
+                  className={`sentence-sidebar${sentenceSidebar ? '' : ' sentence-sidebar--collapsed'}`}
+                  aria-label="句子列表"
+                >
+                  {sentenceSidebar && (
+                    <>
+                      <div className="sentence-sidebar__head">
+                        <span className="caption">句子</span>
+                        <button
+                          className="quiet"
+                          type="button"
+                          onClick={() => setSentenceSidebar(false)}
+                        >
+                          收起
+                        </button>
+                      </div>
+                      <div className="sentence-sidebar__list">
+                        {material.segments.map((s, i) => {
+                          const active = s.id === material.segmentId;
+                          const done = !!attempt?.checked[s.id];
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              className={`sentence-sidebar__item${active ? ' selected' : ''}`}
+                              onClick={() => selectSegment(s)}
+                            >
+                              <span>
+                                {i + 1}. {formatTime(s.start)}
+                              </span>
+                              <small>
+                                {done
+                                  ? '已核对'
+                                  : draftText(attempt?.drafts[s.id])
+                                    ? '草稿'
+                                    : '未写'}
+                              </small>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                  {!sentenceSidebar && (
+                    <button
+                      className="quiet sentence-sidebar__expand"
+                      type="button"
+                      onClick={() => setSentenceSidebar(true)}
                     >
-                      {[0.5, 0.75, 1, 1.25, 1.5].map((n) => (
-                        <option key={n} value={n}>
-                          {n}×
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={loop}
-                      onChange={(e) => setLoop(e.target.checked)}
-                    />{' '}
-                    循环
-                  </label>
-                  <span className="time">
-                    {formatTime(position)} / {formatTime(material.duration)}
-                  </span>
-                </div>
-                <input
-                  className="timeline"
-                  aria-label="播放进度"
-                  type="range"
-                  min="0"
-                  max={material.duration}
-                  step="0.01"
-                  value={position}
-                  onChange={(e) => {
-                    const value = Number(e.target.value);
-                    if (audio.current) audio.current.currentTime = value;
-                    setPosition(value);
-                    update((m) => ({ ...m, position: value }));
-                  }}
-                />
-              </div>
-              <div className="tools">
-                <div className="row">
-                  {mode === 'segment' && (
-                    <label>
-                      片段{' '}
-                      <select
-                        aria-label="选择片段"
-                        value={material.segmentId}
-                        onChange={(e) => {
-                          const target = material.segments.find((s) => s.id === e.target.value);
-                          if (target) selectSegment(target);
-                        }}
+                      句子
+                    </button>
+                  )}
+                </aside>
+                <div className="workbench-main">
+                  <div className="page-heading">
+                    <div>
+                      <div className="caption">{material.name}</div>
+                      <h1>听写练习</h1>
+                    </div>
+                    <div className="row">
+                      <div className="mode" aria-label="练习视图">
+                        <button
+                          aria-pressed={view === 'dictation'}
+                          onClick={() => setView('dictation')}
+                        >
+                          听写
+                        </button>
+                        <button
+                          aria-pressed={view === 'readalong'}
+                          onClick={() => setView('readalong')}
+                        >
+                          跟读
+                        </button>
+                      </div>
+                      <div className="mode" aria-label="播放模式">
+                        <button
+                          aria-pressed={mode === 'segment'}
+                          onClick={() => {
+                            setMode('segment');
+                            audio.current?.pause();
+                          }}
+                        >
+                          按句
+                        </button>
+                        <button
+                          aria-pressed={mode === 'full'}
+                          onClick={() => {
+                            setMode('full');
+                            audio.current?.pause();
+                          }}
+                        >
+                          连续
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <audio
+                    ref={audio}
+                    src={audioUrl}
+                    onLoadedMetadata={() => {
+                      if (audio.current) {
+                        audio.current.currentTime = material.position;
+                        audio.current.playbackRate = speed;
+                        setPosition(material.position);
+                      }
+                    }}
+                    onPlay={() => setPlaying(true)}
+                    onPause={() => {
+                      setPlaying(false);
+                      const player = audio.current,
+                        current = materialRef.current;
+                      if (player && current)
+                        update((m) => ({ ...m, position: player.currentTime }), current.id);
+                    }}
+                    onEnded={() => {
+                      setPlaying(false);
+                      if (mode === 'full' && loop) void play(true);
+                    }}
+                    onError={() => setError('音频无法解码。请尝试 MP3 或 WAV 格式。')}
+                    onTimeUpdate={() => {
+                      const player = audio.current;
+                      if (!player) return;
+                      setPosition(player.currentTime);
+                      if (
+                        mode === 'segment' &&
+                        segment &&
+                        !player.paused &&
+                        player.currentTime >= segment.end - 0.025
+                      ) {
+                        if (loop) player.currentTime = segment.start;
+                        else {
+                          player.pause();
+                          player.currentTime = segment.end;
+                        }
+                      }
+                      if (mode === 'full' && !player.paused) {
+                        const current = material.segments.find(
+                          (s) => player.currentTime >= s.start && player.currentTime < s.end,
+                        );
+                        if (current && current.id !== material.segmentId)
+                          update((m) => ({ ...m, segmentId: current.id }), material.id);
+                      }
+                    }}
+                  />
+                  <div className="player player--fixed">
+                    <div className="row">
+                      <button className="primary" onClick={() => void play()}>
+                        {playing ? '暂停' : '播放'}
+                      </button>
+                      <button onClick={() => void play(true)}>
+                        重播{mode === 'segment' ? '本句' : '整篇'}
+                      </button>
+                      <button
+                        disabled={!segment || material.segments.indexOf(segment) === 0}
+                        onClick={() => goAdjacent(-1)}
                       >
-                        {material.segments.map((s, i) => (
-                          <option key={s.id} value={s.id}>
-                            {i + 1} · {formatTime(s.start)}—{formatTime(s.end)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                  <button className="quiet" onClick={editSegment}>
-                    片段与原文
-                  </button>
-                  <button className="quiet" onClick={() => subtitleInput.current?.click()}>
-                    导入 SRT
-                  </button>
-                  <button
-                    className="quiet"
-                    disabled={!isDesktop() || !!recognition.task}
-                    title={isDesktop() ? undefined : DESKTOP_ONLY}
-                    onClick={startRecognition}
-                  >
-                    识别原文
-                  </button>
-                  <button
-                    className="quiet"
-                    disabled={!isDesktop()}
-                    title={isDesktop() ? undefined : DESKTOP_ONLY}
-                    onClick={openRecognitionSettings}
-                  >
-                    识别设置
-                  </button>
-                  <button className="quiet" onClick={exportSrt}>
-                    导出 SRT
-                  </button>
-                </div>
-                <label className="muted">
-                  <input
-                    type="checkbox"
-                    checked={sound}
-                    onChange={(e) => setSound(e.target.checked)}
-                  />{' '}
-                  输入音效 · 播放时静音
-                </label>
-              </div>
-              {recognition.task && (
-                <div className="notice task" role="status">
-                  <span>{recognition.task.label}</span>
-                  {recognition.task.percent !== undefined && (
-                    <progress max={100} value={recognition.task.percent} />
-                  )}
-                  {recognition.task.cancel && (
-                    <button onClick={recognition.task.cancel}>取消</button>
-                  )}
-                </div>
-              )}
-              {recognitionSettings && (
-                <RecognitionSettings
-                  settings={recognition.settings}
-                  models={recognition.models}
-                  busy={!!recognition.task}
-                  onChange={recognition.changeSettings}
-                  onDownload={recognition.downloadSelected}
-                  onImport={recognition.importLocal}
-                  onClose={() => setRecognitionSettings(false)}
-                />
-              )}
-              {editing && segment && (
-                <section className="settings">
-                  <h2>编辑当前片段</h2>
-                  <p className="muted">原文仅用于核对。修改时间或拆分前，先暂停播放。</p>
-                  <div className="row">
-                    <label>
-                      开始（秒）
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={start}
-                        onChange={(e) => setStart(Number(e.target.value))}
-                      />
-                    </label>
-                    <label>
-                      结束（秒）
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={end}
-                        onChange={(e) => setEnd(Number(e.target.value))}
-                      />
-                    </label>
-                  </div>
-                  <label>
-                    参考原文
-                    <textarea
-                      aria-label="参考原文"
-                      value={reference}
-                      onChange={(e) => setReference(e.target.value)}
+                        上一句
+                      </button>
+                      <button
+                        disabled={
+                          !segment ||
+                          material.segments.indexOf(segment) === material.segments.length - 1
+                        }
+                        onClick={() => goAdjacent(1)}
+                      >
+                        下一句
+                      </button>
+                      <label>
+                        速度{' '}
+                        <select
+                          aria-label="播放速度"
+                          value={speed}
+                          onChange={(e) => setSpeed(Number(e.target.value))}
+                        >
+                          {[0.5, 0.75, 1, 1.25, 1.5].map((n) => (
+                            <option key={n} value={n}>
+                              {n}×
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={loop}
+                          onChange={(e) => setLoop(e.target.checked)}
+                        />{' '}
+                        循环
+                      </label>
+                      <span className="time">
+                        {formatTime(position)} / {formatTime(material.duration)}
+                      </span>
+                    </div>
+                    <input
+                      className="timeline"
+                      aria-label="播放进度"
+                      type="range"
+                      min="0"
+                      max={material.duration}
+                      step="0.01"
+                      value={position}
+                      onChange={(e) => {
+                        const value = Number(e.target.value);
+                        if (audio.current) audio.current.currentTime = value;
+                        setPosition(value);
+                        update((m) => ({ ...m, position: value }));
+                      }}
                     />
-                  </label>
-                  <div className="row">
-                    <button className="primary" onClick={saveSegment}>
-                      保存片段
-                    </button>
-                    <button onClick={split}>在播放位置拆分</button>
-                    <button onClick={() => setEditing(false)}>收起</button>
                   </div>
-                </section>
-              )}
-              <div className="editors">
-                {mode === 'full'
-                  ? material.segments.map(renderEditor)
-                  : segment && renderEditor(segment, material.segments.indexOf(segment))}
+                  <div className="tools">
+                    <div className="row">
+                      <button className="quiet" onClick={editSegment}>
+                        片段与原文
+                      </button>
+                      <button className="quiet" onClick={() => subtitleInput.current?.click()}>
+                        导入 SRT
+                      </button>
+                      <button
+                        className="quiet"
+                        disabled={!isDesktop() || !!recognition.task}
+                        title={isDesktop() ? undefined : DESKTOP_ONLY}
+                        onClick={startRecognition}
+                      >
+                        识别原文
+                      </button>
+                      <button
+                        className="quiet"
+                        disabled={!isDesktop()}
+                        title={isDesktop() ? undefined : DESKTOP_ONLY}
+                        onClick={openRecognitionSettings}
+                      >
+                        识别设置
+                      </button>
+                      <button className="quiet" onClick={exportSrt}>
+                        导出 SRT
+                      </button>
+                      {view === 'readalong' && (
+                        <label className="muted">
+                          <input
+                            type="checkbox"
+                            checked={revealReference}
+                            onChange={(e) => setRevealReference(e.target.checked)}
+                          />{' '}
+                          显示未听写原文
+                        </label>
+                      )}
+                    </div>
+                    <label className="muted">
+                      <input
+                        type="checkbox"
+                        checked={sound}
+                        onChange={(e) => setSound(e.target.checked)}
+                      />{' '}
+                      输入音效 · 播放时静音
+                    </label>
+                  </div>
+                  {recognition.task && (
+                    <div className="notice task" role="status">
+                      <span>{recognition.task.label}</span>
+                      {recognition.task.percent !== undefined && (
+                        <progress max={100} value={recognition.task.percent} />
+                      )}
+                      {recognition.task.cancel && (
+                        <button onClick={recognition.task.cancel}>取消</button>
+                      )}
+                    </div>
+                  )}
+                  {recognitionSettings && (
+                    <RecognitionSettings
+                      settings={recognition.settings}
+                      models={recognition.models}
+                      busy={!!recognition.task}
+                      onChange={recognition.changeSettings}
+                      onDownload={recognition.downloadSelected}
+                      onImport={recognition.importLocal}
+                      onClose={() => setRecognitionSettings(false)}
+                    />
+                  )}
+                  {editing && segment && (
+                    <section className="settings">
+                      <h2>编辑当前片段</h2>
+                      <p className="muted">原文仅用于核对。修改时间或拆分前，先暂停播放。</p>
+                      <div className="row">
+                        <label>
+                          开始（秒）
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={start}
+                            onChange={(e) => setStart(Number(e.target.value))}
+                          />
+                        </label>
+                        <label>
+                          结束（秒）
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={end}
+                            onChange={(e) => setEnd(Number(e.target.value))}
+                          />
+                        </label>
+                      </div>
+                      <label>
+                        参考原文
+                        <textarea
+                          aria-label="参考原文"
+                          value={reference}
+                          onChange={(e) => setReference(e.target.value)}
+                        />
+                      </label>
+                      <div className="row">
+                        <button className="primary" onClick={saveSegment}>
+                          保存片段
+                        </button>
+                        <button onClick={split}>在播放位置拆分</button>
+                        <button onClick={() => setEditing(false)}>收起</button>
+                      </div>
+                    </section>
+                  )}
+                  <div className="workbench-body">
+                    {view === 'dictation'
+                      ? segment && renderDictation(segment, material.segments.indexOf(segment))
+                      : renderReadAlong()}
+                  </div>
+                  <footer>
+                    <span>
+                      Ctrl/⌘+Space 播放暂停 · Ctrl/⌘+Shift+Space 重播 · Ctrl/⌘+↑↓ 上/下一句 · Enter
+                      核对
+                    </span>
+                  </footer>
+                </div>
               </div>
-              <footer>
-                <span>Ctrl / ⌘ + Shift + Space 重播 · Ctrl / ⌘ + Enter 核对</span>
-                {mode === 'segment' && segment && (
-                  <div className="row">
-                    <button
-                      disabled={material.segments.indexOf(segment) === 0}
-                      onClick={() =>
-                        selectSegment(material.segments[material.segments.indexOf(segment) - 1])
-                      }
-                    >
-                      上一段
-                    </button>
-                    <button
-                      disabled={material.segments.indexOf(segment) === material.segments.length - 1}
-                      onClick={() =>
-                        selectSegment(material.segments[material.segments.indexOf(segment) + 1])
-                      }
-                    >
-                      下一段
-                    </button>
-                  </div>
-                )}
-              </footer>
             </>
           )}
         </main>

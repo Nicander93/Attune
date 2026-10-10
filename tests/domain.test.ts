@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   checkSegment,
   compareWords,
+  draftText,
+  draftWords,
   migrateMaterial,
   newAttempt,
   parseSrt,
@@ -24,6 +26,33 @@ describe('reference comparison', () => {
     expect(compareWords(['Hello,', 'WORLD!'], 'hello world.').every((w) => w.kind === 'same')).toBe(
       true,
     ));
+  it('treats arabic numerals and english number words as the same', () =>
+    expect(
+      compareWords(['I', 'have', '3', 'apples'], 'I have three apples.').every(
+        (w) => w.kind === 'same',
+      ),
+    ).toBe(true));
+  it('keeps apostrophes inside words', () =>
+    expect(compareWords(["don't"], "don't").every((w) => w.kind === 'same')).toBe(true));
+});
+describe('draft free text', () => {
+  it('joins and splits drafts without losing words', () => {
+    expect(draftText(['Hello', 'world'])).toBe('Hello world');
+    expect(draftWords('Hello   world.')).toEqual(['Hello', 'world.']);
+    expect(draftText(undefined)).toBe('');
+  });
+  it('round-trips a free-text draft and an older word-array draft', () => {
+    expect(draftText(['I have 3 apples'])).toBe('I have 3 apples');
+    expect(draftText(['I', 'have', '3', 'apples'])).toBe('I have 3 apples');
+    let a = newAttempt();
+    a.drafts.s = draftWords(draftText(['I have 3 apples']));
+    const segment = { id: 's', start: 0, end: 1, reference: 'I have three apples.', words: [] };
+    a = checkSegment(a, segment);
+    expect(a.checked.s.first).toEqual(['I', 'have', '3', 'apples']);
+    expect(
+      compareWords(a.checked.s.first, a.checked.s.reference).every((w) => w.kind === 'same'),
+    ).toBe(true);
+  });
 });
 describe('SRT import', () => {
   it('imports millisecond timing, multiline text and BOM', () => {

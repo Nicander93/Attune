@@ -39,7 +39,50 @@ export const newAttempt = (): Attempt => ({
 export function tokenize(text: string): string[] {
   return text.trim().split(/\s+/).filter(Boolean);
 }
-const normalized = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}']/gu, '');
+/** Map common English number words to digits so 3 and three compare equal. */
+const NUMBER_WORDS: Record<string, string> = {
+  zero: '0',
+  one: '1',
+  two: '2',
+  three: '3',
+  four: '4',
+  five: '5',
+  six: '6',
+  seven: '7',
+  eight: '8',
+  nine: '9',
+  ten: '10',
+  eleven: '11',
+  twelve: '12',
+  thirteen: '13',
+  fourteen: '14',
+  fifteen: '15',
+  sixteen: '16',
+  seventeen: '17',
+  eighteen: '18',
+  nineteen: '19',
+  twenty: '20',
+  thirty: '30',
+  forty: '40',
+  fifty: '50',
+  sixty: '60',
+  seventy: '70',
+  eighty: '80',
+  ninety: '90',
+  hundred: '100',
+};
+function normalized(text: string): string {
+  const base = text.toLowerCase().replace(/[^\p{L}\p{N}']/gu, '');
+  return NUMBER_WORDS[base] ?? base;
+}
+/** Join a stored word draft into free-text for the sentence field. */
+export function draftText(words: string[] | undefined): string {
+  return (words || []).filter(Boolean).join(' ');
+}
+/** Split free-text back into the word array used by drafts and checked records. */
+export function draftWords(text: string): string[] {
+  return tokenize(text);
+}
 export function compareWords(draft: string[], reference: string): DiffWord[] {
   const a = draft.filter(Boolean),
     b = tokenize(reference);
