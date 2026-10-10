@@ -17,7 +17,7 @@ function wav(seconds = 4): Buffer {
   buffer.writeUInt32LE(count * 2, 40);
   return buffer;
 }
-test('audio, word input, immutable first draft, persistence and playback modes', async ({
+test('audio, free-text dictation, immutable first draft, persistence and shortcuts', async ({
   page,
 }) => {
   const errors: string[] = [];
@@ -39,18 +39,12 @@ test('audio, word input, immutable first draft, persistence and playback modes',
         '1\n00:00:00,000 --> 00:00:01,500\nHello world\n\n2\n00:00:01,500 --> 00:00:04,000\nListen again',
       ),
     });
-  const first = page.getByRole('textbox', { name: '片段 1 听写，第 1 个词', exact: true });
-  await first.fill('Hello');
-  await first.press('Space');
-  const second = page.getByRole('textbox', { name: '片段 1 听写，第 2 个词', exact: true });
-  await expect(second).toBeFocused();
-  await second.press('Backspace');
-  await expect(first).toBeFocused();
-  await first.press('Space');
-  await second.fill('word');
+  const field = page.getByRole('textbox', { name: '第 1 句听写', exact: true });
+  await field.fill('Hello word');
   await page.getByRole('button', { name: '核对原文', exact: true }).click();
   await expect(page.locator('ins')).toContainText('world');
-  await second.fill('world');
+  await expect(page.locator('del')).toContainText('word');
+  await field.fill('Hello world');
   await page.getByRole('button', { name: '保存修订稿' }).click();
   await expect(page.locator('header [role=status]').filter({ hasText: '已保存' })).toBeVisible();
   await page.getByRole('button', { name: '练习记录', exact: true }).click();
@@ -58,51 +52,63 @@ test('audio, word input, immutable first draft, persistence and playback modes',
   await expect(page.locator('details')).toContainText('Hello word');
   await expect(page.locator('details')).toContainText('Hello world');
   await page.reload();
-  await expect(
-    page.getByRole('textbox', { name: '片段 1 听写，第 2 个词', exact: true }),
-  ).toHaveValue('world');
-  await second.focus();
-  await page.getByRole('button', { name: '播放', exact: true }).click();
-  await expect(second).toBeFocused();
+  await expect(page.getByRole('textbox', { name: '第 1 句听写', exact: true })).toHaveValue(
+    'Hello world',
+  );
+  await field.focus();
+  await page.keyboard.press('Control+Space');
+  await expect(field).toBeFocused();
+  await expect
+    .poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => !a.paused))
+    .toBe(true);
+  await page.keyboard.press('Control+Space');
   await expect
     .poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.paused))
     .toBe(true);
-  await expect
-    .poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.currentTime))
-    .toBeCloseTo(1.5, 1);
-  await page.getByRole('button', { name: '整篇听', exact: true }).click();
-  await expect(page.locator('.word-editor')).toHaveCount(2);
-  await page.getByRole('button', { name: '重播整篇' }).click();
-  await expect
-    .poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.currentTime), {
-      timeout: 6000,
-    })
-    .toBeGreaterThan(1.7);
-  await page.getByRole('button', { name: '暂停', exact: true }).click();
+  await expect(field).toBeFocused();
+  await expect(field).toHaveValue('Hello world');
+  await page.getByRole('button', { name: '下一句', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '第 2 句听写', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '上一句', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '第 1 句听写', exact: true })).toHaveValue(
+    'Hello world',
+  );
+  await page.getByRole('button', { name: '跟读', exact: true }).click();
+  await expect(page.locator('.readalong__sentence').first()).toContainText('Hello');
+  await expect(page.locator('.readalong__sentence').first()).toContainText('world');
+  await expect(page.locator('.readalong__sentence').nth(1)).toContainText('尚未听写，原文已隐藏');
+  await page.getByRole('button', { name: '听写', exact: true }).click();
   await page.getByRole('button', { name: '练习记录', exact: true }).click();
   await page.getByRole('button', { name: '重新听写', exact: true }).click();
-  await expect(first).toHaveValue('');
+  await expect(page.getByRole('textbox', { name: '第 1 句听写', exact: true })).toHaveValue('');
   await expect(page.locator('.comparison')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
-test('layout and blank-word input fit a narrow viewport', async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
+test('one-screen layout keeps the main area usable with sidebar collapsed', async ({ page }) => {
+  await page.setViewportSize({ width: 1100, height: 800 });
   await page.goto('/');
   await expect(page.getByRole('button', { name: '导入第一篇音频' })).toBeEnabled();
   await page
     .locator('input[type=file]')
     .first()
     .setInputFiles({ name: 'mobile.wav', mimeType: 'audio/wav', buffer: wav() });
-  await page.getByRole('button', { name: '留空 →', exact: true }).click();
-  await expect(
-    page.getByRole('textbox', { name: '片段 1 听写，第 1 个词', exact: true }),
-  ).toHaveValue('…');
-  await expect(
-    page.getByRole('textbox', { name: '片段 1 听写，第 2 个词', exact: true }),
-  ).toBeFocused();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
-    true,
+  await page
+    .locator('input[type=file]')
+    .nth(1)
+    .setInputFiles({
+      name: 'practice.srt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('1\n00:00:00,000 --> 00:00:04,000\nHello world'),
+    });
+  await expect(page.locator('.app--workbench')).toBeVisible();
+  await page.getByRole('button', { name: '收起', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: '第 1 句听写', exact: true })).toBeVisible();
+  await page.getByRole('textbox', { name: '第 1 句听写', exact: true }).fill('Hello');
+  await expect(page.getByRole('button', { name: '播放', exact: true })).toBeVisible();
+  const noPageScroll = await page.evaluate(
+    () => document.documentElement.scrollHeight <= window.innerHeight + 1,
   );
+  expect(noPageScroll).toBe(true);
 });
 test('migrates version 1 data, exports SRT and re-imports it unchanged', async ({ page }) => {
   const errors: string[] = [];
@@ -136,7 +142,7 @@ test('migrates version 1 data, exports SRT and re-imports it unchanged', async (
   }, Array.from(wav()));
   await page.goto('/');
   await expect(page.getByRole('heading', { name: '听写练习', exact: true })).toBeVisible();
-  await expect(page.getByRole('combobox', { name: '选择片段' }).locator('option')).toHaveCount(2);
+  await expect(page.locator('.sentence-sidebar__item')).toHaveCount(2);
   const stored = await page.evaluate(
     () =>
       new Promise<{ ids: string[]; words: boolean }>((resolve) => {
@@ -169,7 +175,6 @@ test('migrates version 1 data, exports SRT and re-imports it unchanged', async (
     .nth(1)
     .setInputFiles({ name: 'old lesson.srt', mimeType: 'text/plain', buffer: Buffer.from(srt) });
   await expect(page.getByText('字幕已导入')).toBeVisible();
-  const options = page.getByRole('combobox', { name: '选择片段' }).locator('option');
-  await expect(options).toHaveText(['1 · 00:00—00:01', '2 · 00:01—00:03']);
+  await expect(page.locator('.sentence-sidebar__item')).toHaveCount(2);
   expect(errors).toEqual([]);
 });

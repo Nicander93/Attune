@@ -98,6 +98,10 @@ small {
 .app {
   min-height: 100vh;
 }
+.app--workbench {
+  height: 100vh;
+  overflow: hidden;
+}
 header {
   display: flex;
   justify-content: space-between;
@@ -125,6 +129,21 @@ header {
   display: grid;
   grid-template-columns: 225px minmax(0, 1fr);
   min-height: calc(100vh - 73px);
+}
+.shell--workbench {
+  height: calc(100vh - 73px);
+  min-height: 0;
+  overflow: hidden;
+}
+.shell--workbench > .materials-aside {
+  overflow: auto;
+}
+.shell--workbench > main {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding-bottom: 18px;
 }
 aside {
   background: var(--soft);
@@ -223,35 +242,24 @@ footer {
 .playing-segment {
   background: #f0f3e9;
 }
-.word-editor {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 10px;
-  align-items: center;
-  min-height: 170px;
-  padding: 26px 18px;
+.sentence-editor {
   margin: 12px 0;
-  background: var(--paper);
+}
+.sentence-editor__field {
+  display: block;
+  width: 100%;
+  min-height: 120px;
+  padding: 18px 16px;
   border: 1px solid var(--line);
   border-radius: 10px;
-}
-.word-editor input {
+  background: var(--paper);
+  color: var(--ink);
+  resize: vertical;
   font:
     20px/1.7 'Maple Mono',
     ui-monospace,
     Consolas,
     monospace;
-  min-width: 56px;
-  max-width: 100%;
-  border: 0;
-  border-bottom: 2px solid #c8cebf;
-  background: transparent;
-  padding: 4px 2px;
-  color: var(--ink);
-}
-.word-editor input:focus {
-  border-bottom-color: #607650;
-  background: #f0f3e9;
 }
 .editor-actions {
   align-items: center;
@@ -405,11 +413,18 @@ summary {
   .brand small {
     display: none;
   }
-  .word-editor {
-    padding: 20px 12px;
-  }
-  .word-editor input {
+  .sentence-editor__field {
     font-size: 18px;
+    padding: 14px 12px;
+  }
+  .sentence-sidebar {
+    width: 100%;
+    max-height: 140px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .workbench {
+    grid-template-columns: 1fr;
   }
   .empty h1 {
     font-size: 34px;
@@ -423,6 +438,129 @@ summary {
   .editor-actions .muted {
     font-size: 11px;
   }
+}
+
+.workbench {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: 0;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.sentence-sidebar {
+  border-right: 1px solid var(--line);
+  background: var(--soft);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.sentence-sidebar--collapsed {
+  width: 44px;
+  grid-column: auto;
+}
+.workbench:has(.sentence-sidebar--collapsed) {
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+.sentence-sidebar__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 10px 8px;
+}
+.sentence-sidebar__list {
+  overflow: auto;
+  padding: 0 8px 12px;
+  display: grid;
+  gap: 4px;
+}
+.sentence-sidebar__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+  padding: 8px 10px;
+}
+.sentence-sidebar__item small {
+  display: block;
+  margin-top: 2px;
+}
+.sentence-sidebar__expand {
+  writing-mode: vertical-rl;
+  margin: 12px auto;
+}
+.workbench-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding-left: 18px;
+}
+.player--fixed {
+  flex-shrink: 0;
+  margin-top: 8px;
+}
+.workbench-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+}
+.workbench-main > footer {
+  flex-shrink: 0;
+}
+.readalong {
+  display: grid;
+  gap: 8px;
+  padding: 8px 0 20px;
+}
+.readalong__sentence {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  width: 100%;
+  text-align: left;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  padding: 12px 14px;
+}
+.readalong__sentence--active {
+  background: #f0f3e9;
+  border-color: #b0be9f;
+}
+.readalong__sentence--hidden .readalong__text {
+  color: var(--muted);
+  filter: blur(5px);
+  user-select: none;
+}
+.readalong__sentence--hidden:hover .readalong__text,
+.readalong__sentence--hidden:focus-visible .readalong__text {
+  filter: blur(3px);
+}
+.readalong__index {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 1.5em;
+}
+.readalong__word {
+  display: inline;
+  cursor: pointer;
+  border-radius: 3px;
+  padding: 0 2px;
+  margin: 0 2px 0 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+}
+.readalong__word:hover {
+  background: #e7eddf;
+}
+.segment-editor {
+  border-top: 0;
+  padding-top: 8px;
 }
 @media (prefers-reduced-motion: reduce) {
   * {
