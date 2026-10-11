@@ -606,3 +606,24 @@ summary {
 .intensive__token--seek ins {
   background: inherit;
 }
+.sentence-editor__feedback {
+  display: block;
+  min-height: 1.5em;
+  color: var(--muted);
+  animation: typing-feedback 160ms ease-out;
+}
+@keyframes typing-feedback {
+  from {
+    transform: translateY(3px);
+    opacity: 0.4;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sentence-editor__feedback {
+    animation: none;
+  }
+}

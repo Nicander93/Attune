@@ -1,4 +1,44 @@
 import { expect, test } from '@playwright/test';
+test('typing feedback modes and composition protection', async ({ page }) => {
+  await page.goto('/');
+  await page
+    .locator('input[type=file]')
+    .first()
+    .setInputFiles({ name: 'typing.wav', mimeType: 'audio/wav', buffer: wav() });
+  await expect(page.getByRole('heading', { name: '听写练习', exact: true })).toBeVisible();
+  await page
+    .locator('input[type=file]')
+    .nth(1)
+    .setInputFiles({
+      name: 'typing.srt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('1\n00:00:00,000 --> 00:00:04,000\nHello world'),
+    });
+  await expect(page.getByText('字幕已导入，原文在核对前保持隐藏。')).toBeVisible();
+  const field = page.getByRole('textbox', { name: '第 1 句听写', exact: true });
+  const mode = page.getByLabel('打字反馈', { exact: true });
+  await expect(mode).toHaveValue('word');
+  await field.fill('Hello ');
+  await expect(page.locator('.sentence-editor__feedback')).toHaveText('输入正确');
+  await field.fill('Hello wrong ');
+  await expect(page.locator('.sentence-editor__feedback')).toHaveText('请检查输入');
+  await mode.selectOption('letter');
+  await field.fill('');
+  await field.fill('H');
+  await expect(page.locator('.sentence-editor__feedback')).toHaveText('输入正确');
+  await mode.selectOption('blind');
+  await field.fill('Hello');
+  await expect(page.locator('.sentence-editor__feedback')).toHaveText('盲写：核对后查看结果');
+  await field.dispatchEvent('compositionstart');
+  await expect(page.locator('.sentence-editor__feedback')).toContainText('请切换到英文输入法');
+  await field.fill('Hello pinyin');
+  await field.dispatchEvent('compositionend', { data: '拼音' });
+  await expect(field).toHaveValue('Hello');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(page.locator('.sentence-editor__feedback')).toHaveCSS('animation-name', 'none');
+  await page.getByLabel('输入音效音量').fill('0.8');
+  await expect(page.getByLabel('输入音效音量')).toHaveValue('0.8');
+});
 function wav(seconds = 4): Buffer {
   const rate = 8000,
     count = rate * seconds,

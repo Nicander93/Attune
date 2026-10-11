@@ -44,6 +44,7 @@ async function audioDuration(file: File): Promise<number> {
   }
 }
 export default function App() {
+  const [soundVolume, setSoundVolume] = useState(0.5);
   const [materials, setMaterials] = useState<Material[]>([]),
     [selected, setSelected] = useState(''),
     [ready, setReady] = useState(false);
@@ -548,6 +549,8 @@ export default function App() {
           </button>
         </div>
         <SentenceEditor
+          key={s.id}
+          reference={s.reference}
           label={`第 ${index + 1} 句听写`}
           text={draftText(attempt.drafts[s.id])}
           inputRef={sentenceField}
@@ -560,8 +563,8 @@ export default function App() {
             }))
           }
           onCheck={() => check(s)}
-          onKeySound={() => {
-            if (sound && !playing) keySound();
+          onKeySound={(kind) => {
+            if (sound && !playing && soundVolume > 0) keySound(soundVolume, kind);
           }}
         />
         <div className="editor-actions">
@@ -1147,6 +1150,18 @@ export default function App() {
                         onChange={(e) => setSound(e.target.checked)}
                       />{' '}
                       输入音效 · 播放时静音
+                    </label>
+                    <label className="muted">
+                      音量{' '}
+                      <input
+                        aria-label="输入音效音量"
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.05"
+                        value={soundVolume}
+                        onChange={(event) => setSoundVolume(Number(event.target.value))}
+                      />
                     </label>
                   </div>
                   {recognition.task && (

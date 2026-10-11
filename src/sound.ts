@@ -1,14 +1,17 @@
 let context: AudioContext | undefined;
-export function keySound(): void {
+export function keySound(volume = 0.5, kind: 'key' | 'correct' | 'wrong' = 'key'): void {
   try {
     context ??= new AudioContext();
     void context.resume();
     const oscillator = context.createOscillator(),
       gain = context.createGain();
     oscillator.type = 'triangle';
-    oscillator.frequency.setValueAtTime(650, context.currentTime);
+    oscillator.frequency.setValueAtTime(
+      kind === 'correct' ? 880 : kind === 'wrong' ? 220 : 650,
+      context.currentTime,
+    );
     oscillator.frequency.exponentialRampToValueAtTime(180, context.currentTime + 0.025);
-    gain.gain.setValueAtTime(0.012, context.currentTime);
+    gain.gain.setValueAtTime(Math.max(0.0001, 0.024 * volume), context.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.035);
     oscillator.connect(gain);
     gain.connect(context.destination);
