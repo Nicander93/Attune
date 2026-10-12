@@ -3,6 +3,7 @@ import { useLibrary } from './useLibrary';
 import type { Route } from './routes';
 import { previousRoute } from './routes';
 import { ErrorBoundary } from './ErrorBoundary';
+import logoUrl from '../assets/logo.svg';
 import { HomePage } from '../features/home/HomePage';
 import { LibraryPage } from '../features/library/LibraryPage';
 import { MaterialPrepPage } from '../features/material/MaterialPrepPage';
@@ -46,7 +47,7 @@ export function App() {
     <div className="app" data-saving={library.saving ? 'true' : 'false'}>
       <header className="topbar">
         <button className="brand" onClick={() => go({ name: 'home' })}>
-          <span className="brand__mark" aria-hidden="true" />
+          <img className="brand__mark" src={logoUrl} alt="" width={20} height={20} />
           Attune
         </button>
         <nav className="topbar__nav" aria-label="主导航">

@@ -54,13 +54,6 @@ export function groupTokens(tokens: WordToken[]): WordToken[] {
   return out;
 }
 
-const punctuation = /^[\p{P}\p{S}]+$/u;
-
-/** The characters that mark a word as misspelled or added. */
-export function decorateWord(word: DiffWord): string {
-  return punctuation.test(word.text.trim()) ? 'diff__word--punctuation' : '';
-}
-
 /**
  * Words the user wrote that are not in the reference at all, and reference words they
  * never wrote. Grouped so the panel can say what happened without listing everything.

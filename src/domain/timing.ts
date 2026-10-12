@@ -1,4 +1,4 @@
-import type { DiffWord, SubtitleSegment, WordTiming } from './types';
+import type { DiffWord, WordTiming } from './types';
 
 /**
  * Index of the word covering `position`, or -1 when the position is outside every word.
@@ -25,6 +25,3 @@ export function timingIndexByDiff(diff: DiffWord[], words: WordTiming[]): Array<
     return index;
   });
 }
-
-/** True only when the timings came from recognition and can be trusted. */
-export const hasWordTimings = (segment: SubtitleSegment) => segment.words.length > 0;

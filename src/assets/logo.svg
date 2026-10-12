@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Attune">
+  <title>Attune</title>
+  <circle cx="256" cy="256" r="232" fill="#25745f" />
+  <g fill="#ffffff">
+    <rect x="174" y="202" width="36" height="110" rx="18" />
+    <rect x="238" y="132" width="36" height="180" rx="18" />
+    <rect x="302" y="172" width="36" height="140" rx="18" />
+  </g>
+  <rect x="150" y="299" width="212" height="26" rx="13" fill="#ffffff" />
+</svg>

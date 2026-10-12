@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activeWordIndex, hasWordTimings, timingIndexByDiff } from '../src/domain/timing';
+import { activeWordIndex, timingIndexByDiff } from '../src/domain/timing';
 import { compareWords } from '../src/domain/text';
 
 const words = [
@@ -19,10 +19,5 @@ describe('word timing lookup', () => {
     const diff = compareWords(['Hello', 'there'], 'Hello world');
     expect(timingIndexByDiff(diff, [])).toEqual([null, null, null]);
     expect(timingIndexByDiff(diff, words)).toEqual([0, 1, null]);
-  });
-
-  it('reports SRT segments as having no word timings', () => {
-    expect(hasWordTimings({ id: 'a', start: 0, end: 1, reference: 'Hi.', words: [] })).toBe(false);
-    expect(hasWordTimings({ id: 'a', start: 0, end: 1, reference: 'Hi.', words })).toBe(true);
   });
 });

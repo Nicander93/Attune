@@ -12,7 +12,8 @@
     "desktop": "node scripts/native-env.mjs tauri dev",
     "test:e2e": "playwright test",
     "format": "prettier --write . --ignore-path .gitignore",
-    "format:check": "prettier --check . --ignore-path .gitignore"
+    "format:check": "prettier --check . --ignore-path .gitignore",
+    "icons": "node scripts/build-icons.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.2",

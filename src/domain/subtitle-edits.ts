@@ -18,7 +18,7 @@ const fail = (message: string): never => {
   throw new SubtitleError(message);
 };
 
-export function segmentAt(material: Material, id: string): SubtitleSegment {
+function segmentAt(material: Material, id: string): SubtitleSegment {
   const segment = material.segments.find((s) => s.id === id);
   if (!segment) throw new SubtitleError('片段不存在。');
   return segment;
@@ -38,8 +38,7 @@ export function validateSpan(
   return clash ? '这段时间和其它字幕重叠了。' : undefined;
 }
 
-/** Replaces one segment, keeping its id so drafts and 难句 markers stay attached. */
-export function updateSegment(material: Material, id: string, next: SubtitleSegment): Material {
+function updateSegment(material: Material, id: string, next: SubtitleSegment): Material {
   return {
     ...material,
     segments: material.segments

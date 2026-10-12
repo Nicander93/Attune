@@ -89,6 +89,3 @@ export function recentStudy(
     })
     .slice(0, limit);
 }
-
-/** The single material 继续学习 should offer, or undefined when nothing has been started. */
-export const continueMaterial = (materials: Material[]) => recentStudy(materials, 1)[0]?.material;

@@ -347,6 +347,7 @@ export function StudyPage({
 
             {checked ? (
               <div className="diff" role="status">
+                <p className="caption">核对结果</p>
                 <p className="diff__text">
                   {diff.map((word, i) => (
                     <span key={i} className={`diff__word diff__word--${word.kind}`}>

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { groupTokens, tokenizeForDisplay } from '../../domain/word-flow';
 
 type Props = {
@@ -32,19 +32,10 @@ export function WordFlowEditor({
 }: Props) {
   const localRef = useRef<HTMLTextAreaElement>(null);
   const ref = inputRef ?? localRef;
-  const mirror = useRef<HTMLDivElement>(null);
   const [caret, setCaret] = useState({ start: 0, end: 0 });
 
   const tokens = useMemo(() => groupTokens(tokenizeForDisplay(value)), [value]);
   const collapsed = caret.start === caret.end;
-
-  useLayoutEffect(() => {
-    const source = ref.current;
-    const target = mirror.current;
-    if (!source || !target) return;
-    target.style.height = `${source.scrollHeight}px`;
-    target.scrollTop = source.scrollTop;
-  }, [value, ref, caret]);
 
   useEffect(() => {
     const node = ref.current;
@@ -63,7 +54,10 @@ export function WordFlowEditor({
 
   return (
     <div className={`flow${checked ? ' flow--checked' : ''}`}>
-      <div className="flow__mirror" ref={mirror} aria-hidden="true">
+      {/* The mirror draws the underlines underneath; the textarea sits on top with
+          transparent text so it stays the only real editor. Both share the same box
+          metrics, so the underlines land exactly under each word. */}
+      <div className="flow__mirror" aria-hidden="true">
         {tokens.map((token, i) =>
           token.space ? (
             <span key={i}>{token.text}</span>
@@ -80,15 +74,18 @@ export function WordFlowEditor({
             </span>
           ),
         )}
+        {tokenizeForDisplay(value).length === 0 && (
+          <span className="flow__placeholder">听完这句，写下来…</span>
+        )}
       </div>
       <textarea
         ref={ref}
         className="flow__input"
         aria-label={ariaLabel}
         value={value}
+        rows={2}
         spellCheck={false}
         autoComplete="off"
-        placeholder="听完这句，写下来…"
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing || event.keyCode === 229) return;
