@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { migrateMaterial, normalizeSegments, type LegacyMaterial } from '../src/domain/migrate';
+import { migrateMaterial, normalizeSegments } from '../src/domain/migrate';
+import type { LegacyMaterial } from '../src/domain/migrate';
 import {
   materialProgress,
   recentStudy,
   bookmarkedSegments,
   roundProgress,
 } from '../src/domain/progress';
-import { parseSrt, parseVtt, toSrt, compareWords, isExactMatch } from '../src/domain';
+import { parseSrt, parseVtt, toSrt } from '../src/domain/subtitles';
+import { compareWords, isExactMatch } from '../src/domain/text';
 import { WAV_TIME, legacyAudio, legacyUnstudied, legacyV1, legacyV2 } from './fixtures/legacy';
 
 describe('migrating a schema v2 material', () => {

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { sentencesToSegments, type Material, type SubtitleSegment } from './domain';
+import { sentencesToSegments } from './domain/subtitles';
+import type { Material, SubtitleSegment } from './domain/types';
 import {
   CANCELLED,
   cancelDownload,

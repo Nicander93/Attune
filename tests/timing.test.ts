@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { activeWordIndex, compareWords, hasWordTimings, timingIndexByDiff } from '../src/domain';
+import { activeWordIndex, hasWordTimings, timingIndexByDiff } from '../src/domain/timing';
+import { compareWords } from '../src/domain/text';
 
 const words = [
   { text: 'Hello', start: 0, end: 0.4 },

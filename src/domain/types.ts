@@ -1,11 +1,15 @@
 /** Word-level timing from speech recognition; empty for SRT/VTT or manual segments. */
-export type WordTiming = { text: string; start: number; end: number };
+export interface WordTiming {
+  text: string;
+  start: number;
+  end: number;
+}
 
 /**
  * One subtitle line. `id` stays stable for the life of a segment so practice rounds,
  * drafts and bookmarks can refer to it.
  */
-export type SubtitleSegment = {
+export interface SubtitleSegment {
   id: string;
   start: number;
   end: number;
@@ -15,17 +19,22 @@ export type SubtitleSegment = {
   translation?: string;
   /** Unreliable timings must be cleared rather than left to look trustworthy. */
   words: WordTiming[];
-};
+}
 
 /** Sentence produced by the desktop recognizer, before it becomes a segment. */
-export type RecognizedSentence = { text: string; start: number; end: number; words: WordTiming[] };
+export interface RecognizedSentence {
+  text: string;
+  start: number;
+  end: number;
+  words: WordTiming[];
+}
 
 /**
  * One pass through a material. Drafts and completed sentences belong here so a new
  * round never destroys the previous one. `completedSegmentIds` means "the user ran
  * 核对答案 on this sentence in this round" - not that the answer was right.
  */
-export type PracticeRound = {
+export interface PracticeRound {
   id: string;
   createdAt: string;
   updatedAt: string;
@@ -39,9 +48,15 @@ export type PracticeRound = {
    * destroys existing records. Nothing reads it - the history page shows progress only.
    */
   legacy?: Record<string, { first: string[]; reference: string; revision?: string[] }>;
-};
+}
 
-export type Folder = { id: string; name: string; createdAt: string };
+export interface Folder {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+export type StudyView = 'dictation' | 'reading';
 
 /**
  * A material is one audio file plus optional subtitles.
@@ -51,7 +66,7 @@ export type Folder = { id: string; name: string; createdAt: string };
  * `lastStudiedAt` is only set by real study behaviour (typing, checking, or playing in
  * 听读) - never by listing, importing or switching folders.
  */
-export type Material = {
+export interface Material {
   id: string;
   /** What the user sees. Renaming changes this only - never the blob or the file name. */
   displayName: string;
@@ -64,25 +79,26 @@ export type Material = {
   segments: SubtitleSegment[];
   createdAt?: string;
   lastStudiedAt?: string;
-  lastView?: 'dictation' | 'reading';
+  lastView?: StudyView;
   playbackPosition: number;
   /** 难句标记. Belongs to the material, so it survives across rounds. */
   bookmarkedSegmentIds: string[];
   rounds: PracticeRound[];
   activeRoundId: string;
-};
+}
 
-export type DiffWord = { text: string; kind: 'same' | 'missing' | 'extra' };
+export interface DiffWord {
+  text: string;
+  kind: 'same' | 'missing' | 'extra';
+}
 
-/** `—` when a time is unknown, so the UI can say so instead of printing a guess. */
-export const UNKNOWN_TIME = '—';
+export const newId = () => crypto.randomUUID();
 
-export const uid = () => crypto.randomUUID();
 export const nowIso = () => new Date().toISOString();
 
 export function newRound(createdAt = nowIso()): PracticeRound {
   return {
-    id: uid(),
+    id: newId(),
     createdAt,
     updatedAt: createdAt,
     drafts: {},
@@ -107,7 +123,7 @@ export function ensureRound(material: Material): Material {
   return { ...material, rounds: [round], activeRoundId: round.id };
 }
 
-export const displayTime = (seconds: number) => {
+export const formatTime = (seconds: number) => {
   const total = Math.max(0, Math.floor(seconds));
   return `${Math.floor(total / 60)
     .toString()

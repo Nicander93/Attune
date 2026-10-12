@@ -1,109 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
-
-/** A real 16-bit PCM WAV, so the browser decodes it like any imported material. */
-function wav(seconds = 4): Buffer {
-  const rate = 8000,
-    count = rate * seconds,
-    data = Buffer.alloc(count * 2);
-  for (let i = 0; i < count; i++) data.writeInt16LE(Math.round(Math.sin(i / 12) * 4000), i * 2);
-  const header = Buffer.alloc(44);
-  header.write('RIFF', 0);
-  header.writeUInt32LE(36 + data.length, 4);
-  header.write('WAVE', 8);
-  header.write('fmt ', 12);
-  header.writeUInt32LE(16, 16);
-  header.writeUInt16LE(1, 20);
-  header.writeUInt16LE(1, 22);
-  header.writeUInt32LE(rate, 24);
-  header.writeUInt32LE(rate * 2, 28);
-  header.writeUInt16LE(2, 32);
-  header.writeUInt16LE(16, 34);
-  header.write('data', 36);
-  header.writeUInt32LE(data.length, 40);
-  return Buffer.concat([header, data]);
-}
-
-/**
- * Writes materials straight into IndexedDB in the schema the app expects, then reloads.
- * This tests the stored shape as well as the UI, which is the contract that matters
- * for a migration. The audio is rebuilt inside the page because a Node Buffer would
- * arrive as a plain object rather than a Blob.
- */
-async function seed(page: Page, materials: { audio: Buffer; [key: string]: unknown }[]) {
-  await page.goto('/');
-  const rows = materials.map((m) => ({ ...m, audio: m.audio.toString('base64') }));
-  await page.evaluate(async (data) => {
-    await new Promise<void>((resolve, reject) => {
-      const open = indexedDB.open('attune', 3);
-      open.onupgradeneeded = () => {
-        const db = open.result;
-        for (const name of ['materials', 'folders', 'audio'])
-          if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' });
-        if (!db.transaction!.objectStore('materials').indexNames.contains('by-folder'))
-          db.transaction!.objectStore('materials').createIndex('by-folder', 'folderId');
-      };
-      open.onerror = () => reject(open.error);
-      open.onsuccess = () => {
-        const db = open.result;
-        const tx = db.transaction(['materials', 'audio'], 'readwrite');
-        for (const row of data as any[]) {
-          const { audio, ...record } = row;
-          const bytes = Uint8Array.from(atob(audio), (c) => c.charCodeAt(0));
-          tx.objectStore('materials').put(record);
-          tx.objectStore('audio').put({
-            id: record.id,
-            blob: new Blob([bytes], { type: 'audio/wav' }),
-          });
-        }
-        tx.onerror = () => reject(tx.error);
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-      };
-    });
-  }, rows);
-  await page.reload();
-}
-
-/** Autosave is debounced, so wait for the queue to drain before reloading or reading. */
-async function settled(page: Page) {
-  await expect(page.locator('.app')).toHaveAttribute('data-saving', 'false');
-}
-
-const storedMaterial = (page: Page, id: string) =>
-  page.evaluate(
-    (key) =>
-      new Promise<any>((resolve) => {
-        const open = indexedDB.open('attune', 3);
-        open.onsuccess = () => {
-          const request = open.result.transaction('materials').objectStore('materials').get(key);
-          request.onsuccess = () => resolve(request.result);
-        };
-      }),
-    id,
-  );
-
-const material = (overrides: Record<string, unknown> = {}) => ({
-  id: 'm1',
-  displayName: 'podcast.mp3',
-  originalFileName: 'podcast.mp3',
-  folderId: null,
-  duration: 9,
-  segments: [
-    { id: 's1', start: 0, end: 3, reference: 'Hello world.', words: [] },
-    { id: 's2', start: 3, end: 6, reference: 'Nice to meet you.', words: [] },
-    { id: 's3', start: 6, end: 9, reference: 'See you later.', words: [] },
-  ],
-  createdAt: '2026-03-01T08:00:00Z',
-  playbackPosition: 0,
-  bookmarkedSegmentIds: [],
-  rounds: [],
-  activeRoundId: '',
-  audio: wav(),
-  ...overrides,
-});
-
+import { expect, test } from '@playwright/test';
+import { material, openStudy, seed, settled, storedMaterial, wav } from './support';
 test.describe('home', () => {
   test('shows an empty state when nothing has been studied', async ({ page }) => {
     await seed(page, [material({ audio: wav() })]);
@@ -294,7 +190,7 @@ test.describe('dictation', () => {
     await field.pressSequentially('Hello world');
     await field.press('Enter');
     await expect(page.locator('.diff')).toBeVisible();
-    await expect(page.locator('.diff')).toContainText('与原文一致');
+    await expect(page.locator('.diff')).toContainText('和原文一致');
     await field.press('Enter');
     await expect(page.getByRole('heading', { name: '第 2 / 3 句' })).toBeVisible();
   });
@@ -360,7 +256,10 @@ test.describe('player and views', () => {
     await field.click();
     await field.pressSequentially('Hello world');
     await page.getByRole('tab', { name: '听读' }).click();
-    await expect(page.locator('.reading')).toContainText('Nice to meet you.');
+    // Undictated sentences stay hidden until the reader asks to see them.
+    await expect(page.locator('.reading__text')).toContainText('原文已隐藏');
+    await page.getByLabel('显示未听写的原文').check();
+    await expect(page.locator('.reading__text')).toContainText('Nice to meet you.');
     await page.getByRole('tab', { name: '听写' }).click();
     await expect(page.getByLabel('第 1 句听写')).toHaveValue('Hello world');
   });

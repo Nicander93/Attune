@@ -1,4 +1,4 @@
-import { nowIso, uid, type Material, type PracticeRound, type SubtitleSegment } from './types';
+import { newId, nowIso, type Material, type PracticeRound, type SubtitleSegment } from './types';
 
 /** A segment as stored by schema v1 and v2 - `id` and `words` may be missing. */
 export type LegacySegment = {
@@ -62,8 +62,8 @@ export function normalizeSegments(segments: LegacySegment[]): {
   const taken = new Set<string>();
   const remap = new Map<string, string>();
   const next = segments.map((s) => {
-    let id = s.id && !taken.has(s.id) ? s.id : uid();
-    while (taken.has(id)) id = uid();
+    let id = s.id && !taken.has(s.id) ? s.id : newId();
+    while (taken.has(id)) id = newId();
     taken.add(id);
     // The first occurrence keeps the old id, so records written against it still land
     // on the right sentence. Later duplicates are already unresolvable in the old data.
@@ -92,7 +92,7 @@ function migrateAttempt(attempt: LegacyAttempt, remap: Map<string, string>): Pra
     ]),
   );
   return {
-    id: attempt.id || uid(),
+    id: attempt.id || newId(),
     createdAt: attempt.createdAt || nowIso(),
     updatedAt: attempt.createdAt || nowIso(),
     drafts,
@@ -119,7 +119,7 @@ export function migrateMaterial(legacy: LegacyMaterial): Material {
   const rounds = attempts.map((a) => migrateAttempt(a, remap));
   if (!rounds.length)
     rounds.push({
-      id: uid(),
+      id: newId(),
       createdAt: nowIso(),
       updatedAt: nowIso(),
       drafts: {},
@@ -130,7 +130,7 @@ export function migrateMaterial(legacy: LegacyMaterial): Material {
     : rounds[rounds.length - 1].id;
   const known = new Set(segments.map((s) => s.id));
   return {
-    id: legacy.id || uid(),
+    id: legacy.id || newId(),
     displayName: legacy.name || '未命名素材',
     originalFileName: legacy.name || '',
     folderId: null,

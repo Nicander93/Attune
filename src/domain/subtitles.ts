@@ -1,4 +1,4 @@
-import { uid, type RecognizedSentence, type SubtitleSegment, type WordTiming } from './types';
+import { newId, type RecognizedSentence, type SubtitleSegment, type WordTiming } from './types';
 
 const CJK = /[\u3400-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af]/;
 
@@ -41,7 +41,7 @@ type Cue = { start: number; end: number; reference: string; translation?: string
 
 function validate(cues: Cue[], duration: number): SubtitleSegment[] {
   if (!cues.length) fail('字幕为空。');
-  const segments = cues.map((c) => ({ ...c, id: uid() })).sort((a, b) => a.start - b.start);
+  const segments = cues.map((c) => ({ ...c, id: newId() })).sort((a, b) => a.start - b.start);
   for (const segment of segments) {
     if (!(segment.end > segment.start)) fail('字幕片段结束时间必须晚于开始时间。');
     if (segment.end > duration + 0.25)
@@ -115,7 +115,7 @@ export function sentencesToSegments(
 ): SubtitleSegment[] {
   return sentences
     .map((s) => ({
-      id: uid(),
+      id: newId(),
       start: Math.max(0, s.start),
       end: Math.min(s.end, duration),
       reference: s.text.trim(),

@@ -1,6 +1,6 @@
 import { isCurrentMaterial, migrateMaterial, type LegacyMaterial } from '../domain/migrate';
 import type { Folder, Material } from '../domain/types';
-import { nowIso, uid } from '../domain/types';
+import { newId, nowIso } from '../domain/types';
 
 const DB_NAME = 'attune';
 const VERSION = 3;
@@ -176,4 +176,4 @@ export const deleteFolder = async (id: string, materials: Material[]): Promise<M
   return affected.map((m) => ({ ...m, folderId: null }));
 };
 
-export const newFolder = (name: string): Folder => ({ id: uid(), name, createdAt: nowIso() });
+export const newFolder = (name: string): Folder => ({ id: newId(), name, createdAt: nowIso() });

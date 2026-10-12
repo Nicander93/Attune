@@ -10,17 +10,20 @@ export type Route =
   | { name: 'subtitles'; materialId: string }
   | { name: 'transcript'; materialId: string };
 
-export type RouteName = Route['name'];
-
-/** Study pages own ←/→/Space. Library and home must not react to playback keys. */
-export const isStudyRoute = (route: Route) => route.name === 'study' || route.name === 'subtitles';
-
-export const titleOf = (route: Route): string =>
-  ({
-    home: '首页',
-    library: '素材库',
-    material: '素材准备',
-    study: '听写学习',
-    subtitles: '字幕校对',
-    transcript: '完整原文',
-  })[route.name];
+export function previousRoute(route: Route): Route {
+  switch (route.name) {
+    case 'home':
+      return { name: 'home' };
+    case 'library':
+      return { name: 'home' };
+    case 'material':
+      return route.from === 'study'
+        ? { name: 'study', materialId: route.materialId, from: 'material' }
+        : { name: 'library', folderId: null };
+    case 'study':
+      return route.from === 'home' ? { name: 'home' } : { name: 'library', folderId: null };
+    case 'subtitles':
+    case 'transcript':
+      return { name: 'study', materialId: route.materialId, from: 'material' };
+  }
+}

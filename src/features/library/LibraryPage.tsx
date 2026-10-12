@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Folder, Material } from '../../domain/types';
-import { displayTime } from '../../domain/types';
+import { formatTime } from '../../domain/types';
 import {
   UNCATEGORIZED,
   SORT_LABELS,
@@ -344,7 +344,7 @@ export function LibraryPage(props: Props) {
                       <span className="materials__main">
                         <strong>{row.displayName}</strong>
                         <span className="muted">
-                          {displayTime(row.duration)} · {progressLabel(row)}
+                          {formatTime(row.duration)} · {progressLabel(row)}
                           {row.hasSubtitles ? '' : ' · 无字幕'}
                           {row.stale > 0 ? ` · ${row.stale} 句待重新核对` : ''}
                         </span>

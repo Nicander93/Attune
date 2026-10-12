@@ -1,16 +1,20 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useLibrary } from './useLibrary';
 import type { Route } from './routes';
+import { previousRoute } from './routes';
 import { ErrorBoundary } from './ErrorBoundary';
 import { HomePage } from '../features/home/HomePage';
 import { LibraryPage } from '../features/library/LibraryPage';
+import { MaterialPrepPage } from '../features/material/MaterialPrepPage';
+import { SubtitleProofPage } from '../features/subtitles/SubtitleProofPage';
 import { StudyPage } from '../features/study/StudyPage';
+import { TranscriptPage } from '../features/reading/TranscriptPage';
 
 /**
  * One window, a page stack, and no router dependency.
  *
- * `back` returns to the page a second-level view was opened from, which is what the
- * "← 返回" contract means - not a hard-coded jump to the library.
+ * `← 返回` returns to the page a second-level view was opened from, which is what the
+ * spec means by "返回实际来源页面" - not a hard-coded jump to the library.
  */
 export function App() {
   const library = useLibrary();
@@ -25,28 +29,17 @@ export function App() {
     setRoute(next);
   }, []);
 
-  const back = useCallback(() => {
-    setRoute((current) => {
-      switch (current.name) {
-        case 'material':
-          return {
-            name: current.from === 'study' ? 'study' : 'library',
-            ...materialOf(current),
-          } as Route;
-        case 'study':
-          return current.from === 'home' ? { name: 'home' } : { name: 'library', folderId: null };
-        case 'subtitles':
-        case 'transcript':
-          return { name: 'study', materialId: current.materialId, from: 'material' };
-        default:
-          return { name: 'home' };
-      }
-    });
-  }, []);
+  const back = useCallback((current: Route): Route => previousRoute(current), []);
+  const goBack = useCallback(() => setRoute(back), [back]);
 
   const material = useMemo(
     () => library.materials.find((m) => m.id === ('materialId' in route ? route.materialId : '')),
     [library.materials, route],
+  );
+  const update = useCallback(
+    (transform: Parameters<typeof library.update>[0]) =>
+      material && library.update(transform, material.id),
+    [library, material],
   );
 
   return (
@@ -77,12 +70,7 @@ export function App() {
       {library.error && (
         <div className="banner banner--error" role="alert">
           {library.error}
-          <button
-            className="quiet"
-            onClick={() => {
-              library.flush();
-            }}
-          >
+          <button className="quiet" onClick={library.flush}>
             重试保存
           </button>
         </div>
@@ -104,6 +92,7 @@ export function App() {
               onNewMaterial={() => go({ name: 'library', folderId: null })}
             />
           )}
+
           {route.name === 'library' && (
             <LibraryPage
               materials={library.materials}
@@ -112,7 +101,7 @@ export function App() {
               selectedFolder={route.folderId}
               onSelectFolder={(folderId) => go({ name: 'library', folderId })}
               selectedId={selectedId}
-              onSelect={(id) => setSelectedId(id)}
+              onSelect={setSelectedId}
               onOpen={(id) => go({ name: 'study', materialId: id, from: 'library' })}
               onPrepare={(id) => go({ name: 'material', materialId: id, from: 'library' })}
               onCreate={library.add}
@@ -125,91 +114,50 @@ export function App() {
               onNotice={setNotice}
             />
           )}
+
           {route.name === 'study' && material && (
             <StudyPage
               material={material}
-              onBack={back}
+              update={update}
+              onBack={goBack}
               onPrepare={() => go({ name: 'material', materialId: material.id, from: 'study' })}
-              onTranscript={() => go({ name: 'transcript', materialId: material.id })}
               onSubtitles={() => go({ name: 'subtitles', materialId: material.id })}
+              onTranscript={() => go({ name: 'transcript', materialId: material.id })}
               onNotice={setNotice}
-              update={(transform) => library.update(transform, material.id)}
-              markStudied={(patch) => library.markStudied(material.id, patch)}
             />
           )}
+
           {route.name === 'material' && material && (
-            <MaterialPlaceholder
+            <MaterialPrepPage
               material={material}
-              onBack={back}
+              update={update}
+              onBack={goBack}
               onStudy={() => go({ name: 'study', materialId: material.id, from: 'material' })}
               onNotice={setNotice}
-              update={(transform) => library.update(transform, material.id)}
             />
           )}
-          {(route.name === 'subtitles' || route.name === 'transcript') && material && (
-            <SecondaryPlaceholder
-              route={route.name}
+
+          {route.name === 'subtitles' && material && (
+            <SubtitleProofPage
               material={material}
-              onBack={back}
-              update={(transform) => library.update(transform, material.id)}
+              update={update}
+              onBack={goBack}
+              onNotice={setNotice}
+            />
+          )}
+
+          {route.name === 'transcript' && material && (
+            <TranscriptPage
+              material={material}
+              onBack={goBack}
+              onPlayFrom={(segmentId) => {
+                const target = material.segments.find((s) => s.id === segmentId);
+                if (target) update((m) => ({ ...m, playbackPosition: target.start }));
+              }}
             />
           )}
         </ErrorBoundary>
       </main>
     </div>
-  );
-}
-
-const materialOf = (route: Extract<Route, { materialId: string }>) => ({
-  materialId: route.materialId,
-});
-
-/**
- * Phase 2 owns material preparation and subtitle proofing. Rendered as an explicit
- * placeholder rather than a fake working form, per the spec's ban on static demos
- * standing in for real capability.
- */
-function MaterialPlaceholder(props: {
-  material: { displayName: string; segments: unknown[] };
-  onBack: () => void;
-  onStudy: () => void;
-  onNotice: (message: string) => void;
-  update: (transform: (material: any) => any) => void;
-}) {
-  return (
-    <section className="placeholder">
-      <button className="quiet back" onClick={props.onBack}>
-        ← 返回
-      </button>
-      <h1>{props.material.displayName}</h1>
-      <p className="muted">
-        音频与字幕的分开导入、Whisper 识别与字幕校对将在<strong>阶段 2</strong>交付。
-      </p>
-      <p className="muted">当前素材已有 {props.material.segments.length} 个片段。</p>
-      <button className="primary" onClick={props.onStudy}>
-        开始听写
-      </button>
-    </section>
-  );
-}
-
-/** Phases 3-5 own the shared player, 听读 and the full transcript page. */
-function SecondaryPlaceholder(props: {
-  route: 'subtitles' | 'transcript';
-  material: { displayName: string };
-  onBack: () => void;
-  update: (transform: (material: any) => any) => void;
-}) {
-  return (
-    <section className="placeholder">
-      <button className="quiet back" onClick={props.onBack}>
-        ← 返回
-      </button>
-      <h1>{props.route === 'subtitles' ? '字幕校对' : '完整原文'}</h1>
-      <p className="muted">{props.material.displayName}</p>
-      <p className="muted">
-        该页面将在<strong>阶段 {props.route === 'subtitles' ? '2' : '5'}</strong>交付。
-      </p>
-    </section>
   );
 }

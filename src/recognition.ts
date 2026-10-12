@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { ask, open } from '@tauri-apps/plugin-dialog';
-import type { RecognizedSentence } from './domain';
+import type { RecognizedSentence } from './domain/types';
 export { isDesktop } from './desktop';
 
 export type ModelStatus = {

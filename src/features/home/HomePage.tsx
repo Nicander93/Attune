@@ -1,5 +1,5 @@
 import type { Material } from '../../domain/types';
-import { displayTime } from '../../domain/types';
+import { formatTime } from '../../domain/types';
 import { recentStudy } from '../../domain/progress';
 
 const viewLabel = (material: Material) => (material.lastView === 'reading' ? '听读' : '听写');
@@ -70,7 +70,7 @@ export function HomePage(props: {
                     <strong>{material.displayName}</strong>
                     <span className="muted">
                       已听写 {progress.completed} / {progress.total} 句 ·{' '}
-                      {displayTime(material.duration)}
+                      {formatTime(material.duration)}
                       {studiedLabel(studiedAt)}
                     </span>
                   </span>
