@@ -1,0 +1,27 @@
+import { describe, expect, it } from 'vitest';
+import { activeWordIndex, compareWords, hasWordTimings, timingIndexByDiff } from '../src/domain';
+
+const words = [
+  { text: 'Hello', start: 0, end: 0.4 },
+  { text: 'world', start: 0.4, end: 0.9 },
+];
+
+describe('word timing lookup', () => {
+  it('finds the active word by playback position', () => {
+    expect(activeWordIndex(words, 0.2)).toBe(0);
+    expect(activeWordIndex(words, 0.4)).toBe(1);
+    expect(activeWordIndex(words, 1)).toBe(-1);
+    expect(activeWordIndex([], 0.2)).toBe(-1);
+  });
+
+  it('maps comparison tokens to timings without inventing any', () => {
+    const diff = compareWords(['Hello', 'there'], 'Hello world');
+    expect(timingIndexByDiff(diff, [])).toEqual([null, null, null]);
+    expect(timingIndexByDiff(diff, words)).toEqual([0, 1, null]);
+  });
+
+  it('reports SRT segments as having no word timings', () => {
+    expect(hasWordTimings({ id: 'a', start: 0, end: 1, reference: 'Hi.', words: [] })).toBe(false);
+    expect(hasWordTimings({ id: 'a', start: 0, end: 1, reference: 'Hi.', words })).toBe(true);
+  });
+});

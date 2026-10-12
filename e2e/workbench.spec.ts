@@ -1,269 +1,396 @@
-import { expect, test } from '@playwright/test';
-test('typing feedback modes and composition protection', async ({ page }) => {
-  await page.goto('/');
-  await page
-    .locator('input[type=file]')
-    .first()
-    .setInputFiles({ name: 'typing.wav', mimeType: 'audio/wav', buffer: wav() });
-  await expect(page.getByRole('heading', { name: '听写练习', exact: true })).toBeVisible();
-  await page
-    .locator('input[type=file]')
-    .nth(1)
-    .setInputFiles({
-      name: 'typing.srt',
-      mimeType: 'text/plain',
-      buffer: Buffer.from('1\n00:00:00,000 --> 00:00:04,000\nHello world'),
-    });
-  await expect(page.getByText('字幕已导入，原文在核对前保持隐藏。')).toBeVisible();
-  const field = page.getByRole('textbox', { name: '第 1 句听写', exact: true });
-  const mode = page.getByLabel('打字反馈', { exact: true });
-  await expect(mode).toHaveValue('word');
-  await field.fill('Hello ');
-  await expect(page.locator('.sentence-editor__feedback')).toHaveText('输入正确');
-  await field.fill('Hello wrong ');
-  await expect(page.locator('.sentence-editor__feedback')).toHaveText('请检查输入');
-  await mode.selectOption('letter');
-  await field.fill('');
-  await field.fill('H');
-  await expect(page.locator('.sentence-editor__feedback')).toHaveText('输入正确');
-  await mode.selectOption('blind');
-  await field.fill('Hello');
-  await expect(page.locator('.sentence-editor__feedback')).toHaveText('盲写：核对后查看结果');
-  await field.dispatchEvent('compositionstart');
-  await expect(page.locator('.sentence-editor__feedback')).toContainText('请切换到英文输入法');
-  await field.fill('Hello pinyin');
-  await field.dispatchEvent('compositionend', { data: '拼音' });
-  await expect(field).toHaveValue('Hello');
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await expect(page.locator('.sentence-editor__feedback')).toHaveCSS('animation-name', 'none');
-  await page.getByLabel('输入音效音量').fill('0.8');
-  await expect(page.getByLabel('输入音效音量')).toHaveValue('0.8');
-});
+import { expect, test, type Page } from '@playwright/test';
+
+/** A real 16-bit PCM WAV, so the browser decodes it like any imported material. */
 function wav(seconds = 4): Buffer {
   const rate = 8000,
     count = rate * seconds,
-    buffer = Buffer.alloc(44 + count * 2);
-  buffer.write('RIFF', 0);
-  buffer.writeUInt32LE(buffer.length - 8, 4);
-  buffer.write('WAVEfmt ', 8);
-  buffer.writeUInt32LE(16, 16);
-  buffer.writeUInt16LE(1, 20);
-  buffer.writeUInt16LE(1, 22);
-  buffer.writeUInt32LE(rate, 24);
-  buffer.writeUInt32LE(rate * 2, 28);
-  buffer.writeUInt16LE(2, 32);
-  buffer.writeUInt16LE(16, 34);
-  buffer.write('data', 36);
-  buffer.writeUInt32LE(count * 2, 40);
-  return buffer;
+    data = Buffer.alloc(count * 2);
+  for (let i = 0; i < count; i++) data.writeInt16LE(Math.round(Math.sin(i / 12) * 4000), i * 2);
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(36 + data.length, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(rate, 24);
+  header.writeUInt32LE(rate * 2, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write('data', 36);
+  header.writeUInt32LE(data.length, 40);
+  return Buffer.concat([header, data]);
 }
-test('audio, free-text dictation, immutable first draft, persistence and shortcuts', async ({
-  page,
-}) => {
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(e.message));
+
+/**
+ * Writes materials straight into IndexedDB in the schema the app expects, then reloads.
+ * This tests the stored shape as well as the UI, which is the contract that matters
+ * for a migration. The audio is rebuilt inside the page because a Node Buffer would
+ * arrive as a plain object rather than a Blob.
+ */
+async function seed(page: Page, materials: { audio: Buffer; [key: string]: unknown }[]) {
   await page.goto('/');
-  await expect(page.getByRole('button', { name: '导入第一篇音频' })).toBeEnabled();
-  await page
-    .locator('input[type=file]')
-    .first()
-    .setInputFiles({ name: 'practice.wav', mimeType: 'audio/wav', buffer: wav() });
-  await expect(page.getByRole('heading', { name: '听写练习', exact: true })).toBeVisible();
-  await page
-    .locator('input[type=file]')
-    .nth(1)
-    .setInputFiles({
-      name: 'practice.srt',
-      mimeType: 'text/plain',
-      buffer: Buffer.from(
-        '1\n00:00:00,000 --> 00:00:01,500\nHello world\n\n2\n00:00:01,500 --> 00:00:04,000\nListen again',
-      ),
+  const rows = materials.map((m) => ({ ...m, audio: m.audio.toString('base64') }));
+  await page.evaluate(async (data) => {
+    await new Promise<void>((resolve, reject) => {
+      const open = indexedDB.open('attune', 3);
+      open.onupgradeneeded = () => {
+        const db = open.result;
+        for (const name of ['materials', 'folders', 'audio'])
+          if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' });
+        if (!db.transaction!.objectStore('materials').indexNames.contains('by-folder'))
+          db.transaction!.objectStore('materials').createIndex('by-folder', 'folderId');
+      };
+      open.onerror = () => reject(open.error);
+      open.onsuccess = () => {
+        const db = open.result;
+        const tx = db.transaction(['materials', 'audio'], 'readwrite');
+        for (const row of data as any[]) {
+          const { audio, ...record } = row;
+          const bytes = Uint8Array.from(atob(audio), (c) => c.charCodeAt(0));
+          tx.objectStore('materials').put(record);
+          tx.objectStore('audio').put({
+            id: record.id,
+            blob: new Blob([bytes], { type: 'audio/wav' }),
+          });
+        }
+        tx.onerror = () => reject(tx.error);
+        tx.oncomplete = () => {
+          db.close();
+          resolve();
+        };
+      };
     });
-  const field = page.getByRole('textbox', { name: '第 1 句听写', exact: true });
-  await field.fill('Hello word');
-  await page.getByRole('button', { name: '核对原文', exact: true }).click();
-  await expect(page.locator('ins')).toContainText('world');
-  await expect(page.locator('del')).toContainText('word');
-  await field.fill('Hello world');
-  await page.getByRole('button', { name: '保存修订稿' }).click();
-  await expect(page.locator('header [role=status]').filter({ hasText: '已保存' })).toBeVisible();
-  await page.getByRole('button', { name: '练习记录', exact: true }).click();
-  await page.getByText('查看首次稿与修订稿').click();
-  await expect(page.locator('details')).toContainText('Hello word');
-  await expect(page.locator('details')).toContainText('Hello world');
+  }, rows);
   await page.reload();
-  await expect(page.getByRole('textbox', { name: '第 1 句听写', exact: true })).toHaveValue(
-    'Hello world',
-  );
-  await field.focus();
-  await page.keyboard.press('Control+Space');
-  await expect(field).toBeFocused();
-  await expect
-    .poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => !a.paused))
-    .toBe(true);
-  await page.keyboard.press('Control+Space');
-  await expect
-    .poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.paused))
-    .toBe(true);
-  await expect(field).toBeFocused();
-  await expect(field).toHaveValue('Hello world');
-  await page.getByRole('button', { name: '下一句', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: '第 2 句听写', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '上一句', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: '第 1 句听写', exact: true })).toHaveValue(
-    'Hello world',
-  );
-  await page.getByRole('button', { name: '跟读', exact: true }).click();
-  await expect(page.locator('.readalong__sentence').first()).toContainText('Hello');
-  await expect(page.locator('.readalong__sentence').first()).toContainText('world');
-  await expect(page.locator('.readalong__sentence').nth(1)).toContainText('尚未听写，原文已隐藏');
-  await page.getByRole('button', { name: '听写', exact: true }).click();
-  await page.getByRole('button', { name: '练习记录', exact: true }).click();
-  await page.getByRole('button', { name: '重新听写', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: '第 1 句听写', exact: true })).toHaveValue('');
-  await expect(page.locator('.comparison')).toHaveCount(0);
-  expect(errors).toEqual([]);
-});
-test('one-screen layout keeps the main area usable with sidebar collapsed', async ({ page }) => {
-  await page.setViewportSize({ width: 1100, height: 800 });
-  await page.goto('/');
-  await expect(page.getByRole('button', { name: '导入第一篇音频' })).toBeEnabled();
-  await page
-    .locator('input[type=file]')
-    .first()
-    .setInputFiles({ name: 'mobile.wav', mimeType: 'audio/wav', buffer: wav() });
-  await page
-    .locator('input[type=file]')
-    .nth(1)
-    .setInputFiles({
-      name: 'practice.srt',
-      mimeType: 'text/plain',
-      buffer: Buffer.from('1\n00:00:00,000 --> 00:00:04,000\nHello world'),
-    });
-  await expect(page.locator('.app--workbench')).toBeVisible();
-  await page.getByRole('button', { name: '收起', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: '第 1 句听写', exact: true })).toBeVisible();
-  await page.getByRole('textbox', { name: '第 1 句听写', exact: true }).fill('Hello');
-  await expect(page.getByRole('button', { name: '播放', exact: true })).toBeVisible();
-  const noPageScroll = await page.evaluate(
-    () => document.documentElement.scrollHeight <= window.innerHeight + 1,
-  );
-  expect(noPageScroll).toBe(true);
-});
-test('migrates version 1 data, exports SRT and re-imports it unchanged', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  await page.addInitScript((audio: number[]) => {
-    if (sessionStorage.getItem('seeded')) return;
-    sessionStorage.setItem('seeded', '1');
-    const request = indexedDB.open('attune', 1);
-    request.onupgradeneeded = () => {
-      const store = request.result.createObjectStore('materials', { keyPath: 'id' });
-      store.put({
-        id: 'old',
-        name: 'old lesson.wav',
-        audio: new Blob([new Uint8Array(audio)], { type: 'audio/wav' }),
-        duration: 4,
-        segments: [
-          { id: 'same', start: 0, end: 1.5, reference: 'Hello world.' },
-          { id: 'same', start: 1.5, end: 3.25, reference: 'Listen again.' },
-        ],
-        attempts: [{ id: 't', createdAt: new Date(0).toISOString(), drafts: {}, checked: {} }],
-        attemptId: 't',
-        segmentId: 'same',
-        position: 0,
-        review: [],
-      });
-    };
-    request.onsuccess = () => {
-      const db = request.result;
-      db.onversionchange = () => db.close();
-    };
-  }, Array.from(wav()));
-  await page.goto('/');
-  await expect(page.getByRole('heading', { name: '听写练习', exact: true })).toBeVisible();
-  await expect(page.locator('.sentence-sidebar__item')).toHaveCount(2);
-  const stored = await page.evaluate(
-    () =>
-      new Promise<{ ids: string[]; words: boolean }>((resolve) => {
-        const request = indexedDB.open('attune');
-        request.onsuccess = () => {
-          const get = request.result.transaction('materials').objectStore('materials').get('old');
-          get.onsuccess = () =>
-            resolve({
-              ids: get.result.segments.map((s: { id: string }) => s.id),
-              words: get.result.segments.every((s: { words: unknown }) => Array.isArray(s.words)),
-            });
+}
+
+/** Autosave is debounced, so wait for the queue to drain before reloading or reading. */
+async function settled(page: Page) {
+  await expect(page.locator('.app')).toHaveAttribute('data-saving', 'false');
+}
+
+const storedMaterial = (page: Page, id: string) =>
+  page.evaluate(
+    (key) =>
+      new Promise<any>((resolve) => {
+        const open = indexedDB.open('attune', 3);
+        open.onsuccess = () => {
+          const request = open.result.transaction('materials').objectStore('materials').get(key);
+          request.onsuccess = () => resolve(request.result);
         };
       }),
+    id,
   );
-  expect(new Set(stored.ids).size).toBe(2);
-  expect(stored.words).toBe(true);
-  await expect(page.getByRole('button', { name: '识别原文' })).toBeDisabled();
 
-  const download = page.waitForEvent('download');
-  await page.getByRole('button', { name: '导出 SRT' }).click();
-  const file = await download;
-  expect(file.suggestedFilename()).toBe('old lesson.srt');
-  const srt = (await (await file.createReadStream()).toArray()).join('');
-  expect(srt).toBe(
-    '\uFEFF1\r\n00:00:00,000 --> 00:00:01,500\r\nHello world.\r\n\r\n' +
-      '2\r\n00:00:01,500 --> 00:00:03,250\r\nListen again.\r\n',
-  );
-  await page
-    .locator('input[type=file]')
-    .nth(1)
-    .setInputFiles({ name: 'old lesson.srt', mimeType: 'text/plain', buffer: Buffer.from(srt) });
-  await expect(page.getByText('字幕已导入')).toBeVisible();
-  await expect(page.locator('.sentence-sidebar__item')).toHaveCount(2);
-  expect(errors).toEqual([]);
+const material = (overrides: Record<string, unknown> = {}) => ({
+  id: 'm1',
+  displayName: 'podcast.mp3',
+  originalFileName: 'podcast.mp3',
+  folderId: null,
+  duration: 9,
+  segments: [
+    { id: 's1', start: 0, end: 3, reference: 'Hello world.', words: [] },
+    { id: 's2', start: 3, end: 6, reference: 'Nice to meet you.', words: [] },
+    { id: 's3', start: 6, end: 9, reference: 'See you later.', words: [] },
+  ],
+  createdAt: '2026-03-01T08:00:00Z',
+  playbackPosition: 0,
+  bookmarkedSegmentIds: [],
+  rounds: [],
+  activeRoundId: '',
+  audio: wav(),
+  ...overrides,
 });
-test('intensive listening rates, loop and SRT without invented word timings', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/');
-  await expect(page.getByRole('button', { name: '导入第一篇音频' })).toBeEnabled();
-  await page
-    .locator('input[type=file]')
-    .first()
-    .setInputFiles({ name: 'intensive.wav', mimeType: 'audio/wav', buffer: wav(4) });
-  await page
-    .locator('input[type=file]')
-    .nth(1)
-    .setInputFiles({
-      name: 'intensive.srt',
-      mimeType: 'text/plain',
-      buffer: Buffer.from('1\n00:00:00,000 --> 00:00:02,000\nHello world\n'),
-    });
-  const field = page.getByRole('textbox', { name: '第 1 句听写', exact: true });
-  await field.fill('Hello word');
-  await page.getByRole('button', { name: '核对原文', exact: true }).click();
-  await expect(page.getByLabel('精听本句')).toBeVisible();
-  await expect(page.getByLabel('核对对照')).toBeVisible();
-  await expect(page.locator('ins')).toContainText('world');
-  await expect(page.locator('del')).toContainText('word');
-  await expect(page.getByText('无词级时间', { exact: false })).toBeVisible();
-  await expect(page.locator('.intensive__token--seek')).toHaveCount(0);
-  await page.getByRole('button', { name: '0.5×', exact: true }).click();
-  await expect
-    .poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.playbackRate))
-    .toBe(0.5);
-  await expect
-    .poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => !a.paused))
-    .toBe(true);
-  await page.locator('.intensive label').filter({ hasText: '单句循环' }).locator('input').check();
-  await expect(page.getByLabel('精听本句').locator('input[type=checkbox]')).toBeChecked();
-  await page.getByRole('button', { name: '再听本句', exact: true }).click();
-  await expect
-    .poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.playbackRate))
-    .toBe(0.5);
-  await page.keyboard.press('Alt+Digit1');
-  await expect
-    .poll(() => page.locator('audio').evaluate((a: HTMLAudioElement) => a.playbackRate))
-    .toBe(1);
-  await expect(page.getByLabel('精听速度').getByRole('button', { name: '1×' })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  expect(errors).toEqual([]);
+
+test.describe('home', () => {
+  test('shows an empty state when nothing has been studied', async ({ page }) => {
+    await seed(page, [material({ audio: wav() })]);
+    await expect(page.getByRole('heading', { name: '继续学习' })).toBeVisible();
+    // An imported-but-never-opened material must not pretend to be a study session.
+    await expect(page.getByText('还没有开始听写')).toBeVisible();
+    await expect(page.getByText('podcast.mp3')).toHaveCount(0);
+  });
+
+  test('offers the last studied material with real progress', async ({ page }) => {
+    await seed(page, [
+      material({
+        id: 'm1',
+        displayName: '已听的.mp3',
+        lastStudiedAt: '2026-05-02T10:00:00Z',
+        rounds: [
+          {
+            id: 'r1',
+            createdAt: '2026-05-01T10:00:00Z',
+            updatedAt: '2026-05-02T10:00:00Z',
+            drafts: {},
+            completedSegmentIds: ['s1', 's2'],
+          },
+        ],
+        activeRoundId: 'r1',
+      }),
+      material({ id: 'm2', displayName: '只导入的.mp3' }),
+    ]);
+    await expect(page.getByRole('heading', { name: '继续学习' })).toBeVisible();
+    const resume = page.locator('.resume');
+    await expect(resume).toContainText('已听的.mp3');
+    await expect(resume).toContainText('已听写 2 / 3 句');
+    await expect(page.locator('.recent')).toContainText('已听的.mp3');
+    await expect(page.locator('.recent')).not.toContainText('只导入的.mp3');
+  });
+});
+
+test.describe('library', () => {
+  test('lists materials with duration, progress and subtitle status', async ({ page }) => {
+    await seed(page, [material({ audio: wav() })]);
+    await page.getByRole('button', { name: '素材库' }).first().click();
+    const row = page.locator('.materials__row');
+    await expect(row).toContainText('podcast.mp3');
+    await expect(row).toContainText('00:09');
+    await expect(row).toContainText('未开始');
+  });
+
+  test('renames the display name without touching the audio or subtitles', async ({ page }) => {
+    await seed(page, [material({ audio: wav() })]);
+    await page.getByRole('button', { name: '素材库' }).first().click();
+    await page.getByLabel('podcast.mp3 的更多操作').click();
+    await page.getByRole('menuitem', { name: '重命名' }).click();
+    await page.getByLabel('重命名 podcast.mp3').fill('我的播客');
+    await page.getByLabel('重命名 podcast.mp3').press('Enter');
+    await expect(page.locator('.materials__row')).toContainText('我的播客');
+    await settled(page);
+
+    // The original file name and every segment survive the rename.
+    const stored = await storedMaterial(page, 'm1');
+    expect(stored.displayName).toBe('我的播客');
+    expect(stored.originalFileName).toBe('podcast.mp3');
+    expect(stored.segments).toHaveLength(3);
+  });
+
+  test('keeps a material when its folder is deleted', async ({ page }) => {
+    await seed(page, [material({ audio: wav() })]);
+    await page.getByRole('button', { name: '素材库' }).first().click();
+    await page.getByLabel('新建文件夹').click();
+    await page.getByLabel('新文件夹名称').fill('播客');
+    await page.getByLabel('新文件夹名称').press('Enter');
+    // Move the material in first, then delete the folder it lives in.
+    await page.getByLabel('podcast.mp3 的更多操作').click();
+    await page.getByRole('menuitem', { name: '移动到文件夹' }).click();
+    await page.locator('.menu').getByRole('menuitem', { name: '播客' }).click();
+    await settled(page);
+    await page.locator('.folders__item', { hasText: '播客' }).click();
+    await expect(page.locator('.materials__row')).toContainText('podcast.mp3');
+
+    page.once('dialog', (dialog) => void dialog.accept());
+    await page.getByLabel('重命名文件夹 播客').click();
+    await page.getByRole('menuitem', { name: '删除文件夹' }).click();
+
+    // The folder is gone; the material falls back to 未分类 and keeps its audio.
+    await expect(page.locator('.folders').getByRole('button', { name: /未分类/ })).toBeVisible();
+    await page.locator('.folders__item', { hasText: '未分类' }).click();
+    await expect(page.locator('.materials__row')).toContainText('podcast.mp3');
+    const kept = await storedMaterial(page, 'm1');
+    expect(kept.displayName).toBe('podcast.mp3');
+    expect(kept.segments).toHaveLength(3);
+  });
+
+  test('searches across every folder and says so', async ({ page }) => {
+    await seed(page, [material({ id: 'm1', displayName: '英语课程.mp3', folderId: 'f1' })]);
+    await page.getByRole('button', { name: '素材库' }).first().click();
+    await page.getByLabel('搜索全部素材').fill('英语');
+    await expect(page.locator('.library__count')).toContainText('已忽略文件夹');
+    await expect(page.locator('.materials__row')).toContainText('英语课程.mp3');
+  });
+
+  test('sorts by a chosen order from the toolbar menu', async ({ page }) => {
+    await seed(page, [
+      material({
+        id: 'm1',
+        displayName: 'bbb.mp3',
+        duration: 30,
+        createdAt: '2026-01-01T00:00:00Z',
+        lastStudiedAt: '2026-06-01T00:00:00Z',
+      }),
+      material({
+        id: 'm2',
+        displayName: 'aaa.mp3',
+        duration: 10,
+        createdAt: '2026-02-01T00:00:00Z',
+      }),
+    ]);
+    await page.getByRole('button', { name: '素材库' }).first().click();
+    // 最近学习 is the default and puts the only studied material first.
+    await expect(page.locator('.materials__row').first()).toContainText('bbb.mp3');
+    await page.getByLabel(/排序：/).click();
+    await page.getByRole('menuitemradio', { name: '名称 A–Z' }).click();
+    await expect(page.locator('.materials__row').first()).toContainText('aaa.mp3');
+    await page.getByLabel(/排序：/).click();
+    await page.getByRole('menuitemradio', { name: '时长' }).click();
+    await expect(page.locator('.materials__row').first()).toContainText('bbb.mp3');
+    await page.getByLabel(/排序：/).click();
+    await page.getByRole('menuitemradio', { name: '最近导入' }).click();
+    // bbb was also imported first, so the two orders agree here by data, not by luck.
+    await expect(page.locator('.materials__row')).toHaveCount(2);
+  });
+
+  test('binds Ctrl+F to search and F2 to rename', async ({ page }) => {
+    await seed(page, [material({ audio: wav() })]);
+    await page.getByRole('button', { name: '素材库' }).first().click();
+
+    await page.keyboard.press('Control+f');
+    await expect(page.getByLabel('搜索全部素材')).toBeFocused();
+    await page.keyboard.press('Escape');
+
+    // Opening a material keeps it selected, so F2 works once the user comes back.
+    await page.locator('.materials__row').first().click();
+    await expect(page.getByRole('heading', { name: '第 1 / 3 句' })).toBeVisible();
+    await page.getByRole('button', { name: '← 返回' }).click();
+    await page.keyboard.press('F2');
+    await expect(page.getByLabel('重命名 podcast.mp3')).toBeFocused();
+  });
+});
+
+test.describe('dictation', () => {
+  const study = async (page: Page) => {
+    await seed(page, [material({ audio: wav() })]);
+    await page.getByRole('button', { name: '素材库' }).first().click();
+    await page.locator('.materials__row').first().click();
+    await expect(page.getByRole('heading', { name: '第 1 / 3 句' })).toBeVisible();
+  };
+
+  test('moves between sentences with the arrow keys only when not typing', async ({ page }) => {
+    await study(page);
+    const field = page.getByLabel('第 1 句听写');
+    await field.click();
+    await field.press('ArrowRight');
+    await field.press('ArrowRight');
+    // Inside the textarea the arrows still move the caret, not the sentence.
+    await expect(page.getByRole('heading', { name: '第 1 / 3 句' })).toBeVisible();
+    await field.press('Escape');
+    await page.locator('h1').first().click();
+    await page.keyboard.press('ArrowRight');
+    await expect(page.getByRole('heading', { name: '第 2 / 3 句' })).toBeVisible();
+    await page.keyboard.press('ArrowLeft');
+    await expect(page.getByRole('heading', { name: '第 1 / 3 句' })).toBeVisible();
+  });
+
+  test('reveals nothing about correctness before 核对答案', async ({ page }) => {
+    await study(page);
+    const field = page.getByLabel('第 1 句听写');
+    await field.click();
+    await field.pressSequentially('Hello');
+    await field.pressSequentially(' wrong');
+    // No "correct" or "wrong" verdict may appear while typing.
+    await expect(page.locator('.diff')).toHaveCount(0);
+    await expect(page.getByText('输入正确')).toHaveCount(0);
+    await expect(page.getByText('请检查输入')).toHaveCount(0);
+  });
+
+  test('checks on Enter, shows the diff, and moves on with Enter again', async ({ page }) => {
+    await study(page);
+    const field = page.getByLabel('第 1 句听写');
+    await field.click();
+    await field.pressSequentially('Hello world');
+    await field.press('Enter');
+    await expect(page.locator('.diff')).toBeVisible();
+    await expect(page.locator('.diff')).toContainText('与原文一致');
+    await field.press('Enter');
+    await expect(page.getByRole('heading', { name: '第 2 / 3 句' })).toBeVisible();
+  });
+
+  test('marks a missing word without turning the whole sentence into errors', async ({ page }) => {
+    await study(page);
+    const field = page.getByLabel('第 1 句听写');
+    await field.click();
+    await field.pressSequentially('Hello');
+    await field.press('Enter');
+    await expect(page.locator('.diff__word--missing')).toHaveCount(1);
+    await expect(page.locator('.diff__word--missing')).toHaveText('world.');
+    await expect(page.locator('.diff__word--extra')).toHaveCount(0);
+  });
+
+  test('goes back to editing with Esc after checking', async ({ page }) => {
+    await study(page);
+    const field = page.getByLabel('第 1 句听写');
+    await field.click();
+    await field.pressSequentially('Hello world');
+    await field.press('Enter');
+    await expect(page.locator('.diff')).toBeVisible();
+    await field.press('Escape');
+    await expect(page.locator('.diff')).toHaveCount(0);
+    // Esc must never clear what was typed.
+    await expect(field).toHaveValue('Hello world');
+  });
+
+  test('counts a sentence as 已听写 only after 核对答案', async ({ page }) => {
+    await study(page);
+    await expect(page.getByText('已听写 0 / 3 句')).toBeVisible();
+    const field = page.getByLabel('第 1 句听写');
+    await field.click();
+    await field.pressSequentially('Hello world');
+    // A draft on its own is in progress, not dictated.
+    await page.locator('h1').first().click();
+    await page.locator('h1').first().click();
+    await page.getByLabel('第 1 句听写').click();
+    await page.getByLabel('第 1 句听写').press('Enter');
+    await expect(page.getByText('已听写 1 / 3 句')).toBeVisible();
+  });
+
+  test('keeps a draft across a reload', async ({ page }) => {
+    await study(page);
+    const field = page.getByLabel('第 1 句听写');
+    await field.click();
+    await field.pressSequentially('Hello world');
+    await page.locator('h1').first().click();
+    await settled(page);
+    await page.reload();
+    await page.getByRole('button', { name: '素材库' }).first().click();
+    await page.locator('.materials__row').first().click();
+    await expect(page.getByLabel('第 1 句听写')).toHaveValue('Hello world');
+  });
+});
+
+test.describe('player and views', () => {
+  test('switches between 听写 and 听读 without losing the draft', async ({ page }) => {
+    await seed(page, [material({ audio: wav() })]);
+    await page.getByRole('button', { name: '素材库' }).first().click();
+    await page.locator('.materials__row').first().click();
+    const field = page.getByLabel('第 1 句听写');
+    await field.click();
+    await field.pressSequentially('Hello world');
+    await page.getByRole('tab', { name: '听读' }).click();
+    await expect(page.locator('.reading')).toContainText('Nice to meet you.');
+    await page.getByRole('tab', { name: '听写' }).click();
+    await expect(page.getByLabel('第 1 句听写')).toHaveValue('Hello world');
+  });
+
+  test('marks a 难句 and keeps it on the material', async ({ page }) => {
+    await seed(page, [material({ audio: wav() })]);
+    await page.getByRole('button', { name: '素材库' }).first().click();
+    await page.locator('.materials__row').first().click();
+    await page.getByRole('button', { name: '☆ 标记难句' }).click();
+    await expect(page.getByRole('button', { name: '★ 难句' })).toBeVisible();
+    await settled(page);
+    await page.reload();
+    await page.getByRole('button', { name: '素材库' }).first().click();
+    await page.locator('.materials__row').first().click();
+    await expect(page.getByRole('button', { name: '★ 难句' })).toBeVisible();
+  });
+
+  test('refuses to check a sentence with no reference text', async ({ page }) => {
+    await seed(page, [
+      material({
+        audio: wav(),
+        segments: [{ id: 's1', start: 0, end: 3, reference: '', words: [] }],
+      }),
+    ]);
+    await page.getByRole('button', { name: '素材库' }).first().click();
+    await page.locator('.materials__row').first().click();
+    const field = page.getByLabel('第 1 句听写');
+    await field.click();
+    await field.pressSequentially('anything');
+    await field.press('Enter');
+    await expect(page.getByText('这句还没有参考原文')).toBeVisible();
+  });
 });

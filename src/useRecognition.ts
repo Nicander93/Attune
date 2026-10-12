@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { sentencesToSegments, type Material, type Segment } from './domain';
+import { sentencesToSegments, type Material, type SubtitleSegment } from './domain';
 import {
   CANCELLED,
   cancelDownload,
@@ -19,7 +19,7 @@ import {
 export type Task = { label: string; percent?: number; cancel?: () => void };
 type Callbacks = {
   /** Called once with the complete result; never with partial segments. */
-  onRecognized: (materialId: string, segments: Segment[]) => void;
+  onRecognized: (materialId: string, segments: SubtitleSegment[]) => void;
   onError: (message: string) => void;
   onNotice: (message: string) => void;
 };
