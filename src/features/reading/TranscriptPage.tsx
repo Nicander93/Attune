@@ -2,12 +2,14 @@ import { useMemo } from 'react';
 import type { Material } from '../../domain/types';
 import { formatTime } from '../../domain/types';
 import { roundProgress } from '../../domain/progress';
+import { Player } from '../player/Player';
+import type { AudioPlayer } from '../player/useAudioPlayer';
 
 type Props = {
   material: Material;
   onBack: () => void;
   /** Jumps the shared player; the workbench keeps whatever was being typed. */
-  onPlayFrom: (segmentId: string) => void;
+  player: AudioPlayer;
 };
 
 /**
@@ -17,7 +19,7 @@ type Props = {
  * is for. Going back returns to the workbench with the draft and sentence intact,
  * because the workbench owns that state and this page never touched it.
  */
-export function TranscriptPage({ material, onBack, onPlayFrom }: Props) {
+export function TranscriptPage({ material, onBack, player }: Props) {
   const translated = useMemo(
     () => material.segments.some((s) => s.translation?.trim()),
     [material.segments],
@@ -36,12 +38,17 @@ export function TranscriptPage({ material, onBack, onPlayFrom }: Props) {
         <span className="muted">{material.segments.length} 句</span>
       </header>
 
+      <Player material={material} player={player} />
+
       {!translated && <p className="muted">这份字幕没有中文译文，只显示英文。</p>}
 
       <ol className="transcript__list">
         {material.segments.map((segment, index) => (
           <li key={segment.id}>
-            <button className="transcript__jump muted" onClick={() => onPlayFrom(segment.id)}>
+            <button
+              className="transcript__jump muted"
+              onClick={() => player.goToSegment(segment.id, { play: true })}
+            >
               {index + 1} · {formatTime(segment.start)}
             </button>
             <div>

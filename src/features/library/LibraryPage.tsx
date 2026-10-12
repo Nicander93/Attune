@@ -17,6 +17,10 @@ type Props = {
   materials: Material[];
   folders: Folder[];
   ready: boolean;
+  query: string;
+  onQueryChange: (query: string) => void;
+  order: SortOrder;
+  onOrderChange: (order: SortOrder) => void;
   selectedFolder: string | null;
   onSelectFolder: (folderId: string | null) => void;
   /** Lifted to the app so the row survives navigating away and back. */
@@ -34,7 +38,7 @@ type Props = {
   onNotice: (message: string) => void;
 };
 
-const blank = (): Material => ({
+export const blank = (): Material => ({
   id: crypto.randomUUID(),
   displayName: '未命名素材',
   originalFileName: '',
@@ -50,8 +54,7 @@ const blank = (): Material => ({
 });
 
 export function LibraryPage(props: Props) {
-  const [query, setQuery] = useState('');
-  const [order, setOrder] = useState<SortOrder>('recent');
+  const { query, onQueryChange: setQuery, order, onOrderChange: setOrder } = props;
   const [sortOpen, setSortOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -80,6 +83,10 @@ export function LibraryPage(props: Props) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.isComposing) return;
+      const inputFocused = (event.target as HTMLElement | null)?.closest(
+        'input, textarea, [contenteditable]',
+      );
+      if (inputFocused) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
         event.preventDefault();
         searchRef.current?.focus();
@@ -93,6 +100,7 @@ export function LibraryPage(props: Props) {
       if (event.key === 'Escape') {
         setMenuFor(null);
         setSortOpen(false);
+        setFolderFor(null);
       }
     };
     document.addEventListener('keydown', onKey);
@@ -152,7 +160,11 @@ export function LibraryPage(props: Props) {
           <p className="eyebrow">素材库</p>
           <h1>全部素材</h1>
         </div>
-        <button className="primary" disabled={!props.ready} onClick={() => props.onCreate(blank())}>
+        <button
+          className="primary"
+          disabled={!props.ready}
+          onClick={() => void props.onCreate(blank()).catch(() => undefined)}
+        >
           ＋ 新建素材
         </button>
       </div>

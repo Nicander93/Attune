@@ -55,7 +55,13 @@ function markStale(material: Material, ids: string[]): PracticeRound[] {
   if (!ids.length) return material.rounds;
   return material.rounds.map((round) =>
     ids.some((id) => round.completedSegmentIds.includes(id))
-      ? { ...round, staleSegmentIds: [...new Set([...(round.staleSegmentIds ?? []), ...ids])] }
+      ? {
+          ...round,
+          checkedSegmentId: ids.includes(round.checkedSegmentId ?? '')
+            ? undefined
+            : round.checkedSegmentId,
+          staleSegmentIds: [...new Set([...(round.staleSegmentIds ?? []), ...ids])],
+        }
       : round,
   );
 }
@@ -102,17 +108,22 @@ export function splitSegment(
   material: Material,
   id: string,
   at: number,
+  textOffset = Math.floor(segmentAt(material, id).reference.length / 2),
 ): { material: Material; report: EditReport } {
   const current = segmentAt(material, id);
   if (at <= current.start + 0.05 || at >= current.end - 0.05) fail('拆分点必须落在这一句的中间。');
+  const firstText = current.reference.slice(0, textOffset).trim();
+  const secondText = current.reference.slice(textOffset).trim();
+  if (!Number.isInteger(textOffset) || !firstText || !secondText)
+    fail('请把文字光标放在句子中间，两边都需要有字幕内容。');
   const second: SubtitleSegment = {
     id: newId(),
     start: at,
     end: current.end,
-    reference: '',
+    reference: secondText,
     words: [],
   };
-  const first: SubtitleSegment = { ...current, end: at, words: [] };
+  const first: SubtitleSegment = { ...current, end: at, reference: firstText, words: [] };
   const next = {
     ...material,
     segments: [...material.segments.filter((s) => s.id !== id), first, second].sort(
@@ -129,8 +140,8 @@ export function splitSegment(
 
 /**
  * Merges a sentence with the one after it. The first keeps its id and records; the
- * second id disappears, so anything recorded against it cannot follow and is reported
- * rather than silently dropped.
+ * second id disappears: drafts are joined, bookmarks move, and either checked result
+ * makes the surviving sentence stale. Legacy archives remain untouched.
  */
 export function mergeWithNext(
   material: Material,
@@ -145,6 +156,8 @@ export function mergeWithNext(
     ...first,
     end: second.end,
     reference: [first.reference, second.reference].filter((t) => t.trim()).join(' '),
+    translation:
+      [first.translation, second.translation].filter((t) => t?.trim()).join(' ') || undefined,
     words: [],
   };
   const next = [...material.segments.filter((s) => s.id !== id && s.id !== second.id), merged].sort(
@@ -155,33 +168,30 @@ export function mergeWithNext(
   const stale: string[] = [];
 
   const rounds = material.rounds.map((round) => {
-    let { drafts } = round;
-    let { completedSegmentIds: completed } = round;
-    let { staleSegmentIds = [] } = round;
-
-    // A draft on the swallowed sentence moves across only if the target has none;
-    // otherwise the target's own draft would be overwritten and both would be lost.
-    // Either way the dead key is removed, so nothing dangles against a gone id.
-    if (drafts[second.id]) {
-      const { [second.id]: swallowed, ...rest } = drafts;
-      drafts = rest;
-      if (rest[first.id]) lost.push(second.id);
-      else drafts = { ...rest, [first.id]: swallowed };
+    const { [second.id]: swallowed, ...drafts } = round.drafts;
+    if (swallowed) drafts[first.id] = [drafts[first.id], swallowed].filter(Boolean).join(' ');
+    const affected = round.completedSegmentIds.some((id) => id === first.id || id === second.id);
+    const completed = round.completedSegmentIds.filter((id) => id !== second.id);
+    if (affected && !completed.includes(first.id)) completed.push(first.id);
+    const staleSegmentIds = (round.staleSegmentIds ?? []).filter((id) => id !== second.id);
+    if (affected) {
+      stale.push(first.id);
+      if (!staleSegmentIds.includes(first.id)) staleSegmentIds.push(first.id);
     }
-    // Its checked result can never be re-used: it covered text now inside the first
-    // sentence, so the merged sentence is marked stale instead.
-    if (completed.includes(second.id)) {
-      lost.push(second.id);
-      if (!completed.includes(first.id)) completed = [...completed, first.id];
-      if (!staleSegmentIds.includes(first.id)) staleSegmentIds = [...staleSegmentIds, first.id];
-    }
-    return { ...round, drafts, completedSegmentIds: completed, staleSegmentIds };
+    return {
+      ...round,
+      drafts,
+      completedSegmentIds: completed,
+      staleSegmentIds,
+      activeSegmentId: round.activeSegmentId === second.id ? first.id : round.activeSegmentId,
+      checkedSegmentId: affected ? undefined : round.checkedSegmentId,
+    };
   });
 
   // 难句 marks live on the material, so the surviving sentence inherits the merged pair.
-  const bookmarks = material.bookmarkedSegmentIds.includes(second.id)
-    ? material.bookmarkedSegmentIds.filter((s) => s !== second.id)
-    : material.bookmarkedSegmentIds;
+  const bookmarks = [
+    ...new Set(material.bookmarkedSegmentIds.map((id) => (id === second.id ? first.id : id))),
+  ];
 
   return {
     material: { ...material, segments: next, rounds, bookmarkedSegmentIds: bookmarks },
@@ -200,7 +210,8 @@ export function replaceTimeline(material: Material, segments: SubtitleSegment[])
   const started = material.rounds.some(
     (r) => r.completedSegmentIds.length > 0 || Object.values(r.drafts).some((d) => d.trim()),
   );
-  if (started) fail('这段素材已经有听写记录，换一份字幕会让旧记录的句子对不上。请新建素材再导入。');
+  if (started || material.bookmarkedSegmentIds.length)
+    fail('这段素材已经有听写记录或难句标记，换一份字幕会让旧记录的句子对不上。请新建素材再导入。');
   return {
     ...material,
     segments: [...segments].sort((a, b) => a.start - b.start),

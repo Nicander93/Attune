@@ -80,10 +80,12 @@ export function compareWords(draft: string[], reference: string): DiffWord[] {
     throw new Error('单段超过 600 个词，请先拆分片段再核对。');
 
   const table = Array.from({ length: a.length + 1 }, () => new Uint16Array(b.length + 1));
+  const normalizedA = a.map(normalize);
+  const normalizedB = b.map(normalize);
   for (let i = a.length - 1; i >= 0; i--)
     for (let j = b.length - 1; j >= 0; j--)
       table[i][j] =
-        normalize(a[i]) === normalize(b[j])
+        normalizedA[i] === normalizedB[j]
           ? table[i + 1][j + 1] + 1
           : Math.max(table[i + 1][j], table[i][j + 1]);
 
@@ -91,7 +93,7 @@ export function compareWords(draft: string[], reference: string): DiffWord[] {
   let i = 0,
     j = 0;
   while (i < a.length || j < b.length) {
-    if (i < a.length && j < b.length && normalize(a[i]) === normalize(b[j])) {
+    if (i < a.length && j < b.length && normalizedA[i] === normalizedB[j]) {
       result.push({ text: a[i++], kind: 'same' });
       j++;
     } else if (j < b.length && (i === a.length || table[i][j + 1] >= table[i + 1][j]))

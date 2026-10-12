@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "test:rust": "node scripts/native-env.mjs cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:native": "node scripts/native-smoke.mjs",
     "tauri": "node scripts/native-env.mjs tauri",
     "desktop": "node scripts/native-env.mjs tauri dev",
     "test:e2e": "playwright test",

@@ -1,20 +1,21 @@
 /*
- * Attune design tokens. Warm off-white paper, deep green ink, one accent.
- * Layout is built so a 1024x640 window still reaches every control: the page never
- * scrolls, only long lists do.
+ * Attune design tokens, taken from the logo concept board: warm cream paper, a blue
+ * that matches the waveform, orange reserved for sound accents. Sampled from the
+ * artwork rather than eyeballed. Layout is built so a 1024x640 window still reaches
+ * every control: the page never scrolls, only long lists do.
  */
 :root {
-  --bg: #f4f6f3;
+  --bg: #f7f4ef;
   --paper: #fff;
-  --ink: #26332c;
-  --sub: #718179;
-  --faint: #a0ada3;
-  --line: #e5ebe5;
-  --accent: #25745f;
-  --tint: #edf6f0;
-  --err: #ae514a;
-  --errbg: #fff1ee;
-  --shadow: 0 8px 35px rgba(30, 55, 40, 0.055);
+  --ink: #2a2622;
+  --sub: #6e6862;
+  --faint: #a39c94;
+  --line: #e8e2d9;
+  --accent: #4a86d6;
+  --tint: #eef4fc;
+  --err: #c0574f;
+  --errbg: #fdf0ee;
+  --shadow: 0 8px 35px rgba(74, 60, 40, 0.07);
   --radius: 10px;
 }
 
@@ -148,7 +149,7 @@ kbd {
 .page {
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 24px;
 }
 .page > section {
@@ -950,4 +951,106 @@ button.back {
 .history__rounds > li.is-active {
   background: var(--tint);
   border-radius: 8px;
+}
+
+/* The transport and action rows stay in the window; only content can scroll. */
+.library,
+.prep,
+.proof,
+.transcript {
+  height: 100%;
+  min-height: 0;
+}
+.library {
+  display: flex;
+  flex-direction: column;
+}
+.library__body,
+.library__list {
+  flex: 1;
+  min-height: 0;
+}
+.library__list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.materials,
+.proof__list,
+.transcript__list,
+.history__rounds {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.folders {
+  max-height: 100%;
+  overflow: auto;
+}
+.study > .player,
+.study__head,
+.tabs,
+.study__foot,
+.prep__head,
+.prep__foot,
+.proof > .player,
+.transcript > .player {
+  flex-shrink: 0;
+}
+.dictation {
+  overflow: hidden;
+}
+.dictation__head,
+.dictation__actions,
+.flow {
+  flex-shrink: 0;
+}
+.diff {
+  min-height: 0;
+  overflow: auto;
+}
+.reading {
+  flex: 1;
+  overflow: hidden;
+}
+.reading__text {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+.prep__content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.prep__head > div,
+.study__head > div {
+  min-width: 0;
+}
+.prep__head h1,
+.study__head .eyebrow {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tabs input[type='range'] {
+  width: 90px;
+}
+@media (max-height: 660px) {
+  .page {
+    padding: 16px 24px;
+  }
+  .study,
+  .prep,
+  .proof,
+  .transcript {
+    gap: 10px;
+  }
+  .player {
+    padding: 8px 12px;
+  }
+  .player__play {
+    width: 32px;
+    height: 32px;
+  }
 }

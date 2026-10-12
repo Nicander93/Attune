@@ -1,15 +1,12 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useLibrary } from './useLibrary';
 import type { Route } from './routes';
-import { previousRoute } from './routes';
 import { ErrorBoundary } from './ErrorBoundary';
 import logoUrl from '../assets/logo.svg';
 import { HomePage } from '../features/home/HomePage';
-import { LibraryPage } from '../features/library/LibraryPage';
-import { MaterialPrepPage } from '../features/material/MaterialPrepPage';
-import { SubtitleProofPage } from '../features/subtitles/SubtitleProofPage';
-import { StudyPage } from '../features/study/StudyPage';
-import { TranscriptPage } from '../features/reading/TranscriptPage';
+import { blank, LibraryPage } from '../features/library/LibraryPage';
+import { MaterialWorkspace } from './MaterialWorkspace';
+import type { SortOrder } from '../features/library/listing';
 
 /**
  * One window, a page stack, and no router dependency.
@@ -20,18 +17,32 @@ import { TranscriptPage } from '../features/reading/TranscriptPage';
 export function App() {
   const library = useLibrary();
   const [route, setRoute] = useState<Route>({ name: 'home' });
+  const history = useRef<Route[]>([]);
+  const [query, setQuery] = useState('');
+  const [order, setOrder] = useState<SortOrder>('recent');
   // Kept above the pages so a row stays selected when the user returns from a study
   // session, which is what makes F2 rename work on the material they just practised.
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [notice, setNotice] = useState('');
 
-  const go = useCallback((next: Route) => {
-    setNotice('');
-    setRoute(next);
-  }, []);
+  const go = useCallback(
+    (next: Route) => {
+      setNotice('');
+      history.current.push(route);
+      setRoute(next);
+    },
+    [route],
+  );
 
-  const back = useCallback((current: Route): Route => previousRoute(current), []);
-  const goBack = useCallback(() => setRoute(back), [back]);
+  const goBack = useCallback(() => setRoute(history.current.pop() ?? { name: 'home' }), []);
+  async function createMaterial(material = blank()) {
+    await library.add(material);
+    go({
+      name: 'material',
+      materialId: material.id,
+      from: route.name === 'home' ? 'home' : 'library',
+    });
+  }
 
   const material = useMemo(
     () => library.materials.find((m) => m.id === ('materialId' in route ? route.materialId : '')),
@@ -83,14 +94,14 @@ export function App() {
       )}
 
       <main className="page">
-        <ErrorBoundary key={route.name}>
+        <ErrorBoundary key={material?.id ?? route.name}>
           {route.name === 'home' && (
             <HomePage
               materials={library.materials}
               ready={library.ready}
               onContinue={(id) => go({ name: 'study', materialId: id, from: 'home' })}
               onOpenLibrary={() => go({ name: 'library', folderId: null })}
-              onNewMaterial={() => go({ name: 'library', folderId: null })}
+              onNewMaterial={() => void createMaterial().catch(() => undefined)}
             />
           )}
 
@@ -100,12 +111,16 @@ export function App() {
               folders={library.folders}
               ready={library.ready}
               selectedFolder={route.folderId}
-              onSelectFolder={(folderId) => go({ name: 'library', folderId })}
+              query={query}
+              onQueryChange={setQuery}
+              order={order}
+              onOrderChange={setOrder}
+              onSelectFolder={(folderId) => setRoute({ name: 'library', folderId })}
               selectedId={selectedId}
               onSelect={setSelectedId}
               onOpen={(id) => go({ name: 'study', materialId: id, from: 'library' })}
               onPrepare={(id) => go({ name: 'material', materialId: id, from: 'library' })}
-              onCreate={library.add}
+              onCreate={createMaterial}
               onRename={library.rename}
               onMove={library.moveToFolder}
               onDelete={library.remove}
@@ -116,45 +131,15 @@ export function App() {
             />
           )}
 
-          {route.name === 'study' && material && (
-            <StudyPage
+          {material && (
+            <MaterialWorkspace
+              key={material.id}
               material={material}
+              route={route}
               update={update}
-              onBack={goBack}
-              onPrepare={() => go({ name: 'material', materialId: material.id, from: 'study' })}
-              onSubtitles={() => go({ name: 'subtitles', materialId: material.id })}
-              onTranscript={() => go({ name: 'transcript', materialId: material.id })}
-              onNotice={setNotice}
-            />
-          )}
-
-          {route.name === 'material' && material && (
-            <MaterialPrepPage
-              material={material}
-              update={update}
-              onBack={goBack}
-              onStudy={() => go({ name: 'study', materialId: material.id, from: 'material' })}
-              onNotice={setNotice}
-            />
-          )}
-
-          {route.name === 'subtitles' && material && (
-            <SubtitleProofPage
-              material={material}
-              update={update}
+              go={go}
               onBack={goBack}
               onNotice={setNotice}
-            />
-          )}
-
-          {route.name === 'transcript' && material && (
-            <TranscriptPage
-              material={material}
-              onBack={goBack}
-              onPlayFrom={(segmentId) => {
-                const target = material.segments.find((s) => s.id === segmentId);
-                if (target) update((m) => ({ ...m, playbackPosition: target.start }));
-              }}
             />
           )}
         </ErrorBoundary>

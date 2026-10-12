@@ -60,6 +60,7 @@ export function useLibrary(): LibraryState {
     queue.current = queue.current.then(async () => {
       try {
         for (const item of batch) await saveMaterial(item);
+        setError('');
       } catch (err) {
         for (const item of batch) {
           const latest = current.current.find((m) => m.id === item.id);
@@ -124,11 +125,14 @@ export function useLibrary(): LibraryState {
   );
 
   const add = useCallback(async (material: Material) => {
-    current.current = [material, ...current.current];
-    setMaterials(current.current);
     setSaving(true);
     try {
       await saveMaterial(material);
+      current.current = [material, ...current.current];
+      setMaterials(current.current);
+    } catch (err) {
+      setError(`创建素材失败：${String(err)}`);
+      throw err;
     } finally {
       setSaving(false);
     }
@@ -153,9 +157,18 @@ export function useLibrary(): LibraryState {
 
   const remove = useCallback(
     async (id: string) => {
-      await deleteMaterial(id);
+      const removed = current.current.find((m) => m.id === id);
+      pending.current.delete(id);
       const next = current.current.filter((m) => m.id !== id);
       commit(next);
+      queue.current = queue.current.then(() => deleteMaterial(id));
+      try {
+        await queue.current;
+      } catch (err) {
+        queue.current = Promise.resolve();
+        if (removed) commit([removed, ...current.current]);
+        setError(`删除失败：${String(err)}`);
+      }
     },
     [commit],
   );
@@ -180,13 +193,15 @@ export function useLibrary(): LibraryState {
   /** Deleting a folder only unlabels its materials; nothing else is touched. */
   const removeFolder = useCallback(
     async (id: string) => {
+      flush();
+      await queue.current;
       const moved = await deleteFolder(id, current.current);
       foldersRef.current = foldersRef.current.filter((f) => f.id !== id);
       setFolders(foldersRef.current);
       const byId = new Map(moved.map((m) => [m.id, m]));
       commit(current.current.map((m) => byId.get(m.id) ?? m));
     },
-    [commit],
+    [commit, flush],
   );
 
   /**

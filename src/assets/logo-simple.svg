@@ -1,0 +1,15 @@
+<!--
+  Attune 图标的小尺寸变体：与 logo.svg 同源，只去掉橙色笔画。
+  16 px 下两笔橙色会并成一团灰，这里是 ≤ 24 px 专用的。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Attune">
+  <title>Attune</title>
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="#fff8f0" />
+  <g fill="#5088d8">
+    <rect x="119" y="250" width="34" height="90" rx="17" />
+    <rect x="179" y="190" width="34" height="150" rx="17" />
+    <rect x="239" y="130" width="34" height="210" rx="17" />
+    <rect x="299" y="200" width="34" height="140" rx="17" />
+    <rect x="359" y="240" width="34" height="100" rx="17" />
+  </g>
+</svg>

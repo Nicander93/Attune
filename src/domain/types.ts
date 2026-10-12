@@ -43,6 +43,8 @@ export interface PracticeRound {
   completedSegmentIds: string[];
   /** Sentences whose reference changed after they were checked; need checking again. */
   staleSegmentIds?: string[];
+  activeSegmentId?: string;
+  checkedSegmentId?: string;
   /**
    * First-draft archive carried over from schema v2 so removing that feature never
    * destroys existing records. Nothing reads it - the history page shows progress only.
@@ -81,6 +83,15 @@ export interface Material {
   lastStudiedAt?: string;
   lastView?: StudyView;
   playbackPosition: number;
+  playbackSettings?: { speed: number; loop: boolean; mode: 'segment' | 'continuous' };
+  studySettings?: {
+    bookmarkedOnly?: boolean;
+    revealAll?: boolean;
+    keySounds?: boolean;
+    volume?: number;
+    language?: 'en' | 'zh' | 'both';
+    following?: boolean;
+  };
   /** 难句标记. Belongs to the material, so it survives across rounds. */
   bookmarkedSegmentIds: string[];
   rounds: PracticeRound[];

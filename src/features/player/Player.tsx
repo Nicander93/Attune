@@ -1,6 +1,6 @@
 import type { Material } from '../../domain/types';
 import { formatTime } from '../../domain/types';
-import { PLAYBACK_RATES, useAudioPlayer, useSentenceStop } from './useAudioPlayer';
+import { PLAYBACK_RATES, useAudioPlayer } from './useAudioPlayer';
 
 type Props = {
   material: Material;
@@ -12,6 +12,8 @@ type Props = {
    * Without it the buttons only move the audio, which is right on 字幕校对.
    */
   onStepSentence?: (delta: 1 | -1) => void;
+  hasPrevious?: boolean;
+  hasNext?: boolean;
 };
 
 /**
@@ -20,30 +22,23 @@ type Props = {
  * It renders no title and no labels beyond the controls themselves: the sentence it
  * acts on is already stated by the page above it.
  */
-export function Player({ material, player, status, onStepSentence }: Props) {
-  const stopAtSentenceEnd = useSentenceStop(player);
-
+export function Player({ material, player, status, onStepSentence, hasPrevious, hasNext }: Props) {
   return (
     <div className="player">
-      <audio
-        ref={player.audioRef}
-        src={player.src || undefined}
-        onPlay={() => player.setMode(player.mode)}
-        onTimeUpdate={(event) => {
-          const current = event.currentTarget.currentTime;
-          stopAtSentenceEnd(current);
-          player.seek(current);
+      <div
+        className="player__controls"
+        onMouseDown={(event) => {
+          if (
+            document.activeElement instanceof HTMLTextAreaElement &&
+            (event.target as HTMLElement).closest('button')
+          )
+            event.preventDefault();
         }}
-        onLoadedMetadata={(event) => {
-          event.currentTarget.currentTime = material.playbackPosition;
-          event.currentTarget.playbackRate = player.speed;
-        }}
-      />
-      <div className="player__controls">
+      >
         <button
           className="quiet"
           aria-label="上一句"
-          disabled={!player.canStep || !player.hasPrevious}
+          disabled={!player.canStep || !(hasPrevious ?? player.hasPrevious)}
           onClick={() => (onStepSentence ? onStepSentence(-1) : player.previous())}
         >
           ⏮
@@ -58,7 +53,7 @@ export function Player({ material, player, status, onStepSentence }: Props) {
         <button
           className="quiet"
           aria-label="下一句"
-          disabled={!player.canStep || !player.hasNext}
+          disabled={!player.canStep || !(hasNext ?? player.hasNext)}
           onClick={() => (onStepSentence ? onStepSentence(1) : player.next())}
         >
           ⏭
@@ -127,5 +122,21 @@ export function Player({ material, player, status, onStepSentence }: Props) {
         </p>
       )}
     </div>
+  );
+}
+
+/** One audio element lives above the pages so navigation cannot restart playback. */
+export function AudioOutput({ player }: { player: ReturnType<typeof useAudioPlayer> }) {
+  return (
+    <audio
+      ref={player.audioRef}
+      src={player.src || undefined}
+      onPlay={player.handlePlay}
+      onPause={player.handlePause}
+      onEnded={player.handlePause}
+      onError={player.handleError}
+      onLoadedMetadata={player.handleMetadata}
+      onTimeUpdate={(event) => player.handleTimeUpdate(event.currentTarget.currentTime)}
+    />
   );
 }

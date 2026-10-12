@@ -28,7 +28,7 @@ export function RecognitionSettings(props: {
     <section className="settings">
       <h2>识别设置</h2>
       <p className="muted">
-        识别在本机离线运行。模型首次识别时自动下载，下载完成并校验通过后才会启用。
+        识别在本机离线运行。首次识别前会询问是否下载模型，下载完成并校验通过后才会启用。
       </p>
       <label>
         模型下载地址

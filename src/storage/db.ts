@@ -62,7 +62,7 @@ function open(): Promise<IDBDatabase> {
 }
 
 /** Ids whose blob is already stored, so autosave never re-copies the audio. */
-const withAudio = new Set<string>();
+const withAudio = new Map<string, Blob>();
 
 /** Closes the connection and drops the cache. Used on window teardown and by tests. */
 export async function closeDatabase(): Promise<void> {
@@ -103,7 +103,7 @@ export async function loadMaterials(): Promise<Material[]> {
       // A row without its audio is unreadable rather than silently empty.
       .filter((record) => audioById.has(record.id))
       .map((record) => {
-        withAudio.add(record.id);
+        withAudio.set(record.id, audioById.get(record.id)!);
         return { ...record, audio: audioById.get(record.id)! };
       })
   );
@@ -112,17 +112,20 @@ export async function loadMaterials(): Promise<Material[]> {
 export async function saveMaterial(material: Material): Promise<void> {
   const { audio, ...record } = material;
   const db = await open();
+  const audioChanged = withAudio.get(material.id) !== audio;
   await new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(
-      withAudio.has(material.id) ? ['materials'] : ['materials', 'audio'],
+      audioChanged ? ['materials', 'audio'] : ['materials'],
       'readwrite',
     );
     transaction.objectStore('materials').put(record);
-    if (!withAudio.has(material.id)) {
+    if (audioChanged) {
       transaction.objectStore('audio').put({ id: material.id, blob: audio });
-      withAudio.add(material.id);
     }
-    transaction.oncomplete = () => resolve();
+    transaction.oncomplete = () => {
+      withAudio.set(material.id, audio);
+      resolve();
+    };
     transaction.onerror = () => reject(transaction.error);
     transaction.onabort = () => reject(transaction.error);
   });

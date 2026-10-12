@@ -13,6 +13,7 @@ type Props = {
   completed: Set<string>;
   onRevealAll: (reveal: boolean) => void;
   onSeekWord: (segmentId: string, wordIndex: number) => void;
+  onSettingsChange: (settings: NonNullable<Material['studySettings']>) => void;
 };
 
 type Lang = 'en' | 'zh' | 'both';
@@ -30,10 +31,11 @@ const LANG_LABELS: { value: Lang; label: string }[] = [
  */
 export function ReadingView(props: Props) {
   const { material } = props;
-  const [lang, setLang] = useState<Lang>('en');
-  const [following, setFollowing] = useState(true);
+  const [lang, setLang] = useState<Lang>(material.studySettings?.language ?? 'en');
+  const [following, setFollowing] = useState(material.studySettings?.following ?? true);
   const list = useRef<HTMLOListElement>(null);
   const suppressedUntil = useRef(0);
+  const [suppressed, setSuppressed] = useState(false);
 
   const translated = useMemo(
     () => material.segments.some((s) => s.translation?.trim()),
@@ -42,18 +44,28 @@ export function ReadingView(props: Props) {
 
   useEffect(() => {
     if (!following || !props.currentId) return;
-    if (Date.now() < suppressedUntil.current) return;
-    const node = list.current?.querySelector(`[data-segment="${props.currentId}"]`);
-    node?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }, [following, props.currentId]);
+    const follow = () => {
+      setSuppressed(false);
+      const node = list.current?.querySelector(`[data-segment="${props.currentId}"]`);
+      node?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    };
+    const delay = suppressedUntil.current - Date.now();
+    if (delay <= 0) {
+      follow();
+      return;
+    }
+    const timer = setTimeout(follow, delay);
+    return () => clearTimeout(timer);
+  }, [following, props.currentId, suppressed]);
 
   // Scrolling by hand takes over for a while; then following resumes on its own.
-  const onScroll = () => {
+  const onManualScroll = () => {
     if (!following) return;
     suppressedUntil.current = Date.now() + 4000;
+    setSuppressed(true);
   };
 
-  const showEnglish = lang !== 'zh';
+  const showEnglish = lang !== 'zh' || !translated;
   const showChinese = lang !== 'en';
 
   return (
@@ -61,7 +73,14 @@ export function ReadingView(props: Props) {
       <div className="reading__bar">
         <div className="mode" role="group" aria-label="显示语言">
           {LANG_LABELS.map(({ value, label }) => (
-            <button key={value} aria-pressed={lang === value} onClick={() => setLang(value)}>
+            <button
+              key={value}
+              aria-pressed={lang === value}
+              onClick={() => {
+                setLang(value);
+                props.onSettingsChange({ language: value });
+              }}
+            >
               {label}
             </button>
           ))}
@@ -70,7 +89,10 @@ export function ReadingView(props: Props) {
           <input
             type="checkbox"
             checked={following}
-            onChange={(event) => setFollowing(event.target.checked)}
+            onChange={(event) => {
+              setFollowing(event.target.checked);
+              props.onSettingsChange({ following: event.target.checked });
+            }}
           />{' '}
           自动跟随
         </label>
@@ -82,12 +104,14 @@ export function ReadingView(props: Props) {
           />{' '}
           显示未听写的原文
         </label>
-        {!following && props.currentId && (
+        {(!following || suppressed) && props.currentId && (
           <button
             className="quiet"
             onClick={() => {
               suppressedUntil.current = 0;
+              setSuppressed(false);
               setFollowing(true);
+              props.onSettingsChange({ following: true });
             }}
           >
             回到当前句
@@ -99,7 +123,12 @@ export function ReadingView(props: Props) {
         <p className="muted reading__note">这份字幕没有中文译文，导入双语字幕后这里会显示中文。</p>
       )}
 
-      <ol className="reading__text" ref={list} onScroll={onScroll}>
+      <ol
+        className="reading__text"
+        ref={list}
+        onWheel={onManualScroll}
+        onTouchMove={onManualScroll}
+      >
         {material.segments.map((segment, index) => {
           const isCurrent = segment.id === props.currentId;
           const checked = props.completed.has(segment.id);
@@ -135,7 +164,7 @@ export function ReadingView(props: Props) {
                   ) : (
                     <p className="reading__en muted">（这句还没听写，原文已隐藏）</p>
                   ))}
-                {showChinese && segment.translation && (
+                {showChinese && visible && segment.translation && (
                   <p className="reading__zh">{segment.translation}</p>
                 )}
               </div>

@@ -63,7 +63,8 @@ describe('splitting a sentence', () => {
     const { material } = splitSegment(materialize(), 's1', 1.5);
     expect(material.segments[0]).toMatchObject({ id: 's1', start: 0, end: 1.5 });
     expect(material.segments[1].id).not.toBe('s1');
-    expect(material.segments[1]).toMatchObject({ start: 1.5, end: 2, reference: '' });
+    expect(material.segments[1]).toMatchObject({ start: 1.5, end: 2 });
+    expect(material.segments[0].reference + material.segments[1].reference).toBe('First sentence.');
   });
 
   it('carries the draft and the 难句 mark onto the surviving half', () => {
@@ -98,11 +99,12 @@ describe('merging with the next sentence', () => {
     expect(material.segments[1].id).toBe('s3');
   });
 
-  it('reports the records on the swallowed sentence instead of dropping them quietly', () => {
+  it('joins both drafts, removes obsolete completion ids and marks the result stale', () => {
     const { material, report } = mergeWithNext(materialize(), 's1');
-    expect(report.lost).toContain('s2');
+    expect(report.lost).toEqual([]);
     expect(material.rounds[0].staleSegmentIds).toContain('s1');
-    expect(material.rounds[0].drafts.s1).toBeTruthy();
+    expect(material.rounds[0].drafts.s1).toBe('First sentence Second sentence');
+    expect(material.rounds[0].completedSegmentIds).toEqual(['s1']);
     expect(material.rounds[0].drafts.s2).toBeUndefined();
     expect(material.bookmarkedSegmentIds).not.toContain('s2');
   });
@@ -125,6 +127,14 @@ describe('merging with the next sentence', () => {
 
   it('refuses when there is no next sentence', () => {
     expect(() => mergeWithNext(untouchedMaterial(), 's3')).toThrow(SubtitleError);
+  });
+  it('carries the second sentence bookmark and both translations into the merged sentence', () => {
+    const base = materialize({ bookmarkedSegmentIds: ['s2'] });
+    base.segments[0].translation = '第一句';
+    base.segments[1].translation = '第二句';
+    const next = mergeWithNext(base, 's1').material;
+    expect(next.bookmarkedSegmentIds).toEqual(['s1']);
+    expect(next.segments[0].translation).toBe('第一句 第二句');
   });
 });
 

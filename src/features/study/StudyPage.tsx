@@ -6,12 +6,13 @@ import { summarizeDiff } from '../../domain/word-flow';
 import { toggleBookmark } from '../../domain/progress';
 import { keySound } from '../../sound';
 import { Player } from '../player/Player';
-import { useAudioPlayer } from '../player/useAudioPlayer';
+import type { AudioPlayer } from '../player/useAudioPlayer';
 import { WordFlowEditor } from '../dictation/WordFlowEditor';
 import { ReadingView, useActiveWord } from '../reading/ReadingView';
 
 type Props = {
   material: Material;
+  player: AudioPlayer;
   update: (transform: (material: Material) => Material) => void;
   onBack: () => void;
   onPrepare: () => void;
@@ -29,6 +30,7 @@ function navigationScope(material: Material, bookmarkedOnly: boolean) {
 
 export function StudyPage({
   material,
+  player,
   update,
   onBack,
   onPrepare,
@@ -36,17 +38,49 @@ export function StudyPage({
   onTranscript,
   onNotice,
 }: Props) {
-  const player = useAudioPlayer(material, (seconds) =>
-    update((m) => ({ ...m, playbackPosition: seconds })),
+  const [view, setView] = useState<'dictation' | 'reading'>(material.lastView ?? 'dictation');
+  const [editingId, setEditingId] = useState(
+    activeRound(material)?.activeSegmentId ?? material.segments[0]?.id ?? '',
   );
-  const [view, setView] = useState<'dictation' | 'reading'>('dictation');
-  const [editingId, setEditingId] = useState(material.segments[0]?.id ?? '');
-  const [checked, setChecked] = useState(false);
-  const [revealAll, setRevealAll] = useState(false);
-  const [bookmarkedOnly, setBookmarkedOnly] = useState(false);
+  const [checked, setChecked] = useState(
+    Boolean(
+      activeRound(material)?.checkedSegmentId &&
+      activeRound(material)?.checkedSegmentId === activeRound(material)?.activeSegmentId,
+    ),
+  );
+  const [revealAll, setRevealAll] = useState(material.studySettings?.revealAll ?? false);
+  const [bookmarkedOnly, setBookmarkedOnly] = useState(
+    material.studySettings?.bookmarkedOnly ?? false,
+  );
   const [showHistory, setShowHistory] = useState(false);
-  const [keySounds, setKeySounds] = useState(false);
+  const [keySounds, setKeySounds] = useState(material.studySettings?.keySounds ?? false);
+  const [volume, setVolume] = useState(material.studySettings?.volume ?? 0.25);
   const field = useRef<HTMLTextAreaElement>(null);
+  function updateStudySettings(settings: NonNullable<Material['studySettings']>) {
+    update((m) => ({ ...m, studySettings: { ...m.studySettings, ...settings } }));
+  }
+
+  function changeView(next: 'dictation' | 'reading') {
+    setView(next);
+    update((m) => ({ ...m, lastView: next }));
+    if (!material.playbackSettings) player.setMode(next === 'reading' ? 'continuous' : 'segment');
+  }
+
+  function selectSentence(id: string, checked = false) {
+    setEditingId(id);
+    setChecked(checked);
+    update((m) => {
+      const next = ensureRound(m);
+      return {
+        ...next,
+        rounds: next.rounds.map((r) =>
+          r.id === next.activeRoundId
+            ? { ...r, activeSegmentId: id, checkedSegmentId: checked ? id : undefined }
+            : r,
+        ),
+      };
+    });
+  }
 
   const scope = useMemo(
     () => navigationScope(material, bookmarkedOnly),
@@ -80,7 +114,15 @@ export function StudyPage({
           ...withRound,
           lastStudiedAt: new Date().toISOString(),
           rounds: withRound.rounds.map((r) =>
-            r.id === current.id ? { ...r, drafts, updatedAt: new Date().toISOString() } : r,
+            r.id === current.id
+              ? {
+                  ...r,
+                  drafts,
+                  activeSegmentId: editingId,
+                  checkedSegmentId: undefined,
+                  updatedAt: new Date().toISOString(),
+                }
+              : r,
           ),
         };
       });
@@ -104,10 +146,15 @@ export function StudyPage({
       field.current?.focus();
       return;
     }
+    try {
+      compareWords(tokenize(draft), segment.reference);
+    } catch (err) {
+      onNotice(String(err));
+      return;
+    }
     update((m) => {
       const withRound = ensureRound(m);
       const current = activeRound(withRound)!;
-      if (current.completedSegmentIds.includes(segment.id)) return withRound;
       return {
         ...withRound,
         lastStudiedAt: new Date().toISOString(),
@@ -116,7 +163,10 @@ export function StudyPage({
             ? {
                 ...r,
                 updatedAt: new Date().toISOString(),
-                completedSegmentIds: [...r.completedSegmentIds, segment.id],
+                activeSegmentId: segment.id,
+                checkedSegmentId: segment.id,
+                staleSegmentIds: r.staleSegmentIds?.filter((id) => id !== segment.id),
+                completedSegmentIds: [...new Set([...r.completedSegmentIds, segment.id])],
               }
             : r,
         ),
@@ -128,8 +178,7 @@ export function StudyPage({
   function goTo(target: number, play = false) {
     const next = scope[target];
     if (!next) return;
-    setEditingId(next.id);
-    setChecked(false);
+    selectSentence(next.id);
     player.goToSegment(next.id, { play });
   }
 
@@ -138,21 +187,13 @@ export function StudyPage({
    * audio - on the workbench the two are expected to stay together.
    */
   function stepSentence(delta: 1 | -1) {
-    if (delta < 0) player.previous();
-    else player.next();
-    const at = scope.findIndex((s) => s.id === (player.playbackSegment ?? segment)?.id);
-    const next = scope[at + delta];
-    if (next) {
-      setEditingId(next.id);
-      setChecked(false);
-    }
+    goTo(index + delta);
   }
 
   // Narrowing to 难句 can leave the current sentence outside the new range.
   useEffect(() => {
     if (scope.length && !scope.some((s) => s.id === editingId)) {
-      setEditingId(scope[0].id);
-      setChecked(false);
+      selectSentence(scope[0].id);
     }
   }, [scope, editingId]);
 
@@ -161,8 +202,14 @@ export function StudyPage({
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.isComposing || event.keyCode === 229) return;
+      if (showHistory || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
       const target = event.target as HTMLElement | null;
-      if (target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement) return;
+      if (
+        target?.closest(
+          'input, textarea, select, [contenteditable], [role="dialog"], [role="menu"]',
+        )
+      )
+        return;
       if (event.key === 'ArrowLeft') {
         event.preventDefault();
         goTo(index - 1);
@@ -172,6 +219,10 @@ export function StudyPage({
       } else if (event.key === ' ') {
         event.preventDefault();
         player.toggle();
+      } else if (event.key === 'Enter' && !(target instanceof HTMLButtonElement)) {
+        event.preventDefault();
+        if (checked) goTo(index + 1);
+        else check();
       }
     };
     document.addEventListener('keydown', onKey);
@@ -182,6 +233,7 @@ export function StudyPage({
     const next = newRound();
     update((m) => ({ ...m, rounds: [next, ...m.rounds], activeRoundId: next.id }));
     setEditingId(material.segments[0]?.id ?? '');
+    setChecked(false);
     setShowHistory(false);
     onNotice('已开启新一轮，上一轮的进度保留在历史里。');
   }
@@ -231,6 +283,10 @@ export function StudyPage({
                   className="quiet"
                   onClick={() => {
                     update((m) => ({ ...m, activeRoundId: r.id }));
+                    setEditingId(r.activeSegmentId ?? material.segments[0]?.id ?? '');
+                    setChecked(
+                      Boolean(r.checkedSegmentId && r.checkedSegmentId === r.activeSegmentId),
+                    );
                     setShowHistory(false);
                   }}
                 >
@@ -268,6 +324,8 @@ export function StudyPage({
         material={material}
         player={player}
         onStepSentence={stepSentence}
+        hasPrevious={index > 0}
+        hasNext={index >= 0 && index < scope.length - 1}
         status={
           player.playbackSegment ? `本句 ${formatTime(player.playbackSegment.start)}` : undefined
         }
@@ -278,11 +336,15 @@ export function StudyPage({
           <button
             role="tab"
             aria-selected={view === 'dictation'}
-            onClick={() => setView('dictation')}
+            onClick={() => changeView('dictation')}
           >
             听写
           </button>
-          <button role="tab" aria-selected={view === 'reading'} onClick={() => setView('reading')}>
+          <button
+            role="tab"
+            aria-selected={view === 'reading'}
+            onClick={() => changeView('reading')}
+          >
             听读
           </button>
         </div>
@@ -292,6 +354,7 @@ export function StudyPage({
             checked={bookmarkedOnly}
             onChange={(event) => {
               setBookmarkedOnly(event.target.checked);
+              updateStudySettings({ bookmarkedOnly: event.target.checked });
               setChecked(false);
             }}
           />{' '}
@@ -302,10 +365,27 @@ export function StudyPage({
           <input
             type="checkbox"
             checked={keySounds}
-            onChange={(event) => setKeySounds(event.target.checked)}
+            onChange={(event) => {
+              setKeySounds(event.target.checked);
+              updateStudySettings({ keySounds: event.target.checked });
+            }}
           />{' '}
           按键音
         </label>
+        {keySounds && (
+          <input
+            type="range"
+            aria-label="按键音量"
+            min="0"
+            max="1"
+            step="0.05"
+            value={volume}
+            onChange={(event) => {
+              setVolume(Number(event.target.value));
+              updateStudySettings({ volume: Number(event.target.value) });
+            }}
+          />
+        )}
         <button className="quiet" onClick={onTranscript}>
           完整原文 ↗
         </button>
@@ -334,12 +414,13 @@ export function StudyPage({
             <WordFlowEditor
               value={draft}
               onChange={(value) => {
-                if (keySounds && !player.playing) keySound();
+                if (keySounds && !player.playing) keySound(volume);
+                setChecked(false);
                 saveDraft(value);
               }}
               // Enter checks, and once checked Enter moves on to the next sentence.
               onCheck={() => (checked ? goTo(index + 1) : check())}
-              onEscape={() => setChecked(false)}
+              onEscape={() => selectSentence(editingId)}
               checked={checked}
               ariaLabel={`第 ${index + 1} 句听写`}
               inputRef={field}
@@ -381,7 +462,11 @@ export function StudyPage({
           activeWord={activeWord}
           revealAll={revealAll}
           completed={completed}
-          onRevealAll={setRevealAll}
+          onRevealAll={(value) => {
+            setRevealAll(value);
+            updateStudySettings({ revealAll: value });
+          }}
+          onSettingsChange={updateStudySettings}
           onSeekWord={(segmentId, wordIndex) => {
             const target = material.segments.find((s) => s.id === segmentId);
             const word = target?.words[wordIndex];

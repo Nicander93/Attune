@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { groupTokens, tokenizeForDisplay } from '../../domain/word-flow';
+import { tokenizeForDisplay } from '../../domain/word-flow';
 
 type Props = {
   value: string;
   onChange: (value: string) => void;
   onCheck: () => void;
-  /** Esc after a check steps back to editing. Esc before a check does nothing. */
+  /** Esc after a check returns to editing; otherwise it releases input focus. */
   onEscape: () => void;
   /** Reference text is never rendered before 核对答案 - it would give the answer away. */
   checked: boolean;
@@ -34,7 +34,9 @@ export function WordFlowEditor({
   const ref = inputRef ?? localRef;
   const [caret, setCaret] = useState({ start: 0, end: 0 });
 
-  const tokens = useMemo(() => groupTokens(tokenizeForDisplay(value)), [value]);
+  // Mirror the exact editable string so punctuation spaces, selection and the caret
+  // keep the same coordinates as the native textarea.
+  const tokens = useMemo(() => tokenizeForDisplay(value), [value]);
   const collapsed = caret.start === caret.end;
 
   useEffect(() => {
@@ -87,15 +89,20 @@ export function WordFlowEditor({
         spellCheck={false}
         autoComplete="off"
         onChange={(event) => onChange(event.target.value)}
+        onScroll={(event) => {
+          const mirror = event.currentTarget.previousElementSibling;
+          if (mirror) mirror.scrollTop = event.currentTarget.scrollTop;
+        }}
         onKeyDown={(event) => {
           if (event.nativeEvent.isComposing || event.keyCode === 229) return;
           if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault();
             onCheck();
           }
-          if (event.key === 'Escape' && checked) {
+          if (event.key === 'Escape') {
             event.preventDefault();
-            onEscape();
+            if (checked) onEscape();
+            else event.currentTarget.blur();
           }
         }}
       />

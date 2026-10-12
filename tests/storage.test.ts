@@ -100,12 +100,23 @@ describe('upgrading a schema v1 database', () => {
 });
 
 describe('saving', () => {
+  it('persists replacement audio without losing the metadata', async () => {
+    await seed(2, [legacyV2()]);
+    const [before] = await loadMaterials();
+    const replacement = new Blob(['replacement audio'], { type: 'audio/wav' });
+    await saveMaterial({ ...before, audio: replacement });
+    await closeDatabase();
+    const [after] = await loadMaterials();
+    expect(after.audio.size).toBe(replacement.size);
+    expect(after.segments).toEqual(before.segments);
+    expect(after.rounds).toEqual(before.rounds);
+  });
   /** Counts writes to the audio store, which is where the expensive blob lives. */
   const spyAudioWrites = () => {
     const put = vi.spyOn(IDBObjectStore.prototype, 'put');
     return () =>
       put.mock.calls.filter(
-        (call) => call[1] && typeof call[1] === 'object' && 'blob' in (call[1] as object),
+        (call) => call[0] && typeof call[0] === 'object' && 'blob' in (call[0] as object),
       ).length;
   };
 

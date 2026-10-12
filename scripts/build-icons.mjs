@@ -1,17 +1,23 @@
 // Renders src/assets/logo.svg into every raster size the app ships, and packs a
-// multi-resolution Windows .ico. Run with: node scripts/build-icons.mjs
+// multi-resolution Windows .ico. Sizes at or below SIMPLIFIED_BELOW use
+// logo-simple.svg, which drops the orange strokes that turn to mush at 16 px.
+// Run with: npm run icons
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const svg = readFileSync(join(root, 'src/assets/logo.svg'), 'utf8');
+const master = readFileSync(join(root, 'src/assets/logo.svg'), 'utf8');
+const simplified = readFileSync(join(root, 'src/assets/logo-simple.svg'), 'utf8');
 
 const PNG_SIZES = [16, 24, 32, 48, 64, 128, 256, 512];
 const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256];
+/** At or below this size the orange accents are dropped. */
+const SIMPLIFIED_BELOW = 32;
 
 /** Draws the mark at `size` and returns the raw PNG bytes. */
 async function drawAt(size) {
+  const svg = size <= SIMPLIFIED_BELOW ? simplified : master;
   const { chromium } = await import('playwright');
   const browser = await chromium.launch();
   try {
@@ -43,7 +49,8 @@ function packIco(images) {
   header.writeUInt16LE(1, 2);
   header.writeUInt16LE(images.length, 4);
 
-  const entries = images.map(({ size, data }, index) => {
+  let offset = header.length + images.length * 16;
+  const entries = images.map(({ size, data }) => {
     const entry = Buffer.alloc(16);
     entry.writeUInt8(size >= 256 ? 0 : size, 0);
     entry.writeUInt8(size >= 256 ? 0 : size, 1);
@@ -52,7 +59,8 @@ function packIco(images) {
     entry.writeUInt16LE(1, 4);
     entry.writeUInt16LE(32, 6);
     entry.writeUInt32LE(data.length, 8);
-    entry.writeUInt32LE(header.length + index * 16 + data.length, 12);
+    entry.writeUInt32LE(offset, 12);
+    offset += data.length;
     return entry;
   });
 
@@ -74,5 +82,4 @@ writeFileSync(
   packIco(ICO_SIZES.map((size) => ({ size, data: pngs[size] }))),
 );
 
-writeFileSync(join(root, 'src/assets/logo.svg'), svg);
 console.log(`wrote ${PNG_SIZES.length} PNGs and icon.ico (${ICO_SIZES.join(', ')})`);

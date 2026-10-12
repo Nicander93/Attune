@@ -42,7 +42,7 @@ test.describe('material preparation', () => {
         buffer: wav(9),
       });
     // A material with no name yet takes the audio file's name.
-    await expect(page.getByRole('heading', { name: 'lesson.wav' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'lesson', exact: true })).toBeVisible();
 
     // A subtitle file is only imported when the user picks it.
     await page
@@ -213,7 +213,7 @@ test.describe('subtitle proofing', () => {
     expect((await storedMaterial(page, 'm1')).segments[0].reference).toBe('Saved with a shortcut.');
   });
 
-  test('merges with the next sentence and reports the records it could not move', async ({
+  test('merges with the next sentence and keeps both drafts after confirmation', async ({
     page,
   }) => {
     await seed(page, [
@@ -233,8 +233,9 @@ test.describe('subtitle proofing', () => {
     ]);
     await openStudy(page);
     await page.getByRole('button', { name: '字幕校对' }).click();
+    page.once('dialog', (dialog) => void dialog.accept());
     await page.getByRole('button', { name: '与下一句合并' }).first().click();
-    await expect(page.getByText(/已合并/)).toBeVisible();
+    await expect(page.getByText(/标记为待重新核对/)).toBeVisible();
     await settled(page);
 
     const stored = await storedMaterial(page, 'm1');
@@ -242,6 +243,8 @@ test.describe('subtitle proofing', () => {
     expect(stored.segments[0].reference).toBe('Hello world. Nice to meet you.');
     // Nothing dangles against the id that disappeared.
     expect(stored.rounds[0].drafts.s2).toBeUndefined();
+    expect(stored.rounds[0].drafts.s1).toBe('one two');
+    expect(stored.rounds[0].completedSegmentIds).toEqual(['s1']);
     expect(stored.rounds[0].staleSegmentIds).toContain('s1');
   });
 });

@@ -144,7 +144,11 @@ export function migrateMaterial(legacy: LegacyMaterial): Material {
     bookmarkedSegmentIds: (legacy.review || [])
       .map((id) => remap.get(id) ?? id)
       .filter((id) => known.has(id)),
-    rounds,
+    rounds: rounds.map((round) =>
+      round.id === activeRoundId
+        ? { ...round, activeSegmentId: remap.get(legacy.segmentId) ?? legacy.segmentId }
+        : round,
+    ),
     activeRoundId,
   };
 }

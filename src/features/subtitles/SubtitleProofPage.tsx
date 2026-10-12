@@ -11,10 +11,11 @@ import {
 } from '../../domain/subtitle-edits';
 import { saveTextFile } from '../../desktop';
 import { Player } from '../player/Player';
-import { useAudioPlayer } from '../player/useAudioPlayer';
+import type { AudioPlayer } from '../player/useAudioPlayer';
 
 type Props = {
   material: Material;
+  player: AudioPlayer;
   update: (transform: (material: Material) => Material) => void;
   onBack: () => void;
   onNotice: (message: string) => void;
@@ -29,13 +30,11 @@ const toDraft = (segment: SubtitleSegment): Draft => ({
   end: segment.end.toFixed(2),
 });
 
-export function SubtitleProofPage({ material, update, onBack, onNotice }: Props) {
-  const player = useAudioPlayer(material, (seconds) =>
-    update((m) => ({ ...m, playbackPosition: seconds })),
-  );
+export function SubtitleProofPage({ material, player, update, onBack, onNotice }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState('');
+  const [splitTime, setSplitTime] = useState('');
   const fieldRef = useRef<HTMLTextAreaElement>(null);
 
   const activeId = player.playbackSegment?.id ?? material.segments[0]?.id;
@@ -57,6 +56,7 @@ export function SubtitleProofPage({ material, update, onBack, onNotice }: Props)
     setEditingId(segment.id);
     setDraft(toDraft(segment));
     setError('');
+    setSplitTime(((segment.start + segment.end) / 2).toFixed(2));
   }
 
   function cancelEdit() {
@@ -97,10 +97,36 @@ export function SubtitleProofPage({ material, update, onBack, onNotice }: Props)
     applyEdit(segmentId, { reference: draft.reference.trim(), start, end });
   }
 
+  function confirmChange(ids: string[]) {
+    const affected = ids.some(
+      (id) =>
+        material.bookmarkedSegmentIds.includes(id) ||
+        material.rounds.some((r) => r.drafts[id]?.trim() || r.completedSegmentIds.includes(id)),
+    );
+    return (
+      !affected ||
+      window.confirm(
+        '这些字幕已有草稿、核对记录或难句标记。拆分会保留原句草稿，合并会连接两句草稿；受影响的核对记录将标记为待重新核对。继续？',
+      )
+    );
+  }
+
   function handleSplit(segmentId: string) {
-    const at = player.position;
+    const at = Number(splitTime);
     try {
-      const { material: next, report } = splitSegment(material, segmentId, at);
+      if (!draft || !fieldRef.current) return;
+      const edited = editSegment(material, segmentId, {
+        reference: draft.reference,
+        start: Number(draft.start),
+        end: Number(draft.end),
+      }).material;
+      const { material: next, report } = splitSegment(
+        edited,
+        segmentId,
+        at,
+        fieldRef.current.selectionStart,
+      );
+      if (!confirmChange([segmentId])) return;
       update(() => next);
       const created = next.segments.find((s) => s.start === at);
       if (created) {
@@ -116,6 +142,8 @@ export function SubtitleProofPage({ material, update, onBack, onNotice }: Props)
   function handleMerge(segmentId: string) {
     try {
       const { material: next, report } = mergeWithNext(material, segmentId);
+      const index = material.segments.findIndex((s) => s.id === segmentId);
+      if (!confirmChange([segmentId, material.segments[index + 1]?.id])) return;
       update(() => next);
       setEditingId(null);
       reportStale(report.stale);
@@ -232,6 +260,27 @@ export function SubtitleProofPage({ material, update, onBack, onNotice }: Props)
                     </button>
                   </div>
                   <p className="muted">Ctrl+Enter 保存 · Esc 取消</p>
+                  <div className="row">
+                    <label className="muted">
+                      拆分时间{' '}
+                      <input
+                        type="number"
+                        step="0.01"
+                        aria-label="拆分时间"
+                        value={splitTime}
+                        onChange={(event) => setSplitTime(event.target.value)}
+                      />
+                    </label>
+                    <button
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => handleSplit(segment.id)}
+                    >
+                      在文字光标处拆分
+                    </button>
+                  </div>
+                  <p className="muted">
+                    把文字光标放在拆分处，再指定时间。原有中文译文保留在前半句，请按实际内容校对。
+                  </p>
                 </div>
               ) : (
                 <div className="proof__text">
@@ -243,8 +292,8 @@ export function SubtitleProofPage({ material, update, onBack, onNotice }: Props)
                     <button className="quiet" onClick={() => beginEdit(segment)}>
                       编辑
                     </button>
-                    <button className="quiet" onClick={() => handleSplit(segment.id)}>
-                      在播放位置拆分
+                    <button className="quiet" onClick={() => beginEdit(segment)}>
+                      拆分
                     </button>
                     <button
                       className="quiet"

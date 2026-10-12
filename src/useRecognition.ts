@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { sentencesToSegments } from './domain/subtitles';
 import type { Material, SubtitleSegment } from './domain/types';
 import {
@@ -30,6 +30,9 @@ export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
   const [settings, setSettings] = useState(loadSettings),
     [models, setModels] = useState<ModelStatus[]>([]),
     [task, setTask] = useState<Task | undefined>();
+  const busy = useRef(false);
+  const cancelTask = useRef<(() => void) | undefined>(undefined);
+  useEffect(() => () => cancelTask.current?.(), []);
 
   function changeSettings(next: RecognitionSettings) {
     setSettings(next);
@@ -55,18 +58,23 @@ export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
     }
   }
   async function run(work: () => Promise<void>, cancelledMessage: string) {
+    if (busy.current) return;
+    busy.current = true;
     try {
       await work();
     } catch (err) {
       if (isCancelled(err)) onNotice(cancelledMessage);
       else onError(String(err));
     } finally {
+      busy.current = false;
+      cancelTask.current = undefined;
       setTask(undefined);
     }
   }
   function downloadSelected() {
     const model = models.find((m) => m.id === settings.modelId);
     if (!model || task) return;
+    cancelTask.current = () => void cancelDownload();
     void run(async () => {
       await download(model);
       onNotice('模型已下载并通过校验。');
@@ -85,16 +93,22 @@ export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
     }, '已取消导入。');
   }
   function start(material: Material) {
-    if (task) return;
+    if (task || busy.current) return;
     const controller = new AbortController();
     const stop = () => {
       controller.abort();
       void cancelRecognition();
+      void cancelDownload();
     };
+    cancelTask.current = stop;
     void run(async () => {
       const model = (await refreshModels()).find((m) => m.id === settings.modelId);
       if (!model) throw new Error('请先在识别设置中选择模型。');
-      if (!model.installed) await download(model);
+      if (!model.installed) {
+        if (!window.confirm(`模型 ${model.label} 尚未安装，下载并校验后开始识别？`))
+          throw CANCELLED;
+        await download(model);
+      }
       setTask({ label: '正在解码音频…', cancel: stop });
       const sentences = await recognize(
         material.audio,

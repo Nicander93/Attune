@@ -11,7 +11,7 @@ type Props = {
   material: Material;
   update: (transform: (material: Material) => Material) => void;
   onBack: () => void;
-  onStudy: () => void;
+  onStudy: (view: 'dictation' | 'reading') => void;
   onNotice: (message: string) => void;
 };
 
@@ -65,14 +65,17 @@ export function MaterialPrepPage({ material, update, onBack, onStudy, onNotice }
     setAudioBusy(true);
     try {
       const duration = await readAudioDuration(file);
+      if (material.segments.some((s) => s.end > duration + 0.01))
+        throw new Error('新音频短于现有字幕时间轴，请新建素材再导入。');
       update((m) => ({
         ...m,
         audio: file,
         duration,
         // A material created empty takes the audio's name; a rename the user already
         // made is left alone.
-        displayName: m.originalFileName ? m.displayName : file.name,
+        displayName: m.originalFileName ? m.displayName : file.name.replace(/\.[^.]+$/, ''),
         originalFileName: file.name,
+        playbackPosition: 0,
       }));
       onNotice(`音频已导入：${file.name}`);
     } catch (err) {
@@ -124,133 +127,155 @@ export function MaterialPrepPage({ material, update, onBack, onStudy, onNotice }
         </p>
       )}
 
-      <div className="prep__panes">
-        {/* Audio and subtitles are chosen independently: a matching file name is not a
+      <div className="prep__content">
+        <div className="prep__panes">
+          {/* Audio and subtitles are chosen independently: a matching file name is not a
             reason to import anything the user did not pick. */}
-        <article
-          className={`dropzone${dragging === 'audio' ? ' is-dragging' : ''}`}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setDragging('audio');
-          }}
-          onDragLeave={() => setDragging(null)}
-          onDrop={(event) => {
-            event.preventDefault();
-            setDragging(null);
-            void importAudio(event.dataTransfer.files[0]);
-          }}
-        >
-          <h2>
-            音频 <span className="caption">必需</span>
-          </h2>
-          <p className="muted">{material.originalFileName || '还没有音频'}</p>
-          <p className="muted">{formatTime(material.duration)}</p>
-          <button
-            className="primary"
-            disabled={audioBusy}
-            onClick={() => audioInput.current?.click()}
-          >
-            {audioBusy ? '正在读取…' : '选择音频'}
-          </button>
-          <p className="muted prep__hint">{dropHint} · MP3 / WAV / M4A</p>
-          <input
-            ref={audioInput}
-            type="file"
-            accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac"
-            hidden
-            onChange={(event) => {
-              void importAudio(event.target.files?.[0]);
-              event.target.value = '';
+          <article
+            className={`dropzone${dragging === 'audio' ? ' is-dragging' : ''}`}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragging('audio');
             }}
-          />
-        </article>
-
-        <article
-          className={`dropzone${dragging === 'subtitle' ? ' is-dragging' : ''}`}
-          onDragOver={(event) => {
-            event.preventDefault();
-            setDragging('subtitle');
-          }}
-          onDragLeave={() => setDragging(null)}
-          onDrop={(event) => {
-            event.preventDefault();
-            setDragging(null);
-            void importSubtitles(event.dataTransfer.files[0]);
-          }}
-        >
-          <h2>
-            字幕 <span className="caption">可选</span>
-          </h2>
-          <p className="muted">
-            {hasSubtitles ? `已导入 ${material.segments.length} 句` : '还没有字幕'}
-          </p>
-          <p className="muted">
-            {hasSubtitles ? '可以随时换成别的字幕文件。' : '没有字幕也能听，但无法核对答案。'}
-          </p>
-          <div className="row">
-            <button onClick={() => subtitleInput.current?.click()}>选择字幕文件</button>
+            onDragLeave={() => setDragging(null)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragging(null);
+              void importAudio(event.dataTransfer.files[0]);
+            }}
+          >
+            <h2>
+              音频 <span className="caption">必需</span>
+            </h2>
+            <p className="muted">{material.originalFileName || '还没有音频'}</p>
+            <p className="muted">{formatTime(material.duration)}</p>
             <button
-              disabled={!isDesktop() || !!recognition.task}
-              title={isDesktop() ? undefined : '语音识别需要桌面版'}
-              onClick={() => {
-                setSettingsOpen(true);
-                void recognition.refreshModels();
-              }}
+              className="primary"
+              disabled={audioBusy}
+              onClick={() => audioInput.current?.click()}
             >
-              本地识别原文
+              {audioBusy ? '正在读取…' : '选择音频'}
+            </button>
+            <p className="muted prep__hint">{dropHint} · MP3 / WAV / M4A</p>
+            <input
+              ref={audioInput}
+              type="file"
+              accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac"
+              hidden
+              onChange={(event) => {
+                void importAudio(event.target.files?.[0]);
+                event.target.value = '';
+              }}
+            />
+          </article>
+
+          <article
+            className={`dropzone${dragging === 'subtitle' ? ' is-dragging' : ''}`}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragging('subtitle');
+            }}
+            onDragLeave={() => setDragging(null)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragging(null);
+              void importSubtitles(event.dataTransfer.files[0]);
+            }}
+          >
+            <h2>
+              字幕 <span className="caption">可选</span>
+            </h2>
+            <p className="muted">
+              {hasSubtitles ? `已导入 ${material.segments.length} 句` : '还没有字幕'}
+            </p>
+            <p className="muted">
+              {hasSubtitles ? '可以随时换成别的字幕文件。' : '没有字幕也能听，但无法核对答案。'}
+            </p>
+            <div className="row">
+              <button onClick={() => subtitleInput.current?.click()}>选择字幕文件</button>
+              <button
+                disabled={!isDesktop() || !!recognition.task}
+                title={isDesktop() ? undefined : '语音识别需要桌面版'}
+                onClick={() => {
+                  setSettingsOpen(true);
+                  void recognition.refreshModels().catch((err) => setError(String(err)));
+                }}
+              >
+                本地识别原文
+              </button>
+            </div>
+            <p className="muted prep__hint">
+              {dropHint} · SRT / VTT，双语字幕会自动分成英文和中文两行
+            </p>
+            <input
+              ref={subtitleInput}
+              type="file"
+              accept=".srt,.vtt"
+              hidden
+              onChange={(event) => {
+                void importSubtitles(event.target.files?.[0]);
+                event.target.value = '';
+              }}
+            />
+          </article>
+        </div>
+
+        {recognition.task && (
+          <p className="banner" role="status">
+            {recognition.task.label}
+            {recognition.task.percent !== undefined && (
+              <progress max={100} value={recognition.task.percent} />
+            )}
+            {recognition.task.cancel && (
+              <button className="quiet" onClick={recognition.task.cancel}>
+                取消
+              </button>
+            )}
+          </p>
+        )}
+
+        {settingsOpen && (
+          <div>
+            <RecognitionSettings
+              settings={recognition.settings}
+              models={recognition.models}
+              busy={!!recognition.task}
+              onChange={recognition.changeSettings}
+              onDownload={recognition.downloadSelected}
+              onImport={recognition.importLocal}
+              onClose={() => setSettingsOpen(false)}
+            />
+            <button
+              className="primary"
+              disabled={!!recognition.task || !material.duration}
+              onClick={() => recognition.start(material)}
+            >
+              开始识别
             </button>
           </div>
-          <p className="muted prep__hint">
-            {dropHint} · SRT / VTT，双语字幕会自动分成英文和中文两行
-          </p>
-          <input
-            ref={subtitleInput}
-            type="file"
-            accept=".srt,.vtt"
-            hidden
-            onChange={(event) => {
-              void importSubtitles(event.target.files?.[0]);
-              event.target.value = '';
-            }}
-          />
-        </article>
+        )}
       </div>
-
-      {recognition.task && (
-        <p className="banner" role="status">
-          {recognition.task.label}
-          {recognition.task.percent !== undefined && (
-            <progress max={100} value={recognition.task.percent} />
-          )}
-          {recognition.task.cancel && (
-            <button className="quiet" onClick={recognition.task.cancel}>
-              取消
-            </button>
-          )}
-        </p>
-      )}
-
-      {settingsOpen && (
-        <RecognitionSettings
-          settings={recognition.settings}
-          models={recognition.models}
-          busy={!!recognition.task}
-          onChange={recognition.changeSettings}
-          onDownload={recognition.downloadSelected}
-          onImport={recognition.importLocal}
-          onClose={() => setSettingsOpen(false)}
-        />
-      )}
 
       <footer className="prep__foot">
         <p className="muted">
           {hasSubtitles ? '准备完成，可以开始听写。' : '没有字幕时无法核对答案，但可以先听音频。'}
         </p>
         <div className="row">
-          <button onClick={onStudy} disabled={!material.duration}>
+          <button
+            onClick={() => {
+              onStudy('dictation');
+            }}
+            disabled={!material.duration}
+          >
             开始听写
           </button>
-          <button className="primary" onClick={onStudy} disabled={!material.duration}>
+          <button
+            className="primary"
+            onClick={() => {
+              onStudy('reading');
+            }}
+            disabled={!material.duration}
+          >
             开始听读
           </button>
         </div>

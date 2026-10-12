@@ -1,10 +1,25 @@
+<!--
+  Attune 应用图标主稿。
+
+  取自设计稿的概念板：蓝色声波条为主体，右上两笔橙色声波标记，暖米白圆角方块底。
+  色值由 scripts/sample-logo 之类的方式从设计稿像素实测得到，不是凭感觉配的：
+  蓝 #5088d8、橙 #f8b858、底 #fff8f0。
+
+  规则：16 px 下橙色小笔画会糊成一团，所以小尺寸用 logo-simple.svg（去掉橙色）。
+  角色插画是设计稿的另一部分，只适合作为吉祥物，不适合当图标。
+-->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Attune">
   <title>Attune</title>
-  <circle cx="256" cy="256" r="232" fill="#25745f" />
-  <g fill="#ffffff">
-    <rect x="174" y="202" width="36" height="110" rx="18" />
-    <rect x="238" y="132" width="36" height="180" rx="18" />
-    <rect x="302" y="172" width="36" height="140" rx="18" />
+  <rect x="16" y="16" width="480" height="480" rx="112" fill="#fff8f0" />
+  <g fill="#5088d8">
+    <rect x="119" y="250" width="34" height="90" rx="17" />
+    <rect x="179" y="190" width="34" height="150" rx="17" />
+    <rect x="239" y="130" width="34" height="210" rx="17" />
+    <rect x="299" y="200" width="34" height="140" rx="17" />
+    <rect x="359" y="240" width="34" height="100" rx="17" />
   </g>
-  <rect x="150" y="299" width="212" height="26" rx="13" fill="#ffffff" />
+  <g fill="#f8b858">
+    <rect x="352" y="128" width="20" height="66" rx="10" transform="rotate(28 362 161)" />
+    <rect x="410" y="166" width="20" height="52" rx="10" transform="rotate(28 420 192)" />
+  </g>
 </svg>

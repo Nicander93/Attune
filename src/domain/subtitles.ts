@@ -43,6 +43,8 @@ function validate(cues: Cue[], duration: number): SubtitleSegment[] {
   if (!cues.length) fail('字幕为空。');
   const segments = cues.map((c) => ({ ...c, id: newId() })).sort((a, b) => a.start - b.start);
   for (const segment of segments) {
+    if (!segment.reference.trim()) fail('字幕内容不能为空。');
+    if (segment.start < 0 || segment.start >= duration) fail('字幕开始时间超出音频范围。');
     if (!(segment.end > segment.start)) fail('字幕片段结束时间必须晚于开始时间。');
     if (segment.end > duration + 0.25)
       fail(`字幕片段结束于 ${segment.end.toFixed(2)}s，超出音频时长 ${duration.toFixed(2)}s。`);

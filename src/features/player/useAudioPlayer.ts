@@ -2,150 +2,102 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Material, SubtitleSegment } from '../../domain/types';
 
 export const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5] as const;
-
-/** What the player can be told to do, independent of who is listening. */
 export type PlayerMode = 'segment' | 'continuous';
 
-export type AudioPlayer = {
-  audioRef: React.RefObject<HTMLAudioElement | null>;
-  src: string;
-  playing: boolean;
-  position: number;
-  speed: number;
-  loop: boolean;
-  mode: PlayerMode;
-  /** Sentence the audio is inside. Null when there are no subtitles or we are between them. */
-  playbackSegment: SubtitleSegment | undefined;
-  /** False when there is nothing to navigate by, e.g. audio without subtitles. */
-  canStep: boolean;
-  hasPrevious: boolean;
-  hasNext: boolean;
-  unreadable: boolean;
-  setSpeed: (rate: number) => void;
-  setLoop: (loop: boolean) => void;
-  setMode: (mode: PlayerMode) => void;
-  toggle: () => void;
-  play: () => void;
-  pause: () => void;
-  playFrom: (seconds: number) => void;
-  seek: (seconds: number) => void;
-  /** Moves to a sentence start. Never decides which sentence the user is typing into. */
-  goToSegment: (id: string, options?: { play?: boolean }) => void;
-  previous: () => void;
-  next: () => void;
-  replay: () => void;
-};
-
-/**
- * Owns the audio element and sentence navigation.
- *
- * Deliberately separate from whatever sentence the user is editing: during continuous
- * playback the audio walks forward on its own, and forcing the input field to follow
- * would throw away the draft. Callers read `playbackSegment` when they want to follow
- * along, and keep their own cursor for typing.
- */
 export function useAudioPlayer(
   material: Material,
   onPositionChange?: (seconds: number) => void,
-): AudioPlayer {
-  const segments = material.segments;
+  onSettingsChange?: (settings: NonNullable<Material['playbackSettings']>) => void,
+  onPlay?: () => void,
+) {
   const audioRef = useRef<HTMLAudioElement>(null);
+  const callbacks = useRef({ onPositionChange, onSettingsChange, onPlay });
+  callbacks.current = { onPositionChange, onSettingsChange, onPlay };
   const [playing, setPlaying] = useState(false);
   const [position, setPosition] = useState(material.playbackPosition);
-  const [speed, setSpeed] = useState(1);
-  const [loop, setLoop] = useState(false);
-  const [mode, setMode] = useState<PlayerMode>('segment');
+  const [speed, setSpeedState] = useState(material.playbackSettings?.speed ?? 1);
+  const [loop, setLoopState] = useState(material.playbackSettings?.loop ?? false);
+  const [mode, setModeState] = useState<PlayerMode>(
+    material.playbackSettings?.mode ?? (material.lastView === 'reading' ? 'continuous' : 'segment'),
+  );
   const [src, setSrc] = useState('');
   const [unreadable, setUnreadable] = useState(false);
-
+  // timeupdate can jump over a boundary. Keep the sentence selected at play/seek
+  // time instead of rediscovering it from the next timeupdate.
+  const stopSegment = useRef<SubtitleSegment | undefined>(undefined);
+  const segmentAt = useCallback(
+    (time: number) => material.segments.find((s) => time >= s.start && time < s.end),
+    [material.segments],
+  );
   useEffect(() => {
-    if (!(material.audio instanceof Blob)) {
-      setSrc('');
+    if (!(material.audio instanceof Blob) || !material.audio.size) {
       setUnreadable(true);
       return;
     }
-    const objectUrl = URL.createObjectURL(material.audio);
-    setSrc(objectUrl);
+    const url = URL.createObjectURL(material.audio);
+    setSrc(url);
     setUnreadable(false);
-    return () => URL.revokeObjectURL(objectUrl);
+    return () => URL.revokeObjectURL(url);
   }, [material.audio]);
-
   useEffect(() => {
     if (audioRef.current) audioRef.current.playbackRate = speed;
   }, [speed, src]);
-
-  const index = useMemo(
-    () => segments.findIndex((s) => position >= s.start && position < s.end),
-    [segments, position],
-  );
-  const playbackSegment = index >= 0 ? segments[index] : undefined;
-
-  const play = useCallback(() => void audioRef.current?.play().catch(() => setPlaying(false)), []);
-
-  /** Stopping is the point where the playback position becomes worth writing down. */
-  const pause = useCallback(() => {
-    const player = audioRef.current;
-    if (player && !player.paused) onPositionChange?.(player.currentTime);
-    player?.pause();
-  }, [onPositionChange]);
-
-  const playFrom = useCallback((seconds: number) => {
-    const player = audioRef.current;
-    if (!player) return;
-    player.currentTime = seconds;
-    setPosition(seconds);
-    void player.play().catch(() => setPlaying(false));
+  useEffect(() => {
+    const node = audioRef.current;
+    const savePosition = () => {
+      if (node && Number.isFinite(node.currentTime))
+        callbacks.current.onPositionChange?.(node.currentTime);
+    };
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') savePosition();
+    };
+    window.addEventListener('pagehide', savePosition);
+    document.addEventListener('visibilitychange', onHide);
+    return () => {
+      window.removeEventListener('pagehide', savePosition);
+      document.removeEventListener('visibilitychange', onHide);
+      savePosition();
+      node?.pause();
+    };
   }, []);
-
-  /**
-   * Moves the audio without persisting. `timeupdate` fires several times a second, so
-   * routing it through storage would rewrite the material on every tick.
-   */
-  const seek = useCallback((seconds: number) => {
-    if (!audioRef.current) return;
-    audioRef.current.currentTime = seconds;
-    setPosition(seconds);
-  }, []);
-
-  const goToSegment = useCallback(
-    (id: string, options?: { play?: boolean }) => {
-      const target = segments.find((s) => s.id === id);
-      if (!target) return;
-      pause();
-      if (options?.play) playFrom(target.start);
-      else seek(target.start);
-      onPositionChange?.(target.start);
+  const playbackSegment = useMemo(() => segmentAt(position), [segmentAt, position]);
+  const index = material.segments.findIndex((s) => s.id === playbackSegment?.id);
+  const persistPosition = () => {
+    if (audioRef.current) callbacks.current.onPositionChange?.(audioRef.current.currentTime);
+  };
+  const play = useCallback(() => {
+    const node = audioRef.current;
+    if (!node) return;
+    stopSegment.current = segmentAt(node.currentTime);
+    void node.play().catch(() => setPlaying(false));
+  }, [segmentAt]);
+  const pause = useCallback(() => audioRef.current?.pause(), []);
+  const seek = useCallback(
+    (seconds: number) => {
+      const node = audioRef.current;
+      if (!node) return;
+      const time = Math.max(0, Math.min(seconds, material.duration));
+      node.currentTime = time;
+      setPosition(time);
+      stopSegment.current = segmentAt(time);
+      callbacks.current.onPositionChange?.(time);
     },
-    [segments, pause, playFrom, seek, onPositionChange],
+    [material.duration, segmentAt],
   );
-
-  /**
-   * Always lands on the previous sentence's start, even when already part way into the
-   * current one. The two-step "back to sentence start first" behaviour makes rehearsing
-   * a single line need one extra keypress every time.
-   */
-  const previous = useCallback(() => {
-    if (!segments.length) return;
-    const current = playbackSegment ?? segments[segments.length - 1];
-    const at = segments.findIndex((s) => s.id === current.id);
-    if (at > 0) goToSegment(segments[at - 1].id);
-  }, [segments, playbackSegment, goToSegment]);
-
-  const next = useCallback(() => {
-    if (!playbackSegment) return;
-    const at = segments.findIndex((s) => s.id === playbackSegment.id);
-    if (at >= 0 && at < segments.length - 1) goToSegment(segments[at + 1].id);
-  }, [segments, playbackSegment, goToSegment]);
-
-  const replay = useCallback(() => {
-    if (playbackSegment) playFrom(playbackSegment.start);
-  }, [playbackSegment, playFrom]);
-
-  const toggle = useCallback(() => {
-    if (audioRef.current?.paused) play();
-    else pause();
-  }, [play, pause]);
-
+  const playFrom = (seconds: number) => {
+    seek(seconds);
+    play();
+  };
+  const goToSegment = (id: string, options?: { play?: boolean }) => {
+    const target = material.segments.find((s) => s.id === id);
+    if (!target) return;
+    pause();
+    seek(target.start);
+    if (options?.play) play();
+  };
+  const updateSettings = (patch: Partial<NonNullable<Material['playbackSettings']>>) => {
+    callbacks.current.onSettingsChange?.({ speed, loop, mode, ...patch });
+  };
   return {
     audioRef,
     src,
@@ -155,41 +107,72 @@ export function useAudioPlayer(
     loop,
     mode,
     playbackSegment,
-    canStep: segments.length > 0,
+    canStep: material.segments.length > 0,
     hasPrevious: index > 0,
-    hasNext: index >= 0 && index < segments.length - 1,
+    hasNext: index >= 0 && index < material.segments.length - 1,
     unreadable,
-    setSpeed,
-    setLoop,
-    setMode,
-    toggle,
+    setSpeed: (value: number) => {
+      setSpeedState(value);
+      updateSettings({ speed: value });
+    },
+    setLoop: (value: boolean) => {
+      setLoopState(value);
+      updateSettings({ loop: value });
+    },
+    setMode: (value: PlayerMode) => {
+      setModeState(value);
+      updateSettings({ mode: value });
+    },
     play,
     pause,
-    playFrom,
     seek,
+    playFrom,
     goToSegment,
-    previous,
-    next,
-    replay,
+    toggle: () => (audioRef.current?.paused ? play() : pause()),
+    previous: () => {
+      if (index > 0) goToSegment(material.segments[index - 1].id);
+    },
+    next: () => {
+      if (index >= 0 && index < material.segments.length - 1)
+        goToSegment(material.segments[index + 1].id);
+    },
+    replay: () => {
+      if (playbackSegment) playFrom(playbackSegment.start);
+    },
+    handlePlay: () => {
+      setPlaying(true);
+      callbacks.current.onPlay?.();
+    },
+    handlePause: () => {
+      setPlaying(false);
+      persistPosition();
+    },
+    handleError: () => {
+      setPlaying(false);
+      setUnreadable(true);
+    },
+    handleTimeUpdate: (time: number) => {
+      const target = stopSegment.current;
+      if (target && time >= target.end) {
+        if (loop) {
+          seek(target.start);
+          return;
+        }
+        if (mode === 'segment') {
+          pause();
+          seek(Math.max(target.start, target.end - 0.001));
+          return;
+        }
+      }
+      setPosition(time);
+    },
+    handleMetadata: () => {
+      const node = audioRef.current;
+      if (!node) return;
+      node.currentTime = Math.min(material.playbackPosition, material.duration);
+      node.playbackRate = speed;
+      stopSegment.current = segmentAt(node.currentTime);
+    },
   };
 }
-
-/**
- * Stops at the end of the current sentence unless looping, and wraps in continuous mode.
- * Returns the time handler to put on the <audio> element.
- */
-export function useSentenceStop(player: AudioPlayer): (time: number) => void {
-  const { loop, mode, playbackSegment } = player;
-  return useCallback(
-    (time: number) => {
-      if (!playbackSegment) return;
-      if (time < playbackSegment.end - 0.03) return;
-      if (loop) {
-        player.seek(playbackSegment.start);
-        return;
-      }
-      if (mode === 'segment') player.pause();
-    },
-    [player, loop, mode, playbackSegment],
-  );
-}
+export type AudioPlayer = ReturnType<typeof useAudioPlayer>;
