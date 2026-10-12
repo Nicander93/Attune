@@ -73,7 +73,7 @@ export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
   }
   function downloadSelected() {
     const model = models.find((m) => m.id === settings.modelId);
-    if (!model || task) return;
+    if (!model || task || busy.current) return;
     cancelTask.current = () => void cancelDownload();
     void run(async () => {
       await download(model);
@@ -81,7 +81,7 @@ export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
     }, '已暂停下载，下次会从断点继续。');
   }
   function importLocal() {
-    if (task) return;
+    if (task || busy.current) return;
     void run(async () => {
       const path = await pickModelFile();
       if (!path) return;

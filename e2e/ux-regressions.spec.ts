@@ -1,6 +1,21 @@
 import { expect, test } from '@playwright/test';
 import { material, openStudy, seed, settled, storedMaterial, wav } from './support';
 
+test('reopening a material resumes audio rather than persisting the initial unloaded zero', async ({
+  page,
+}) => {
+  await seed(page, [material({ audio: wav(9), playbackPosition: 4 })]);
+  await openStudy(page);
+  await expect
+    .poll(() => page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime))
+    .toBe(4);
+  await page.getByRole('button', { name: '← 返回' }).click();
+  await page.locator('.materials__row').first().click();
+  await expect
+    .poll(() => page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime))
+    .toBe(4);
+});
+
 test('new material opens preparation directly and returns to its actual source', async ({
   page,
 }) => {

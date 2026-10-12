@@ -45,7 +45,8 @@ export function useAudioPlayer(
   useEffect(() => {
     const node = audioRef.current;
     const savePosition = () => {
-      if (node && Number.isFinite(node.currentTime))
+      // StrictMode probes cleanup before metadata loads; that zero is not a resume position.
+      if (node && node.readyState >= 1 && Number.isFinite(node.currentTime))
         callbacks.current.onPositionChange?.(node.currentTime);
     };
     const onHide = () => {
