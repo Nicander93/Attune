@@ -44,6 +44,7 @@ export function MaterialWorkspace({ material, route, update, go, onBack, onNotic
           update={update}
           onBack={onBack}
           onNotice={onNotice}
+          onSubtitles={() => go({ name: 'subtitles', materialId: material.id })}
           onStudy={(view) => {
             update((m) => ({ ...m, lastView: view }));
             if (!material.playbackSettings)

@@ -35,6 +35,10 @@ export function Player({ material, player, status, onStepSentence, hasPrevious, 
             event.preventDefault();
         }}
       >
+        <div className="player__track">
+          <strong title={material.displayName}>{material.displayName}</strong>
+          <span className="caption">{status ?? `${material.segments.length} 句 · 英语听写`}</span>
+        </div>
         <button
           className="quiet"
           aria-label="上一句"
@@ -61,7 +65,6 @@ export function Player({ material, player, status, onStepSentence, hasPrevious, 
         <button className="quiet" disabled={!player.canStep} onClick={player.replay}>
           ↻ 重听本句
         </button>
-        {status && <span className="muted">{status}</span>}
         <span className="player__spacer" />
         <label className="muted">
           <select

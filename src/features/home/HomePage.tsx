@@ -31,8 +31,7 @@ export function HomePage(props: {
     <section className="home">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">首页</p>
-          <h1>继续学习</h1>
+          <h1>首页</h1>
         </div>
         <button className="primary" onClick={props.onNewMaterial} disabled={!ready}>
           ＋ 新建素材
@@ -43,7 +42,11 @@ export function HomePage(props: {
         <p className="muted">正在打开本地数据…</p>
       ) : resume ? (
         <>
+          <h2 className="home__resume-label">继续学习</h2>
           <article className="resume">
+            <span className="material-symbol" aria-hidden="true">
+              ♫
+            </span>
             <button className="resume__main" onClick={() => props.onContinue(resume.material.id)}>
               <span className="resume__title">{resume.material.displayName}</span>
               <span className="muted">
@@ -52,7 +55,7 @@ export function HomePage(props: {
               </span>
             </button>
             <button className="primary" onClick={() => props.onContinue(resume.material.id)}>
-              继续听写 →
+              继续{viewLabel(resume.material)} →
             </button>
           </article>
 
@@ -66,6 +69,9 @@ export function HomePage(props: {
             {recent.map(({ material, progress, studiedAt }) => (
               <li key={material.id}>
                 <button className="recent__row" onClick={() => props.onContinue(material.id)}>
+                  <span className="material-symbol" aria-hidden="true">
+                    ♫
+                  </span>
                   <span>
                     <strong>{material.displayName}</strong>
                     <span className="muted">
@@ -88,7 +94,7 @@ export function HomePage(props: {
           <p className="muted">
             导入一段音频和字幕，就可以开始第一篇听写。所有数据只保存在这台机器上。
           </p>
-          <button className="primary" onClick={props.onNewMaterial} disabled={!ready}>
+          <button className="primary" onClick={props.onOpenLibrary} disabled={!ready}>
             打开素材库
           </button>
         </div>
