@@ -1,0 +1,4 @@
+﻿1 PASS (scripted; UI banner still needs human)
+2 PASS (probe+extract; Material/dictation UI needs human)
+3 PASS (copy created; UI needs human)
+4 PASS (config+code; human: confirm <video> not using raw disk path)

@@ -9,6 +9,8 @@ import {
   saveFolder,
   saveMaterial,
 } from '../storage/db';
+import { clearMediaCache } from '../media';
+import { isDesktop } from '../desktop';
 
 const AUTOSAVE_MS = 300;
 
@@ -161,7 +163,10 @@ export function useLibrary(): LibraryState {
       pending.current.delete(id);
       const next = current.current.filter((m) => m.id !== id);
       commit(next);
-      queue.current = queue.current.then(() => deleteMaterial(id));
+      queue.current = queue.current.then(async () => {
+        await deleteMaterial(id);
+        if (isDesktop()) await clearMediaCache(id).catch(() => undefined);
+      });
       try {
         await queue.current;
       } catch (err) {

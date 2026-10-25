@@ -8,7 +8,7 @@ test('prepared material uses state rows, supports rename and opens subtitle proo
   await openStudy(page);
   await page.getByRole('button', { name: '素材设置' }).click();
   await expect(page.locator('.dropzone')).toHaveCount(0);
-  await expect(page.locator('.prep__section')).toHaveCount(3);
+  await expect(page.locator('.prep__section')).toHaveCount(4); // audio + subtitle + status + video import
   await expect(page.getByRole('button', { name: '开始听写' })).toHaveClass('primary');
   await page.getByRole('button', { name: '重命名', exact: true }).click();
   await page.getByLabel('素材名称').fill('');

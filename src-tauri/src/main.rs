@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod jobs;
+mod media;
 mod models;
 mod transcribe;
 
@@ -171,6 +172,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .manage(Jobs::default())
+        .manage(media::MediaState::default())
         .invoke_handler(tauri::generate_handler![
             list_models,
             download_model,
@@ -179,7 +181,13 @@ fn main() {
             clear_audio,
             append_audio,
             recognize,
-            cancel_recognition
+            cancel_recognition,
+            media::media_ffmpeg_status,
+            media::media_authorize_path,
+            media::media_probe,
+            media::media_extract_audio,
+            media::media_prepare_playback,
+            media::media_clear_cache
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Attune");

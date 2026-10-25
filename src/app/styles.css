@@ -1690,3 +1690,31 @@ h1 {
   display: flex;
   flex-direction: column;
 }
+
+
+.video-probe {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border, #333);
+  border-radius: 8px;
+}
+
+.video-probe__field,
+.video-probe__range label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.video-probe__range {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.video-probe input,
+.video-probe select {
+  min-width: 12rem;
+}

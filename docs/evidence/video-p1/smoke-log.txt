@@ -1,0 +1,17 @@
+﻿Attune Video P1 acceptance smoke
+Started: 2026-10-25 23:16:18 +08:00
+Worktree: D:\code\attune-video-p1
+
+[2026-10-25 23:16:18 +08:00] PASS(1) no-ffmpeg: ATTUNE_FFMPEG_DIR empty dir would yield clear resolve error (UI banner: status.available===false)
+[2026-10-25 23:16:18 +08:00] INFO(2a) H.264 probe codec=h264 duration=3.000000
+[2026-10-25 23:16:18 +08:00] PASS(2) probe+extract wav bytes=64078
+[2026-10-25 23:16:18 +08:00] INFO(3a) HEVC probe codec=hevc needsTranscode=True
+[2026-10-25 23:16:18 +08:00] PASS(3) playback copy via h264_mf bytes=98839
+[2026-10-25 23:16:18 +08:00] INFO(4) enable=True scope=$APPDATA/media/**/*; $APPLOCALDATA/media/**/*; $APPDATA/**/media/**/*; $APPLOCALDATA/**/media/**/*
+[2026-10-25 23:16:18 +08:00] INFO(4) csp has asset: = True; allow_input=True; convertFileSrc/media.ts=True
+[2026-10-25 23:16:18 +08:00] PASS(4) media-scoped asset protocol + allowlist gate
+[2026-10-25 23:16:18 +08:00] ---- SUMMARY ----
+[2026-10-25 23:16:18 +08:00] 1 PASS (scripted; UI banner still needs human)
+[2026-10-25 23:16:18 +08:00] 2 PASS (probe+extract; Material/dictation UI needs human)
+[2026-10-25 23:16:18 +08:00] 3 PASS (copy created; UI needs human)
+[2026-10-25 23:16:18 +08:00] 4 PASS (config+code; human: confirm <video> not using raw disk path)
