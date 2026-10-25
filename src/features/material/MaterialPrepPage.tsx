@@ -6,6 +6,7 @@ import { replaceTimeline } from '../../domain/subtitle-edits';
 import { isDesktop } from '../../desktop';
 import { RecognitionSettings } from '../../RecognitionSettings';
 import { useRecognition } from '../../useRecognition';
+import { VideoImportPanel } from './VideoImportPanel';
 
 type Props = {
   material: Material;
@@ -271,6 +272,12 @@ export function MaterialPrepPage({
       )}
 
       <div className="prep__content">
+        <VideoImportPanel
+          material={material}
+          update={update}
+          onNotice={onNotice}
+          onError={setError}
+        />
         {hasAudio ? (
           <div className="prep__section-list">
             <article

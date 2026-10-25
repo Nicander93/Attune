@@ -60,8 +60,28 @@ export interface Folder {
 
 export type StudyView = 'dictation' | 'reading';
 
+export type SubtitleOrigin = 'embedded' | 'asr' | 'ocr' | 'external';
+
 /**
- * A material is one audio file plus optional subtitles.
+ * Optional video source for a material. Audio materials leave this undefined.
+ * Times on the material (`duration`, segments, playbackPosition) are **clip-relative**
+ * seconds; absolute time in the file is `clipStart + relative`.
+ */
+export interface VideoSource {
+  originalName: string;
+  /** Authorized desktop path to the user's original file. Not read by the WebView directly. */
+  sourcePath: string;
+  /** Managed H.264 playback copy under app media cache (asset-protocol scope). */
+  playbackPath?: string;
+  clipStart: number;
+  clipEnd: number;
+  selectedAudioStream?: number;
+  selectedSubtitleStream?: number;
+  subtitleOrigin?: SubtitleOrigin;
+}
+
+/**
+ * A material is one audio or video file plus optional subtitles.
  *
  * `createdAt` is optional because legacy data has no honest import time: guessing one
  * would make 最近导入 and 最近学习 lie. Materials without it sort last, stably.
@@ -77,6 +97,8 @@ export interface Material {
   /** Exactly one folder or null for 未分类. */
   folderId: string | null;
   audio: Blob;
+  /** Present when this material was imported from a video file. */
+  video?: VideoSource;
   duration: number;
   segments: SubtitleSegment[];
   createdAt?: string;
