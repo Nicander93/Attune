@@ -83,6 +83,38 @@ npm run test:rust
 4. Confirm `duration` matches clip length; recognition still uses `Material.audio`.
 5. For HEVC: either a managed H.264 copy appears under appData `media/{id}/playback.mp4`, or a **clear error** (never silent).
 
+## 产品验收清单（主管可勾选）
+
+P1 合并前建议按下面四条验收。证据目录：`docs/evidence/video-p1/`（脚本冒烟日志；完整桌面截图若未附上，需人工在 `v0.1.1` + 本分支 build 上补一眼）。
+
+- [ ] **1. 本机没有 ffmpeg**  
+  不设置 `ATTUNE_FFMPEG_DIR`，且 `PATH` / `{appData}/tools/ffmpeg` 都找不到二进制时：材料准备页「从视频导入」区域出现明确错误提示（`banner--error`，文案来自 `media_ffmpeg_status` hint，例如未找到 ffmpeg/ffprobe），**导入按钮禁用**，应用不崩溃。
+
+- [ ] **2. H.264/AAC 导入可进入听读/听写链路（P1 能做到的部分）**  
+  选本地 H.264（如 `fixtures/video-p0/h264_aac.mp4`）→ probe → 选音轨/时间范围 → 提取音频写入 `Material.audio`，并带上 `Material.video` 元数据。之后仍可用现有「开始听写 / 听读」路径（音频 blob + duration 为 clip 相对秒）。不要求本 PR 做 P2 藏视频 UX。
+
+- [ ] **3. HEVC（H.265）**  
+  选 HEVC 源（如 `h265_aac.mp4`）时：要么在 appData `media/{materialId}/playback.mp4` 生成可播的 H.264 副本（优先 `h264_mf`），要么界面给出**清晰错误**（`无法生成可播放副本…`），**禁止静默失败**。`needsTranscode` / `compatibilityNote` 在 probe 结果里可见。
+
+- [ ] **4. 未授权路径进不了播放器 / asset 协议**  
+  WebView **不直接**加载用户原始 `sourcePath`。仅 `media_authorize_path` 登记过的输入可供 ffmpeg；播放走 `convertFileSrc(playbackPath)`，且 `assetProtocol.scope` 只允许 app `media/**`。对未授权绝对路径调用 probe/extract 应返回明确拒绝错误，而不是把文件暴露给 `asset:`。
+
+### 本机已自动核验 vs 仍需人眼
+
+| 项 | 自动冒烟（本 PR） | 仍需人眼 |
+| --- | --- | --- |
+| 1 无 ffmpeg | 临时清空 `ATTUNE_FFMPEG_DIR` + 隔离 PATH 后跑 resolve/status 脚本；单元/面板逻辑（`available === false` → banner） | 真机桌面点开确认 banner 文案与不崩溃 |
+| 2 H.264 | 对 `h264_aac.mp4` 跑与 Rust 同参的 ffprobe + 抽 wav；Vitest / Rust 绿；e2e 节数对齐 | 桌面走完「提取并写入材料」再点听写入口 |
+| 3 HEVC | 对 `h265_aac.mp4` 跑 probe（`needs_transcode`）+ 尝试 `h264_mf` 转码；失败则核对错误串存在于代码路径 | 桌面确认错误展示或 playback 副本可播 |
+| 4 未授权路径 | Rust allowlist / 危险字符单测；`tauri.conf.json` scope 审计 | 手工确认 `<video>`/`<img>` 未用原始盘符路径 |
+
+跑冒烟（需本机已有 `D:\Temp\ffmpeg-p0` 与 P0 fixtures，**勿提交二进制**）：
+
+```powershell
+cd D:\code\attune-video-p1
+powershell -File scripts/video-p1-acceptance-smoke.ps1
+```
+
 ## Out of scope (later)
 
 - P2: dictation hide-video / unified media clock UI
