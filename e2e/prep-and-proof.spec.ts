@@ -53,7 +53,7 @@ test.describe('material preparation', () => {
         mimeType: 'text/plain',
         buffer: Buffer.from(srt),
       });
-    await expect(page.getByText(/字幕已导入 2 句/)).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: /字幕已导入 2 句/ })).toBeVisible();
     await settled(page);
     expect((await storedMaterial(page, 'm1')).segments).toHaveLength(2);
   });

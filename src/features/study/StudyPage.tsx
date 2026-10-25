@@ -304,17 +304,11 @@ export function StudyPage({
   }
 
   return (
-    <section className="study">
+    <section className="study study--workbench">
       <header className="study__head">
         <button className="quiet back" onClick={onBack}>
           ← 返回
         </button>
-        <div>
-          <p className="eyebrow">{material.displayName}</p>
-          <h1>
-            第 {index + 1} / {scope.length} 句
-          </h1>
-        </div>
         <span className="muted">
           已听写 {round?.completedSegmentIds.length ?? 0} / {material.segments.length} 句
         </span>
@@ -326,9 +320,7 @@ export function StudyPage({
         onStepSentence={stepSentence}
         hasPrevious={index > 0}
         hasNext={index >= 0 && index < scope.length - 1}
-        status={
-          player.playbackSegment ? `本句 ${formatTime(player.playbackSegment.start)}` : undefined
-        }
+        status={`第 ${index + 1} / ${scope.length} 句`}
       />
 
       <div className="tabs">
@@ -386,9 +378,6 @@ export function StudyPage({
             }}
           />
         )}
-        <button className="quiet" onClick={onTranscript}>
-          完整原文 ↗
-        </button>
         <button className="quiet" onClick={() => setShowHistory(true)}>
           轮次
         </button>
@@ -398,6 +387,9 @@ export function StudyPage({
         segment ? (
           <div className="dictation">
             <div className="dictation__head">
+              <h1>
+                第 {index + 1} / {scope.length} 句
+              </h1>
               <span className="muted">
                 {formatTime(segment.start)} — {formatTime(segment.end)}
                 {stale.has(segment.id) ? ' · 待重新核对' : ''}
@@ -445,9 +437,16 @@ export function StudyPage({
               </div>
             ) : (
               <div className="dictation__actions">
-                <span className="muted">Enter 核对 · Esc 退出输入后可用 ← → 切句</span>
-                <button className="primary" onClick={check} disabled={!draft.trim()}>
-                  核对答案
+                <button className="quiet" onClick={onTranscript}>
+                  完整原文 ↗
+                </button>
+                <button
+                  className="primary"
+                  aria-label="核对答案"
+                  onClick={check}
+                  disabled={!draft.trim()}
+                >
+                  核对答案 <kbd>Enter</kbd>
                 </button>
               </div>
             )}
@@ -476,6 +475,14 @@ export function StudyPage({
       )}
 
       <footer className="study__foot">
+        <span className="study__hint muted">
+          Enter 核对 / 下一句 · Space 播放 · Esc 退出输入后 ← → 切句
+        </span>
+        {(view === 'reading' || checked) && (
+          <button className="quiet" onClick={onTranscript}>
+            完整原文 ↗
+          </button>
+        )}
         <button className="quiet" onClick={onSubtitles}>
           字幕校对
         </button>

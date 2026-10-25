@@ -23,7 +23,7 @@ test('new material opens preparation directly and returns to its actual source',
   await page.getByRole('button', { name: /新建素材/ }).click();
   await expect(page.getByText('素材准备')).toBeVisible();
   await page.getByRole('button', { name: '← 返回' }).click();
-  await expect(page.getByRole('heading', { name: '继续学习' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '首页' })).toBeVisible();
 });
 
 test('preserves sentence, checked state, view and player preferences through secondary pages', async ({

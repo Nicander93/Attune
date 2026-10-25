@@ -157,8 +157,7 @@ export function LibraryPage(props: Props) {
     <section className="library">
       <div className="page-heading">
         <div>
-          <p className="eyebrow">素材库</p>
-          <h1>全部素材</h1>
+          <h1>素材库</h1>
         </div>
         <button
           className="primary"
@@ -288,7 +287,17 @@ export function LibraryPage(props: Props) {
                 aria-expanded={sortOpen}
                 onClick={() => setSortOpen((open) => !open)}
               >
-                ⚑
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  aria-hidden="true"
+                >
+                  <path d="M4 6h10M4 12h7M4 18h4M18 5v14m-3-3 3 3 3-3" />
+                </svg>
               </button>
               {sortOpen && (
                 <ul className="menu" role="menu">
@@ -353,6 +362,9 @@ export function LibraryPage(props: Props) {
                         }
                       }}
                     >
+                      <span className="material-symbol" aria-hidden="true">
+                        ♫
+                      </span>
                       <span className="materials__main">
                         <strong>{row.displayName}</strong>
                         <span className="muted">

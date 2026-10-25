@@ -42,7 +42,7 @@ try {
   if (!ready) throw new Error('WebView2 debug endpoint did not open.');
   browser = await chromium.connectOverCDP(endpoint);
   const page = browser.contexts()[0].pages()[0];
-  await expect(page.getByRole('heading', { name: '继续学习' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '首页' })).toBeVisible();
   expect(await page.evaluate(() => '__TAURI_INTERNALS__' in window)).toBe(true);
   // The fresh profile must be empty; abort before writing if isolation did not work.
   await page.getByRole('button', { name: '素材库' }).first().click();
@@ -85,11 +85,11 @@ try {
         '1\n00:00:00,000 --> 00:00:03,000\nHello world.\n\n2\n00:00:03,000 --> 00:00:06,000\nNice to meet you.\n',
       ),
     });
-  await expect(page.getByText(/字幕已导入 2 句/)).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: /字幕已导入 2 句/ })).toBeVisible();
   await page.getByRole('button', { name: '本地识别原文' }).click();
   await expect(page.getByRole('button', { name: '开始识别' })).toBeVisible();
   await expect(page.getByLabel('识别模型')).toBeEnabled();
-  await page.getByRole('button', { name: '收起' }).click();
+  await page.getByRole('button', { name: '收起', exact: true }).click();
   await page.getByRole('button', { name: '开始听写' }).click();
   const field = page.getByLabel('第 1 句听写');
   await field.fill('Hello world');

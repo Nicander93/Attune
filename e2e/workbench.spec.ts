@@ -3,7 +3,7 @@ import { material, openStudy, seed, settled, storedMaterial, wav } from './suppo
 test.describe('home', () => {
   test('shows an empty state when nothing has been studied', async ({ page }) => {
     await seed(page, [material({ audio: wav() })]);
-    await expect(page.getByRole('heading', { name: '继续学习' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '首页' })).toBeVisible();
     // An imported-but-never-opened material must not pretend to be a study session.
     await expect(page.getByText('还没有开始听写')).toBeVisible();
     await expect(page.getByText('podcast.mp3')).toHaveCount(0);
