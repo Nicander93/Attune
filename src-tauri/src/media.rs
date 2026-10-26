@@ -107,13 +107,13 @@ pub struct FfmpegStatus {
     pub hint: String,
 }
 
-fn app_data(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn app_data(app: &AppHandle) -> Result<PathBuf, String> {
     app.path()
         .app_data_dir()
         .map_err(|e| format!("无法定位应用数据目录：{e}"))
 }
 
-fn media_dir(app: &AppHandle, material_id: &str) -> Result<PathBuf, String> {
+pub(crate) fn media_dir(app: &AppHandle, material_id: &str) -> Result<PathBuf, String> {
     validate_material_id(material_id)?;
     let dir = app_data(app)?.join("media").join(material_id);
     fs::create_dir_all(&dir).map_err(|e| format!("无法创建媒体缓存目录：{e}"))?;
@@ -122,6 +122,19 @@ fn media_dir(app: &AppHandle, material_id: &str) -> Result<PathBuf, String> {
 
 
 /// Text subtitle codecs ffmpeg can convert to SRT. Bitmap/PGS stays out (OCR = P4).
+pub fn is_bitmap_subtitle_codec(codec: &str) -> bool {
+    matches!(
+        codec.to_ascii_lowercase().as_str(),
+        "hdmv_pgs_subtitle"
+            | "pgssub"
+            | "dvd_subtitle"
+            | "dvdsub"
+            | "dvb_subtitle"
+            | "xsub"
+            | "vobsub"
+    )
+}
+
 pub fn is_text_subtitle_codec(codec: &str) -> bool {
     matches!(
         codec.to_ascii_lowercase().as_str(),
@@ -138,7 +151,7 @@ pub fn is_text_subtitle_codec(codec: &str) -> bool {
     )
 }
 
-fn validate_material_id(id: &str) -> Result<(), String> {
+pub(crate) fn validate_material_id(id: &str) -> Result<(), String> {
     if id.is_empty() || id.len() > 80 || !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
     {
         return Err("素材 ID 无效".into());
@@ -165,7 +178,7 @@ fn is_under(child: &Path, root: &Path) -> bool {
     child.starts_with(root)
 }
 
-fn allow_input(app: &AppHandle, state: &MediaState, path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn allow_input(app: &AppHandle, state: &MediaState, path: &Path) -> Result<PathBuf, String> {
     let full = canonicalize_existing(path)?;
     let data = app_data(app)?;
     let media_root = data.join("media");
@@ -182,7 +195,7 @@ fn allow_input(app: &AppHandle, state: &MediaState, path: &Path) -> Result<PathB
     Err("该文件路径未授权。请通过「导入视频」对话框重新选择。".into())
 }
 
-fn allow_output(app: &AppHandle, path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn allow_output(app: &AppHandle, path: &Path) -> Result<PathBuf, String> {
     let data = app_data(app)?;
     let media_root = fs::canonicalize(data.join("media")).or_else(|_| {
         fs::create_dir_all(data.join("media")).ok();
@@ -220,7 +233,7 @@ fn which_in_path(name: &str) -> Option<PathBuf> {
     None
 }
 
-fn resolve_bins(app: &AppHandle) -> Result<(PathBuf, PathBuf, String), String> {
+pub(crate) fn resolve_bins(app: &AppHandle) -> Result<(PathBuf, PathBuf, String), String> {
     let ffmpeg_name = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
     let ffprobe_name = if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" };
 
@@ -254,7 +267,7 @@ fn resolve_bins(app: &AppHandle) -> Result<(PathBuf, PathBuf, String), String> {
     )
 }
 
-fn run_typed(bin: &Path, args: &[String]) -> Result<(String, String), String> {
+pub(crate) fn run_typed(bin: &Path, args: &[String]) -> Result<(String, String), String> {
     for a in args {
         if looks_dangerous(a) {
             return Err("参数包含非法字符".into());
@@ -622,6 +635,128 @@ pub fn media_extract_subtitles(
     })
 }
 
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrBurnedInRequest {
+    pub source_path: String,
+    pub material_id: String,
+    pub clip_start: f64,
+    pub clip_end: f64,
+    /// Seconds between sampled frames (clamped).
+    pub sample_interval: Option<f64>,
+    /// Hard cap on frames OCR'd in one run.
+    pub max_samples: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OcrBurnedInResult {
+    pub srt_path: String,
+    pub cue_count: u32,
+    pub sample_count: u32,
+    pub backend: String,
+    pub language: Option<String>,
+}
+
+#[tauri::command]
+pub fn media_ocr_burned_in(
+    app: AppHandle,
+    state: State<'_, MediaState>,
+    request: OcrBurnedInRequest,
+) -> Result<OcrBurnedInResult, String> {
+    if request.clip_end <= request.clip_start {
+        return Err("时间范围无效：结束时间必须大于开始时间。".into());
+    }
+    let status = crate::ocr::ocr_status();
+    if !status.available {
+        return Err(status.hint);
+    }
+    let full = allow_input(&app, &state, Path::new(&request.source_path))?;
+    let (ff, _, _) = resolve_bins(&app)?;
+    let clip_duration = request.clip_end - request.clip_start;
+    let interval = request.sample_interval.unwrap_or(0.75).clamp(0.25, 5.0);
+    let max_samples = request.max_samples.unwrap_or(24).clamp(1, 48) as usize;
+
+    let frames_dir = media_dir(&app, &request.material_id)?.join("ocr-frames");
+    if frames_dir.exists() {
+        let _ = fs::remove_dir_all(&frames_dir);
+    }
+    fs::create_dir_all(&frames_dir).map_err(|e| format!("无法创建 OCR 帧目录：{e}"))?;
+
+    let mut samples: Vec<(f64, String)> = Vec::new();
+    let mut sample_count = 0u32;
+    let mut t = 0.0_f64;
+    while t < clip_duration - 0.05 && samples.len() < max_samples {
+        let abs_t = request.clip_start + t;
+        let frame_path = frames_dir.join(format!("f_{:04}.png", sample_count));
+        let out = allow_output(&app, &frame_path)?;
+        let args = vec![
+            "-y".into(),
+            "-ss".into(),
+            format!("{:.3}", abs_t),
+            "-i".into(),
+            full.display().to_string(),
+            "-frames:v".into(),
+            "1".into(),
+            "-q:v".into(),
+            "2".into(),
+            out.display().to_string(),
+        ];
+        run_typed(&ff, &args)?;
+        if out.is_file() {
+            match crate::ocr::recognize_image_file(&out) {
+                Ok(text) => samples.push((t, text)),
+                Err(err) => {
+                    // Soft-fail a single frame; keep going unless nothing works.
+                    if sample_count == 0 {
+                        return Err(err);
+                    }
+                }
+            }
+            sample_count += 1;
+        }
+        t += interval;
+    }
+
+    let cues = crate::ocr::merge_ocr_samples(&samples, clip_duration);
+    if cues.is_empty() {
+        return Err("OCR 未识别到可用字幕文本。可安装英文 OCR 语言包后重试，或改用语音识别。".into());
+    }
+
+    let srt_path = media_dir(&app, &request.material_id)?.join("ocr.srt");
+    let srt_path = allow_output(&app, &srt_path)?;
+    let mut body = String::new();
+    for (i, (start, end, text)) in cues.iter().enumerate() {
+        body.push_str(&format!(
+            "{}\n{} --> {}\n{}\n\n",
+            i + 1,
+            format_srt_time(*start),
+            format_srt_time(*end),
+            text
+        ));
+    }
+    fs::write(&srt_path, body).map_err(|e| format!("无法写入 OCR SRT：{e}"))?;
+
+    Ok(OcrBurnedInResult {
+        srt_path: srt_path.display().to_string(),
+        cue_count: cues.len() as u32,
+        sample_count,
+        backend: status.backend,
+        language: status.preferred_language,
+    })
+}
+
+fn format_srt_time(seconds: f64) -> String {
+    let ms_total = (seconds.max(0.0) * 1000.0).round() as u64;
+    let ms = ms_total % 1000;
+    let s = (ms_total / 1000) % 60;
+    let m = (ms_total / 60_000) % 60;
+    let h = ms_total / 3_600_000;
+    format!("{h:02}:{m:02}:{s:02},{ms:03}")
+}
+
+
 #[tauri::command]
 pub fn media_clear_cache(app: AppHandle, material_id: String) -> Result<(), String> {
     validate_material_id(&material_id)?;
@@ -673,5 +808,8 @@ mod tests {
         assert!(is_text_subtitle_codec("webvtt"));
         assert!(!is_text_subtitle_codec("hdmv_pgs_subtitle"));
         assert!(!is_text_subtitle_codec("dvd_subtitle"));
+        assert!(is_bitmap_subtitle_codec("hdmv_pgs_subtitle"));
+        assert!(is_bitmap_subtitle_codec("dvd_subtitle"));
+        assert!(!is_bitmap_subtitle_codec("subrip"));
     }
 }

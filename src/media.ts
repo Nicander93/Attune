@@ -2,7 +2,7 @@ import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile } from '@tauri-apps/plugin-fs';
 import { isDesktop } from './desktop';
-import { isTextSubtitleCodec } from './domain/subtitle-source';
+import { isBitmapSubtitleCodec, isTextSubtitleCodec } from './domain/subtitle-source';
 
 export interface MediaStreamInfo {
   index: number;
@@ -104,6 +104,54 @@ export async function preparePlayback(input: {
       forceTranscode: !!input.forceTranscode,
     },
   });
+}
+
+export interface OcrStatus {
+  available: boolean;
+  backend: string;
+  languages: string[];
+  preferredLanguage?: string;
+  hint: string;
+}
+
+export interface OcrBurnedInResult {
+  srtPath: string;
+  cueCount: number;
+  sampleCount: number;
+  backend: string;
+  language?: string;
+}
+
+export async function ocrStatus(): Promise<OcrStatus> {
+  return invoke<OcrStatus>('ocr_status_cmd');
+}
+
+export async function ocrBurnedInSubtitles(input: {
+  sourcePath: string;
+  materialId: string;
+  clipStart: number;
+  clipEnd: number;
+  sampleInterval?: number;
+  maxSamples?: number;
+}): Promise<OcrBurnedInResult> {
+  return invoke<OcrBurnedInResult>('media_ocr_burned_in', {
+    request: {
+      sourcePath: input.sourcePath,
+      materialId: input.materialId,
+      clipStart: input.clipStart,
+      clipEnd: input.clipEnd,
+      sampleInterval: input.sampleInterval,
+      maxSamples: input.maxSamples,
+    },
+  });
+}
+
+export function pickDefaultBitmapSubtitleStream(probe: MediaProbe): number | undefined {
+  const subs = probe.streams.filter(
+    (s) => s.codecType === 'subtitle' && isBitmapSubtitleCodec(s.codecName),
+  );
+  if (!subs.length) return undefined;
+  return subs[0].index;
 }
 
 export async function loadSrtText(srtPath: string): Promise<string> {

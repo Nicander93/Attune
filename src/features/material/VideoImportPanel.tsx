@@ -4,19 +4,26 @@ import { formatTime } from '../../domain/types';
 import { defaultClipEnd } from '../../domain/video';
 import { parseSrt } from '../../domain/subtitles';
 import { applySubtitleTimeline, hasProtectedSubtitles } from '../../domain/subtitle-edits';
-import { isTextSubtitleCodec, toClipRelativeSegments } from '../../domain/subtitle-source';
+import {
+  isBitmapSubtitleCodec,
+  isTextSubtitleCodec,
+  toClipRelativeSegments,
+} from '../../domain/subtitle-source';
 import { isDesktop } from '../../desktop';
 import {
   extractClipAudio,
   extractEmbeddedSubtitles,
   ffmpegStatus,
   loadSrtText,
+  ocrBurnedInSubtitles,
+  ocrStatus,
   pickAndProbeVideo,
   pickDefaultAudioStream,
   pickDefaultSubtitleStream,
   preparePlayback,
   type FfmpegStatus,
   type MediaProbe,
+  type OcrStatus,
 } from '../../media';
 
 type Props = {
@@ -36,20 +43,34 @@ function fileName(path: string): string {
 /**
  * Desktop-only video import: probe → pick audio/range → extract Whisper-friendly audio
  * and a managed H.264 playback copy. Does not change study UX (P2).
+ * P3: text subtitle extract. P4: optional burned-in/bitmap OCR (does not alter the text→ASR path).
  */
 export function VideoImportPanel({ material, update, onNotice, onError, onNeedAsr }: Props) {
   const [status, setStatus] = useState<FfmpegStatus | null>(null);
+  const [ocr, setOcr] = useState<OcrStatus | null>(null);
   const [probe, setProbe] = useState<MediaProbe | null>(null);
   const [audioStream, setAudioStream] = useState<number | undefined>();
   const [subtitleStream, setSubtitleStream] = useState<number | undefined>();
   const [clipStart, setClipStart] = useState(0);
   const [clipEnd, setClipEnd] = useState(0);
   const [busy, setBusy] = useState(false);
+  /** Prefer burned-in/bitmap OCR over ASR when no text track was applied. */
+  const [wantOcr, setWantOcr] = useState(false);
 
   useEffect(() => {
     void ffmpegStatus()
       .then(setStatus)
       .catch((err) => setStatus({ available: false, source: 'error', hint: String(err) }));
+    void ocrStatus()
+      .then(setOcr)
+      .catch((err) =>
+        setOcr({
+          available: false,
+          backend: 'winrt',
+          languages: [],
+          hint: String(err),
+        }),
+      );
   }, []);
 
   const audioStreams = useMemo(
@@ -66,7 +87,7 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
   const bitmapSubtitleCount = useMemo(
     () =>
       probe?.streams.filter(
-        (s) => s.codecType === 'subtitle' && !isTextSubtitleCodec(s.codecName),
+        (s) => s.codecType === 'subtitle' && isBitmapSubtitleCodec(s.codecName),
       ).length ?? 0,
     [probe],
   );
@@ -81,10 +102,14 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
       setSubtitleStream(pickDefaultSubtitleStream(next));
       setClipStart(0);
       setClipEnd(defaultClipEnd(next.duration));
-      onNotice(`已探测：${fileName(next.path)}`);
+      const hasBitmap = next.streams.some(
+        (s) => s.codecType === 'subtitle' && isBitmapSubtitleCodec(s.codecName),
+      );
+      setWantOcr(hasBitmap);
+      onNotice(`\u5df2\u63a2\u6d4b\uff1a${fileName(next.path)}`);
     } catch (err) {
       const message = String(err);
-      if (!message.includes('取消')) onError(message);
+      if (!message.includes('\u53d6\u6d88')) onError(message);
     } finally {
       setBusy(false);
     }
@@ -178,15 +203,42 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
       }
 
       if (!embeddedApplied) {
-        if (!hasProtectedSubtitles(material)) {
+        if (hasProtectedSubtitles(material)) {
+          onNotice(
+            `\u89c6\u9891\u5df2\u5199\u5165\uff08\u7247\u6bb5 ${formatTime(clipStart)}\u2013${formatTime(clipEnd)}\uff09\u3002${playbackNote} \u5df2\u6709\u7528\u6237\u6821\u5bf9/\u7ec3\u4e60\u8bb0\u5f55\uff0c\u672a\u8986\u76d6\u5b57\u5e55\u3002 ${probe.compatibilityNote}`,
+          );
+        } else if (wantOcr) {
+          try {
+            const ocrResult = await ocrBurnedInSubtitles({
+              sourcePath: probe.path,
+              materialId: material.id,
+              clipStart,
+              clipEnd,
+            });
+            const srtText = await loadSrtText(ocrResult.srtPath);
+            const segments = toClipRelativeSegments(
+              parseSrt(srtText, clipDuration),
+              clipStart,
+              clipDuration,
+            );
+            if (segments.length === 0) {
+              throw new Error('\u672a\u5f97\u5230\u53ef\u7528 OCR \u5b57\u5e55\u53e5');
+            }
+            update((m) => applySubtitleTimeline(m, segments, 'ocr', 'unreviewed'));
+            onNotice(
+              `\u89c6\u9891\u5df2\u5199\u5165\uff08\u7247\u6bb5 ${formatTime(clipStart)}\u2013${formatTime(clipEnd)}\uff09\u3002${playbackNote} OCR\uff08${ocrResult.backend}\uff09\u8bc6\u522b ${segments.length} \u53e5\uff08${ocrResult.sampleCount} \u5e27\uff09\uff0c\u8bf7\u6821\u5bf9\u540e\u518d\u542c\u5199\u3002 ${probe.compatibilityNote}`,
+            );
+          } catch (err) {
+            onNotice(
+              `\u89c6\u9891\u5df2\u5199\u5165\u3002${playbackNote} OCR \u5931\u8d25\uff0c\u5c06\u5c1d\u8bd5\u8bed\u97f3\u8bc6\u522b\uff1a${String(err)}`,
+            );
+            onNeedAsr?.();
+          }
+        } else {
           onNotice(
             `\u89c6\u9891\u7d20\u6750\u5df2\u7ecf\u5199\u5165\uff08\u7247\u6bb5 ${formatTime(clipStart)}\u2013${formatTime(clipEnd)}\uff09\u3002${playbackNote} ${probe.compatibilityNote}`,
           );
           onNeedAsr?.();
-        } else {
-          onNotice(
-            `\u89c6\u9891\u5df2\u5199\u5165\uff08\u7247\u6bb5 ${formatTime(clipStart)}\u2013${formatTime(clipEnd)}\uff09\u3002${playbackNote} \u5df2\u6709\u7528\u6237\u6821\u5bf9/\u7ec3\u4e60\u8bb0\u5f55\uff0c\u672a\u8986\u76d6\u5b57\u5e55\u3002 ${probe.compatibilityNote}`,
-          );
         }
       }
       setProbe(null);
@@ -197,7 +249,7 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
     }
   }
 
-async function reassociate() {
+  async function reassociate() {
     onError('');
     setBusy(true);
     try {
@@ -222,10 +274,12 @@ async function reassociate() {
             }
           : m,
       );
-      onNotice('已重新关联视频源文件。如需重新提取音轨，请再走一遍导入。');
+      onNotice(
+        '\u5df2\u91cd\u65b0\u5173\u8054\u89c6\u9891\u6e90\u6587\u4ef6\u3002\u5982\u9700\u91cd\u65b0\u63d0\u53d6\u97f3\u8f68\uff0c\u8bf7\u518d\u8d70\u4e00\u904d\u5bfc\u5165\u3002',
+      );
     } catch (err) {
       const message = String(err);
-      if (!message.includes('取消')) onError(message);
+      if (!message.includes('\u53d6\u6d88')) onError(message);
     } finally {
       setBusy(false);
     }
@@ -235,8 +289,12 @@ async function reassociate() {
     return (
       <article className="prep__section">
         <div className="prep__summary">
-          <h2>视频</h2>
-          <p className="muted">视频导入、探测与抽轨仅桌面版支持；浏览器请继续用音频文件。</p>
+          <h2>{'\u89c6\u9891'}</h2>
+          <p className="muted">
+            {
+              '\u89c6\u9891\u5bfc\u5165\u3001\u63a2\u6d4b\u4e0e\u62bd\u8f68\u4ec5\u684c\u9762\u7248\u652f\u6301\uff1b\u6d4f\u89c8\u5668\u8bf7\u7ee7\u7eed\u7528\u97f3\u9891\u6587\u4ef6\u3002'
+            }
+          </p>
         </div>
       </article>
     );
@@ -245,26 +303,40 @@ async function reassociate() {
   return (
     <article className="prep__section prep__section--video">
       <div className="prep__summary">
-        <h2>视频</h2>
+        <h2>{'\u89c6\u9891'}</h2>
         <p className="muted">
           {material.video
-            ? `${material.video.originalName} · 片段 ${formatTime(material.video.clipStart)}–${formatTime(material.video.clipEnd)}`
-            : '可选：从本地视频提取音轨，沿用现有听写流程'}
+            ? `${material.video.originalName} \u00b7 \u7247\u6bb5 ${formatTime(material.video.clipStart)}\u2013${formatTime(material.video.clipEnd)}`
+            : '\u53ef\u9009\uff1a\u4ece\u672c\u5730\u89c6\u9891\u63d0\u53d6\u97f3\u8f68\uff0c\u6cbf\u7528\u73b0\u6709\u542c\u5199\u6d41\u7a0b'}
         </p>
         {status && !status.available && (
           <p className="banner banner--error" role="alert">
-            {status.hint || '未找到 ffmpeg/ffprobe'}
+            {status.hint || '\u672a\u627e\u5230 ffmpeg/ffprobe'}
           </p>
         )}
-        {status?.available && <p className="muted prep__hint">ffmpeg：{status.source}</p>}
+        {status?.available && (
+          <p className="muted prep__hint">ffmpeg\uff1a{status.source}</p>
+        )}
+        {ocr && (
+          <p className="muted prep__hint">
+            OCR\uff08{ocr.backend}\uff09\uff1a
+            {ocr.available
+              ? `\u53ef\u7528 \u00b7 ${ocr.preferredLanguage ?? (ocr.languages.join(', ') || '\u8bed\u8a00\u5305\u5df2\u88c5')}`
+              : ocr.hint}
+          </p>
+        )}
       </div>
       <div className="prep__actions">
         <button disabled={busy || status?.available === false} onClick={() => void chooseVideo()}>
-          {busy ? '处理中…' : material.video ? '重新导入视频' : '导入视频'}
+          {busy
+            ? '\u5904\u7406\u4e2d\u2026'
+            : material.video
+              ? '\u91cd\u65b0\u5bfc\u5165\u89c6\u9891'
+              : '\u5bfc\u5165\u89c6\u9891'}
         </button>
         {material.video && (
           <button className="quiet" disabled={busy} onClick={() => void reassociate()}>
-            重新关联源文件
+            {'\u91cd\u65b0\u5173\u8054\u6e90\u6587\u4ef6'}
           </button>
         )}
       </div>
@@ -273,10 +345,11 @@ async function reassociate() {
         <div className="video-probe">
           <p className="muted">{probe.compatibilityNote}</p>
           <p className="muted">
-            容器 {probe.formatName || 'unknown'} · 总时长 {formatTime(probe.duration)}
+            {'\u5bb9\u5668'} {probe.formatName || 'unknown'} \u00b7 {'\u603b\u65f6\u957f'}{' '}
+            {formatTime(probe.duration)}
           </p>
           <label className="video-probe__field">
-            音轨
+            {'\u97f3\u8f68'}
             <select
               value={audioStream ?? ''}
               onChange={(event) => setAudioStream(Number(event.target.value))}
@@ -284,8 +357,8 @@ async function reassociate() {
               {audioStreams.map((s) => (
                 <option key={s.index} value={s.index}>
                   #{s.index} {s.codecName}
-                  {s.channels ? ` · ${s.channels}ch` : ''}
-                  {s.language ? ` · ${s.language}` : ''}
+                  {s.channels ? ` \u00b7 ${s.channels}ch` : ''}
+                  {s.language ? ` \u00b7 ${s.language}` : ''}
                 </option>
               ))}
             </select>
@@ -294,12 +367,16 @@ async function reassociate() {
             <p className="muted prep__hint">
               {'\u8fd8\u6709 '}
               {bitmapSubtitleCount}
-              {' \u6761\u56fe\u5f62\u5b57\u5e55\u8f68\uff08PGS/DVD\uff09\uff0cP3 \u4e0d\u63d0\u53d6\uff0cOCR \u7559\u5f85 P4\u3002'}
+              {
+                ' \u6761\u56fe\u5f62\u5b57\u5e55\u8f68\uff08PGS/DVD\uff09\uff1b\u6587\u672c\u8f68\u4ecd\u8d70 P3\uff0c\u56fe\u5f62/\u70e7\u5f55\u53ef\u7528\u4e0b\u65b9 OCR\u3002'
+              }
             </p>
           )}
           {subtitleStreams.length > 0 && (
             <label className="video-probe__field">
-              字幕轨（P1 仅记录选择；提取在 P3）
+              {
+                '\u5b57\u5e55\u8f68\uff08\u6587\u672c\u8f68\u63d0\u53d6\uff1b\u65e0\u6587\u672c\u8f68\u65f6\u53ef\u6539\u7528 OCR\uff09'
+              }
               <select
                 value={subtitleStream ?? ''}
                 onChange={(event) =>
@@ -308,19 +385,30 @@ async function reassociate() {
                   )
                 }
               >
-                <option value="">不选</option>
+                <option value="">{'\u4e0d\u9009'}</option>
                 {subtitleStreams.map((s) => (
                   <option key={s.index} value={s.index}>
                     #{s.index} {s.codecName}
-                    {s.language ? ` · ${s.language}` : ''}
+                    {s.language ? ` \u00b7 ${s.language}` : ''}
                   </option>
                 ))}
               </select>
             </label>
           )}
+          <label className="video-probe__field video-probe__check">
+            <input
+              type="checkbox"
+              checked={wantOcr}
+              disabled={ocr?.available === false}
+              onChange={(event) => setWantOcr(event.target.checked)}
+            />{' '}
+            {
+              'OCR \u70e7\u5f55/\u56fe\u5f62\u5b57\u5e55\uff08WinRT\uff1b\u65e0\u6587\u672c\u8f68\u4e14\u672a\u4fdd\u62a4\u65f6\u4f18\u5148\u4e8e ASR\uff09'
+            }
+          </label>
           <div className="row video-probe__range">
             <label>
-              开始（秒）
+              {'\u5f00\u59cb\uff08\u79d2\uff09'}
               <input
                 type="number"
                 min={0}
@@ -331,7 +419,7 @@ async function reassociate() {
               />
             </label>
             <label>
-              结束（秒）
+              {'\u7ed3\u675f\uff08\u79d2\uff09'}
               <input
                 type="number"
                 min={0}
@@ -343,7 +431,7 @@ async function reassociate() {
             </label>
           </div>
           <button className="primary" disabled={busy} onClick={() => void applyVideo()}>
-            提取音轨并写入素材
+            {'\u63d0\u53d6\u97f3\u8f68\u5e76\u5199\u5165\u7d20\u6750'}
           </button>
         </div>
       )}
