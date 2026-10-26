@@ -1,0 +1,157 @@
+Attune Video P3 desktop smoke (CDP + screenshots)
+Date: 2026-10-26 11:05 Asia/Shanghai
+Branch: feat/video-p3-subtitles @ ac1b527 (ac1b5270ee39a19d4919b7c5a7db82ef1df29633)
+Machine: LM Windows WebView2 CDP :9222
+Fixtures: h264_aac_subs.mkv (embedded eng subrip); speech_nosubs.mp4 (SAPI English, no text track); manual.srt
+RESULT: 1=PASS 2=PASS 3=PASS 4=PASS all=PASS
+--- resume items 2+4 ---
+page http://localhost:1420/
+=== ITEM 2 ASR (speech fixture) ===
+video dialog {"code":0,"out":"DIALOG title=[��] hwnd=985834\r\nCLICKED_OK"}
+shot 20-nosubs-probed.png
+shot 21-nosubs-applied.png
+prep after apply ← 返回
+
+素材准备
+
+speech_nosubs 重命名
+00:05 · 音频已添加
+
+当前字幕来自语音识别（ASR），尚未校对，不应作为最终答案。
+去校对
+
+视频
+
+speech_nosubs.mp4 · 片段 00:00–00:05
+
+ffmpeg：ATTUNE_FFMPEG_DIR
+
+重新导入视频
+重新关联源文件
+♫
+音频
+
+speech_nosubs.mp4 · 00:05
+
+更换音频
+拖入音频以更换
+≡
+字幕
+
+已导入 2 句 · 可继续校对
+
+导入字幕
+校对字幕
+拖入 SRT / VTT 文件
+文
+中文翻译
+
+未提供译文，可导入双语字幕；听读时显示英文
+
+可选
+本地识别原文
++
+
+准备完成，可以开始听写。
+
+开始听写
+开始听读
+item2 {"n":2,"asr":true,"unreviewed":true,"banners":"识别完成，共 2 句。ASR 结果仅供参考，请校对后再开始听写。 | 当前字幕来自语音识别（ASR），尚未校对，不应作为最终答案。去校对","prep":"← 返回\n\n素材准备\n\nspeech_nosubs 重命名\n00:05 · 音频已添加\n\n当前字幕来自语音识别（ASR），尚未校对，不应作为最终答案。\n去校对\n\n视频\n\nspeech_nosubs.mp4 · 片段 00:00–00:05\n\nffmpeg：ATTUNE_FFMPEG_DIR\n\n重新导入视频\n重新关联源文件\n♫\n音频\n\nspeech_nosubs.mp4 · 00:05\n\n更换音频\n拖入音频以更换\n≡\n字幕\n\n已导入 2 句 · 可继续校对\n\n导入字幕\n校对字幕\n拖入 SRT / VTT 文件\n文\n中文翻译\n\n未提供译文，可导入双语字幕；听读时显示英文\n\n可选\n本地识别原文\n+\n\n准备完成，可以开始听写。\n\n开始听写\n开始听读"}
+shot 22-asr-result.png
+2 PASS=true
+=== ITEM 4 manual SRT ===
+video dialog {"code":0,"out":"DIALOG title=[��] hwnd=1444514\r\nCLICKED_OK"}
+shot 30-manual-video-probed.png
+shot 31-manual-video-applied.png
+prep after apply ← 返回
+
+素材准备
+
+speech_nosubs 重命名
+00:05 · 音频已添加
+
+当前字幕来自语音识别（ASR），尚未校对，不应作为最终答案。
+去校对
+
+视频
+
+speech_nosubs.mp4 · 片段 00:00–00:05
+
+ffmpeg：ATTUNE_FFMPEG_DIR
+
+重新导入视频
+重新关联源文件
+♫
+音频
+
+speech_nosubs.mp4 · 00:05
+
+更换音频
+拖入音频以更换
+≡
+字幕
+
+已导入 2 句 · 可继续校对
+
+导入字幕
+校对字幕
+拖入 SRT / VTT 文件
+文
+中文翻译
+
+未提供译文，可导入双语字幕；听读时显示英文
+
+可选
+本地识别原文
++
+
+准备完成，可以开始听写。
+
+开始听写
+开始听读
+srt dialog {"code":0,"out":"DIALOG title=[��] hwnd=1510050\r\nCLICKED_OK"}
+after srt banners=字幕已导入 2 句（没有中文译文）。
+after srt prep=← 返回
+
+素材准备
+
+speech_nosubs 重命名
+00:05 · 音频已添加
+视频
+
+speech_nosubs.mp4 · 片段 00:00–00:05
+
+ffmpeg：ATTUNE_FFMPEG_DIR
+
+重新导入视频
+重新关联源文件
+♫
+音频
+
+speech_nosubs.mp4 · 00:05
+
+更换音频
+拖入音频以更换
+≡
+字幕
+
+已导入 2 句 · 可继续校对
+
+导入字幕
+校对字幕
+拖入 SRT / VTT 文件
+文
+中文翻译
+
+未提供译文，可导入双语字幕；听读时显示英文
+
+可选
+本地识别原文
++
+
+准备完成，可以开始听写。
+
+开始听写
+开始听读
+shot 32-manual-srt-imported.png
+4 PASS=true n=2

@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Material, SubtitleSegment } from '../../domain/types';
 import { formatTime } from '../../domain/types';
 import { parseSrt, parseVtt } from '../../domain/subtitles';
-import { replaceTimeline } from '../../domain/subtitle-edits';
+import { applySubtitleTimeline } from '../../domain/subtitle-edits';
 import { isDesktop } from '../../desktop';
 import { RecognitionSettings } from '../../RecognitionSettings';
 import { useRecognition } from '../../useRecognition';
@@ -56,11 +56,15 @@ export function MaterialPrepPage({
   const [renameValue, setRenameValue] = useState(material.displayName);
   const [dragging, setDragging] = useState<'audio' | 'subtitle' | null>(null);
 
+    const pendingAsr = useRef(false);
+
   const recognition = useRecognition({
     onRecognized: (_id, segments) => {
       try {
-        update((m) => replaceTimeline(m, segments));
-        onNotice(`识别完成，共 ${segments.length} 句。原文在核对前保持隐藏。`);
+        update((m) => applySubtitleTimeline(m, segments, 'asr', 'unreviewed'));
+        onNotice(
+          `\u8bc6\u522b\u5b8c\u6210\uff0c\u5171 ${segments.length} \u53e5\u3002ASR \u7ed3\u679c\u4ec5\u4f9b\u53c2\u8003\uff0c\u8bf7\u6821\u5bf9\u540e\u518d\u5f00\u59cb\u542c\u5199\u3002`,
+        );
       } catch (err) {
         setError(String(err));
       }
@@ -71,6 +75,13 @@ export function MaterialPrepPage({
 
   const hasAudio = material.duration > 0;
   const hasSubtitles = material.segments.some((s) => s.reference.trim());
+
+  useEffect(() => {
+    if (!pendingAsr.current) return;
+    if (!hasAudio || hasSubtitles || recognition.task || !isDesktop()) return;
+    pendingAsr.current = false;
+    recognition.start(material);
+  }, [material, hasAudio, hasSubtitles, recognition]);
 
   async function importAudio(file?: File) {
     if (!file) return;
@@ -106,7 +117,7 @@ export function MaterialPrepPage({
       const segments: SubtitleSegment[] = file.name.toLowerCase().endsWith('.vtt')
         ? parseVtt(text, material.duration)
         : parseSrt(text, material.duration);
-      update((m) => replaceTimeline(m, segments));
+      update((m) => applySubtitleTimeline(m, segments, 'external', 'reviewed'));
       const translated = segments.filter((s) => s.translation?.trim()).length;
       onNotice(
         `字幕已导入 ${segments.length} 句${translated ? `，其中 ${translated} 句带中文` : '（没有中文译文）'}。`,
@@ -271,12 +282,27 @@ export function MaterialPrepPage({
         </p>
       )}
 
+      
+      {material.subtitleOrigin && material.subtitleReviewStatus === 'unreviewed' && hasSubtitles && (
+        <p className="banner" role="status">
+          {material.subtitleOrigin === 'asr'
+            ? '\u5f53\u524d\u5b57\u5e55\u6765\u81ea\u8bed\u97f3\u8bc6\u522b\uff08ASR\uff09\uff0c\u5c1a\u672a\u6821\u5bf9\uff0c\u4e0d\u5e94\u4f5c\u4e3a\u6700\u7ec8\u7b54\u6848\u3002'
+            : material.subtitleOrigin === 'embedded'
+              ? '\u5f53\u524d\u5b57\u5e55\u6765\u81ea\u5185\u5d4c\u8f68\uff0c\u5c1a\u672a\u6821\u5bf9\u3002'
+              : '\u5b57\u5e55\u5c1a\u672a\u6821\u5bf9\u3002'}
+          <button onClick={onSubtitles}>{'\u53bb\u6821\u5bf9'}</button>
+        </p>
+      )}
+
       <div className="prep__content">
         <VideoImportPanel
           material={material}
           update={update}
           onNotice={onNotice}
           onError={setError}
+          onNeedAsr={() => {
+            pendingAsr.current = true;
+          }}
         />
         {hasAudio ? (
           <div className="prep__section-list">

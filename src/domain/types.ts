@@ -114,6 +114,13 @@ export interface Material {
     language?: 'en' | 'zh' | 'both';
     following?: boolean;
   };
+  /**
+   * How the current segments were produced. Absent = legacy / unknown.
+   * ASR must never be treated as silent ground truth — see subtitleReviewStatus.
+   */
+  subtitleOrigin?: SubtitleOrigin;
+  /** Auto-generated (embedded/asr) starts unreviewed; proof edits mark reviewed. */
+  subtitleReviewStatus?: 'unreviewed' | 'reviewed';
   /** 难句标记. Belongs to the material, so it survives across rounds. */
   bookmarkedSegmentIds: string[];
   rounds: PracticeRound[];

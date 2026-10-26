@@ -2,10 +2,15 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Material } from '../../domain/types';
 import { formatTime } from '../../domain/types';
 import { defaultClipEnd } from '../../domain/video';
+import { parseSrt } from '../../domain/subtitles';
+import { applySubtitleTimeline, hasProtectedSubtitles } from '../../domain/subtitle-edits';
+import { isTextSubtitleCodec, toClipRelativeSegments } from '../../domain/subtitle-source';
 import { isDesktop } from '../../desktop';
 import {
   extractClipAudio,
+  extractEmbeddedSubtitles,
   ffmpegStatus,
+  loadSrtText,
   pickAndProbeVideo,
   pickDefaultAudioStream,
   pickDefaultSubtitleStream,
@@ -19,6 +24,8 @@ type Props = {
   update: (transform: (material: Material) => Material) => void;
   onNotice: (message: string) => void;
   onError: (message: string) => void;
+  /** Called after video apply when no embedded text track was applied (ASR fallback). */
+  onNeedAsr?: () => void;
 };
 
 function fileName(path: string): string {
@@ -30,7 +37,7 @@ function fileName(path: string): string {
  * Desktop-only video import: probe → pick audio/range → extract Whisper-friendly audio
  * and a managed H.264 playback copy. Does not change study UX (P2).
  */
-export function VideoImportPanel({ material, update, onNotice, onError }: Props) {
+export function VideoImportPanel({ material, update, onNotice, onError, onNeedAsr }: Props) {
   const [status, setStatus] = useState<FfmpegStatus | null>(null);
   const [probe, setProbe] = useState<MediaProbe | null>(null);
   const [audioStream, setAudioStream] = useState<number | undefined>();
@@ -50,7 +57,17 @@ export function VideoImportPanel({ material, update, onNotice, onError }: Props)
     [probe],
   );
   const subtitleStreams = useMemo(
-    () => probe?.streams.filter((s) => s.codecType === 'subtitle') ?? [],
+    () =>
+      probe?.streams.filter(
+        (s) => s.codecType === 'subtitle' && isTextSubtitleCodec(s.codecName),
+      ) ?? [],
+    [probe],
+  );
+  const bitmapSubtitleCount = useMemo(
+    () =>
+      probe?.streams.filter(
+        (s) => s.codecType === 'subtitle' && !isTextSubtitleCodec(s.codecName),
+      ).length ?? 0,
     [probe],
   );
 
@@ -76,11 +93,11 @@ export function VideoImportPanel({ material, update, onNotice, onError }: Props)
   async function applyVideo() {
     if (!probe) return;
     if (audioStream === undefined) {
-      onError('这个视频没有可用音轨。');
+      onError('\u8fd9\u8def\u89c6\u9891\u6ca1\u6709\u53ef\u7528\u97f3\u8f68\u3002');
       return;
     }
     if (clipEnd <= clipStart) {
-      onError('时间范围无效。');
+      onError('\u65f6\u95f4\u8303\u56f4\u65e0\u6548\u3002');
       return;
     }
     onError('');
@@ -102,12 +119,15 @@ export function VideoImportPanel({ material, update, onNotice, onError }: Props)
           forceTranscode: probe.needsTranscode,
         });
         playbackPath = playback.playbackPath;
-        playbackNote = playback.transcoded ? '已生成 H.264 播放副本。' : '已缓存可播放副本。';
+        playbackNote = playback.transcoded
+          ? '\u5df2\u8f6c\u7801\u4e3a H.264 \u64ad\u653e\u526f\u672c\u3002'
+          : '\u5df2\u7f13\u5b58\u53ef\u64ad\u653e\u526f\u672c\u3002';
       } catch (err) {
-        playbackNote = `音轨已提取，但播放副本失败：${String(err)}`;
+        playbackNote = `\u97f3\u9891\u5df2\u63d0\u53d6\uff0c\u4f46\u64ad\u653e\u526f\u672c\u5931\u8d25\uff1a${String(err)}`;
       }
 
       const originalName = fileName(probe.path);
+      const clipDuration = clipEnd - clipStart;
       update((m) => ({
         ...m,
         audio: extracted.blob,
@@ -126,9 +146,49 @@ export function VideoImportPanel({ material, update, onNotice, onError }: Props)
           subtitleOrigin: subtitleStream !== undefined ? 'embedded' : undefined,
         },
       }));
-      onNotice(
-        `视频素材已就绪（片段 ${formatTime(clipStart)}–${formatTime(clipEnd)}）。${playbackNote} ${probe.compatibilityNote}`,
-      );
+
+      let embeddedApplied = false;
+      if (subtitleStream !== undefined && !hasProtectedSubtitles(material)) {
+        try {
+          const sub = await extractEmbeddedSubtitles({
+            sourcePath: probe.path,
+            materialId: material.id,
+            subtitleStream,
+            clipStart,
+            clipEnd,
+          });
+          const srtText = await loadSrtText(sub.srtPath);
+          const segments = toClipRelativeSegments(
+            parseSrt(srtText, clipDuration),
+            clipStart,
+            clipDuration,
+          );
+          if (segments.length > 0) {
+            update((m) => applySubtitleTimeline(m, segments, 'embedded', 'unreviewed'));
+            onNotice(
+              `\u89c6\u9891\u5df2\u5199\u5165\uff08\u7247\u6bb5 ${formatTime(clipStart)}\u2013${formatTime(clipEnd)}\uff09\u3002${playbackNote} \u5df2\u4ece\u5185\u5d4c\u5b57\u5e55\u8f68\u63d0\u53d6 ${segments.length} \u53e5\uff08${sub.codecName}\uff09\uff0c\u8bf7\u6821\u5bf9\u540e\u518d\u542c\u5199\u3002 ${probe.compatibilityNote}`,
+            );
+            embeddedApplied = true;
+          }
+        } catch (err) {
+          onNotice(
+            `\u89c6\u9891\u5df2\u5199\u5165\u3002${playbackNote} \u5185\u5d4c\u5b57\u5e55\u63d0\u53d6\u5931\u8d25\uff0c\u5c06\u5c1d\u8bd5\u8bed\u97f3\u8bc6\u522b\uff1a${String(err)}`,
+          );
+        }
+      }
+
+      if (!embeddedApplied) {
+        if (!hasProtectedSubtitles(material)) {
+          onNotice(
+            `\u89c6\u9891\u7d20\u6750\u5df2\u7ecf\u5199\u5165\uff08\u7247\u6bb5 ${formatTime(clipStart)}\u2013${formatTime(clipEnd)}\uff09\u3002${playbackNote} ${probe.compatibilityNote}`,
+          );
+          onNeedAsr?.();
+        } else {
+          onNotice(
+            `\u89c6\u9891\u5df2\u5199\u5165\uff08\u7247\u6bb5 ${formatTime(clipStart)}\u2013${formatTime(clipEnd)}\uff09\u3002${playbackNote} \u5df2\u6709\u7528\u6237\u6821\u5bf9/\u7ec3\u4e60\u8bb0\u5f55\uff0c\u672a\u8986\u76d6\u5b57\u5e55\u3002 ${probe.compatibilityNote}`,
+          );
+        }
+      }
       setProbe(null);
     } catch (err) {
       onError(String(err));
@@ -137,7 +197,7 @@ export function VideoImportPanel({ material, update, onNotice, onError }: Props)
     }
   }
 
-  async function reassociate() {
+async function reassociate() {
     onError('');
     setBusy(true);
     try {
@@ -230,6 +290,13 @@ export function VideoImportPanel({ material, update, onNotice, onError }: Props)
               ))}
             </select>
           </label>
+          {bitmapSubtitleCount > 0 && (
+            <p className="muted prep__hint">
+              {'\u8fd8\u6709 '}
+              {bitmapSubtitleCount}
+              {' \u6761\u56fe\u5f62\u5b57\u5e55\u8f68\uff08PGS/DVD\uff09\uff0cP3 \u4e0d\u63d0\u53d6\uff0cOCR \u7559\u5f85 P4\u3002'}
+            </p>
+          )}
           {subtitleStreams.length > 0 && (
             <label className="video-probe__field">
               字幕轨（P1 仅记录选择；提取在 P3）

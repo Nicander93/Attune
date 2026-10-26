@@ -2,6 +2,7 @@ import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile } from '@tauri-apps/plugin-fs';
 import { isDesktop } from './desktop';
+import { isTextSubtitleCodec } from './domain/subtitle-source';
 
 export interface MediaStreamInfo {
   index: number;
@@ -40,6 +41,12 @@ export interface ExtractAudioResult {
 export interface PlaybackCopyResult {
   playbackPath: string;
   transcoded: boolean;
+}
+
+export interface ExtractSubtitlesResult {
+  srtPath: string;
+  streamIndex: number;
+  codecName: string;
 }
 
 export async function ffmpegStatus(): Promise<FfmpegStatus> {
@@ -99,6 +106,29 @@ export async function preparePlayback(input: {
   });
 }
 
+export async function loadSrtText(srtPath: string): Promise<string> {
+  const bytes = await readFile(srtPath);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+export async function extractEmbeddedSubtitles(input: {
+  sourcePath: string;
+  materialId: string;
+  subtitleStream: number;
+  clipStart: number;
+  clipEnd: number;
+}): Promise<ExtractSubtitlesResult> {
+  return invoke<ExtractSubtitlesResult>('media_extract_subtitles', {
+    request: {
+      sourcePath: input.sourcePath,
+      materialId: input.materialId,
+      subtitleStream: input.subtitleStream,
+      clipStart: input.clipStart,
+      clipEnd: input.clipEnd,
+    },
+  });
+}
+
 export async function clearMediaCache(materialId: string): Promise<void> {
   if (!isDesktop()) return;
   await invoke('media_clear_cache', { materialId });
@@ -117,7 +147,9 @@ export function pickDefaultAudioStream(probe: MediaProbe): number | undefined {
 }
 
 export function pickDefaultSubtitleStream(probe: MediaProbe): number | undefined {
-  const subs = probe.streams.filter((s) => s.codecType === 'subtitle');
+  const subs = probe.streams.filter(
+    (s) => s.codecType === 'subtitle' && isTextSubtitleCodec(s.codecName),
+  );
   if (!subs.length) return undefined;
   const eng = subs.find((s) => (s.language || '').toLowerCase().startsWith('en'));
   return (eng ?? subs[0]).index;

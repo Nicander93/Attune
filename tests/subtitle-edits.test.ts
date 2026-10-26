@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   SubtitleError,
+  applySubtitleTimeline,
   editSegment,
+  hasProtectedSubtitles,
+  markSubtitlesReviewed,
   mergeWithNext,
   replaceTimeline,
   splitSegment,
@@ -148,5 +151,67 @@ describe('replacing the whole timeline', () => {
 
   it('is refused once a draft or a check exists', () => {
     expect(() => replaceTimeline(materialize(), [])).toThrow(/听写记录/);
+  });
+});
+
+describe('P3 subtitle origin and protection', () => {
+  it('tags origin and reviewStatus when applying a timeline', () => {
+    const next = applySubtitleTimeline(
+      untouchedMaterial(),
+      [{ id: 'e1', start: 0, end: 2, reference: 'Embedded.', words: [] }],
+      'embedded',
+      'unreviewed',
+    );
+    expect(next.subtitleOrigin).toBe('embedded');
+    expect(next.subtitleReviewStatus).toBe('unreviewed');
+    expect(next.segments).toHaveLength(1);
+  });
+
+  it('marks ASR as unreviewed and never as silent ground truth', () => {
+    const next = applySubtitleTimeline(
+      untouchedMaterial(),
+      [{ id: 'a1', start: 0, end: 1, reference: 'Asr.', words: [] }],
+      'asr',
+      'unreviewed',
+    );
+    expect(next.subtitleOrigin).toBe('asr');
+    expect(next.subtitleReviewStatus).toBe('unreviewed');
+  });
+
+  it('protects once reviewed even without drafts', () => {
+    const reviewed = markSubtitlesReviewed(
+      applySubtitleTimeline(
+        untouchedMaterial(),
+        [{ id: 'e1', start: 0, end: 2, reference: 'Ok.', words: [] }],
+        'embedded',
+        'unreviewed',
+      ),
+    );
+    expect(reviewed.subtitleReviewStatus).toBe('reviewed');
+    expect(hasProtectedSubtitles(reviewed)).toBe(true);
+    expect(() => replaceTimeline(reviewed, [])).toThrow();
+  });
+
+  it('protects materials with drafts or bookmarks', () => {
+    expect(hasProtectedSubtitles(materialize())).toBe(true);
+    expect(hasProtectedSubtitles(untouchedMaterial())).toBe(false);
+  });
+
+  it('mirrors origin onto video.subtitleOrigin when video is present', () => {
+    const base = untouchedMaterial({
+      video: {
+        originalName: 'clip.mkv',
+        sourcePath: 'D:/x.mkv',
+        clipStart: 0,
+        clipEnd: 5,
+      },
+    });
+    const next = applySubtitleTimeline(
+      base,
+      [{ id: 'e1', start: 0, end: 2, reference: 'Hi.', words: [] }],
+      'embedded',
+      'unreviewed',
+    );
+    expect(next.video?.subtitleOrigin).toBe('embedded');
   });
 });

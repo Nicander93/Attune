@@ -5,6 +5,7 @@ import { toSrt } from '../../domain/subtitles';
 import {
   SubtitleError,
   editSegment,
+  markSubtitlesReviewed,
   mergeWithNext,
   splitSegment,
   validateSpan,
@@ -68,7 +69,7 @@ export function SubtitleProofPage({ material, player, update, onBack, onNotice }
   function applyEdit(segmentId: string, edit: Parameters<typeof editSegment>[2]) {
     try {
       const { material: next, report } = editSegment(material, segmentId, edit);
-      update(() => next);
+      update(() => markSubtitlesReviewed(next));
       cancelEdit();
       reportStale(report.stale);
     } catch (err) {
@@ -127,7 +128,7 @@ export function SubtitleProofPage({ material, player, update, onBack, onNotice }
         fieldRef.current.selectionStart,
       );
       if (!confirmChange([segmentId])) return;
-      update(() => next);
+      update(() => markSubtitlesReviewed(next));
       const created = next.segments.find((s) => s.start === at);
       if (created) {
         setEditingId(created.id);
@@ -144,7 +145,7 @@ export function SubtitleProofPage({ material, player, update, onBack, onNotice }
       const { material: next, report } = mergeWithNext(material, segmentId);
       const index = material.segments.findIndex((s) => s.id === segmentId);
       if (!confirmChange([segmentId, material.segments[index + 1]?.id])) return;
-      update(() => next);
+      update(() => markSubtitlesReviewed(next));
       setEditingId(null);
       reportStale(report.stale);
       if (report.lost.length)
@@ -152,6 +153,12 @@ export function SubtitleProofPage({ material, player, update, onBack, onNotice }
     } catch (err) {
       setError(String(err));
     }
+  }
+
+
+  function markReviewed() {
+    update((m) => markSubtitlesReviewed(m));
+    onNotice('\u5df2\u6807\u8bb0\u4e3a\u5df2\u6821\u5bf9\u3002');
   }
 
   async function exportSrt() {
@@ -175,9 +182,16 @@ export function SubtitleProofPage({ material, player, update, onBack, onNotice }
           <p className="eyebrow">字幕校对</p>
           <h1>{material.displayName}</h1>
         </div>
-        <button className="quiet" onClick={() => void exportSrt()}>
+        <div className="row">
+          {material.subtitleReviewStatus !== 'reviewed' && (
+            <button className="quiet" onClick={markReviewed}>
+              {'\u6807\u8bb0\u5df2\u6821\u5bf9'}
+            </button>
+          )}
+          <button className="quiet" onClick={() => void exportSrt()}>
           导出 SRT
         </button>
+        </div>
       </header>
 
       <Player material={material} player={player} />
