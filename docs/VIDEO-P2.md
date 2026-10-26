@@ -41,6 +41,30 @@ Focus: `tests/media-player.test.ts` (resolveMediaSource never uses raw `sourcePa
 5. Leave study → 素材准备 / 字幕校对 → surface hidden; return to study → dictation still hidden until 听读 or 看画面.
 6. Pure audio material: still `<audio>` only; no regression on loop/restore position.
 
+## 产品验收清单（主管可勾选）
+
+Tip under test: 629a446 on eat/video-p2-player. Evidence: docs/evidence/video-p2/.
+
+| # | Item | Result | Evidence |
+| --- | --- | --- | --- |
+| 1 | Dictation: audio plays, video surface hidden | **PASS** | 10-dictation-entry.png, 11-dictation-playing-hidden.png; DOM wrapHidden=true, <video> playing via sset.localhost |
+| 2 | After 核对: 看画面 / 收起画面 does **not** remount/reset clock | **PASS** | 20-after-check.png, 21-show-video.png, 22-hide-video.png; sameEl=true, currentTime unchanged across show/hide |
+| 3 | Listen-read: video + subtitle sync; loop / speed / keyboard | **PASS** | 30-listen-read.png, 31-listen-read-controls.png; surface visible, playbackRate=1.25, Space toggles pause |
+| 4 | Pure audio materials: no regression | **PASS** | 41-audio-dictation.png, 42-audio-playing.png; <audio> blob only, no <video>, speed OK |
+
+**CI:** GitHub Checks on PR #7 tip 629a446 — rontend green (push + pull_request).
+
+**How this smoke was run (LM):**
+
+`powershell
+\D:\Tempfmpeg-p0 = 'D:\Temp\ffmpeg-p0'
+\--remote-debugging-port=9222 = '--remote-debugging-port=9222'
+cd D:\code\attune-video-p2
+npm run desktop
+# then: node scripts/_cdp_p2_smoke.mjs  (+ continue helpers if needed)
+`
+
+
 ## Residual risks
 
 - WebView2 codec support still depends on P1 playback copy (HEVC → H.264); P2 does not add new codecs.

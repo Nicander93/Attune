@@ -1,0 +1,39 @@
+Attune Video P2 desktop smoke (CDP + screenshots)
+Date: 2026-10-26 Asia/Shanghai
+Branch: feat/video-p2-player @ 629a446
+Machine: LM Windows WebView2 CDP :9222
+
+shot 01-video-probed.png
+shot 02-video-extracted.png
+video: h264_aac.mp4 clip ready; playback under appData media/*/playback.mp4
+shot 03-subtitles-imported.png
+shot 10-dictation-entry.png
+1 entry DOM: videoCount=1 audioCount=0 wrapHidden=true aria-hidden=true
+  videoSrc=http://asset.localhost/.../playback.mp4 (no raw disk)
+1 after play: tag=VIDEO paused=false currentTime~0.60 wrapHidden=true
+shot 11-dictation-playing-hidden.png
+1 PASS=true
+
+shot 20-after-check.png
+2 before show: sameEl=true hidden=true readyState=4 t unchanged
+shot 21-show-video.png
+2 after show: sameEl=true hidden=false videoCount=1 t unchanged (no remount/reset)
+shot 22-hide-video.png
+2 after hide: sameEl=true hidden=true videoCount=1 t unchanged
+2 PASS=true
+
+shot 30-listen-read.png
+3 reading surface: wrapHidden=false sameEl=true videoCount=1 asset URL
+shot 31-listen-read-controls.png
+3 controls: speedOk=true (1.25x) Space toggles pause/play; reading UI present
+3 PASS=true
+
+shot 40-audio-material.png
+shot 40b-audio-with-subs.png
+shot 41-audio-dictation.png
+4 audio DOM: videoCount=0 audioCount=1 blob: audioSrc, no media-output, no 看画面
+4 audio play: paused=false t~0.62 tagOnlyAudio=true speed=0.75
+shot 42-audio-playing.png
+4 PASS=true
+
+SUMMARY all=true
