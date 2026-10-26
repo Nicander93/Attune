@@ -89,6 +89,7 @@ dependencies = [
  "tauri-plugin-fs",
  "ureq",
  "whisper-rs",
+ "windows",
 ]
 
 [[package]]

@@ -1,0 +1,104 @@
+page http://localhost:1420/
+tip 2e4fbf528eda418575123096b1dc8b106c6baeeb
+=== ITEM 1 burned-in OCR ===
+video dialog {"code":0,"out":"DIALOG title=[��] hwnd=5310656\r\nCLICKED_OK"}
+shot 01-burned-probed.png
+probe1 视频
+
+可选：从本地视频提取音轨，沿用现有听写流程
+
+ffmpeg\uff1aATTUNE_FFMPEG_DIR
+
+OCR\uff08winrt\uff09\uff1a可用 · zh-Hans-CN — Windows.Media.Ocr ready via zh-Hans-CN; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language settings, or fall back to ASR.
+
+导入视频
+
+视频编码为 H.264，可作为播放基线。
+
+容器 mov,mp4,m4a,3gp,3g2,mj2 \u00b7 总时长 00:03
+
+音轨
+#1 aac · 1ch · und
+OCR 烧录/图形字幕（WinRT；无文本轨且未保护时优先于 ASR）
+开始（秒）
+结束（秒）
+提取音轨并写入素材
+OCR checkbox want=true after=true
+shot 02-burned-applied.png
+item1 {"n":1,"ocr":true,"unreviewed":true,"banner":"视频已写入（片段 00:00–00:03）。已缓存可播放副本。 OCR（winrt）识别 1 句（4 帧），请校对后再听写。 视频编码为 H.264，可作为播放基线。 | 当前字幕来自 OCR（烧录/图形），尚未校对，不应作为最终答案。去校对","prep":"← 返回\n\n素材准备\n\nburned_in_en 重命名\n00:03 · 音频已添加\n\n当前字幕来自 OCR（烧录/图形），尚未校对，不应作为最终答案。\n去校对\n\n视频\n\nburned_in_en.mp4 · 片段 00:00–00:03\n\nffmpeg\\uff1aATTUNE_FFMPEG_DIR\n\nOCR\\uff08winrt\\uff09\\uff1a可用 · zh-Hans-CN — Windows.Media.Ocr ready via zh-Hans-CN; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language s"}
+shot 03-burned-ocr-ready.png
+1 PASS=true
+=== setup reviewed protect ===
+shot 10-proof-before-mark.png
+marked reviewed
+shot 11-proof-marked.png
+before protect {"prep":"← 返回\n\n素材准备\n\nburned_in_en 重命名\n00:03 · 音频已添加\n视频\n\nburned_in_en.mp4 · 片段 00:00–00:03\n\nffmpeg\\uff1aATTUNE_FFMPEG_DIR\n\nOCR\\uff08winrt\\uff09\\uff1a可用 · zh-Hans-CN — Windows.Media.Ocr ready via zh-Hans-CN; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language settings, or fall back to ASR.\n\n重新导入视频\n重新关联源文件\n♫\n音频\n\nburned_in_en.mp4 · 00:03\n\n更换音频\n拖入音频以更换\n≡\n字幕\n\n已导入 1 句 · 可继续校对\n\n导入字幕\n校对字幕\n拖入 SRT / VTT 文件\n文\n中文翻译\n\n未提供译文，可导入双语字幕；听读时显示英文\n\n可选\n本地识别原文\n+\n\n准备完成，可以开始听写。\n\n开始听写\n开始听读","n":1,"banners":"已标记为已校对。"}
+=== ITEM 4 protected no OCR overwrite ===
+video dialog {"code":0,"out":"DIALOG title=[��] hwnd=7277190\r\nCLICKED_OK"}
+shot 12-protect-reprobe.png
+OCR checkbox want=true after=true
+shot 13-protect-reapplied.png
+after protect {"prep":"← 返回\n\n素材准备\n\nburned_in_en 重命名\n00:03 · 音频已添加\n视频\n\nburned_in_en.mp4 · 片段 00:00–00:03\n\nffmpeg\\uff1aATTUNE_FFMPEG_DIR\n\nOCR\\uff08winrt\\uff09\\uff1a可用 · zh-Hans-CN — Windows.Media.Ocr ready via zh-Hans-CN; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language settings, or fall back to ASR.\n\n重新导入视频\n重新关联源文件\n♫\n音频\n\nburned_in_en.mp4 · 00:03\n\n更换音频\n拖入音频以更换\n≡\n字幕\n\n已导入 1 句 · 可继续校对\n\n导入字幕\n校对字幕\n拖入 SRT / VTT 文件\n文\n中文翻译\n\n未提供译文，可导入双语字幕；听读时显示英文\n\n可选\n本地识别原文\n+\n\n准备完成，可以开始听写。\n\n开始听写\n开始听读","n":1,"banners":"视频已写入（片段 00:00–00:03）。已缓存可播放副本。 已有用户校对/练习记录，未覆盖字幕。 视频编码为 H.264，可作为播放基线。"}
+protect notice 视频已写入（片段 00:00–00:03）。已缓存可播放副本。 已有用户校对/练习记录，未覆盖字幕。 视频编码为 H.264，可作为播放基线。
+4 PASS=true reviewedSetup=true
+=== ITEM 2 EN missing + ASR fallback ===
+video dialog {"code":0,"out":"DIALOG title=[��] hwnd=2034228\r\nCLICKED_OK"}
+shot 20-en-missing-probed.png
+probe2 视频
+
+可选：从本地视频提取音轨，沿用现有听写流程
+
+ffmpeg\uff1aATTUNE_FFMPEG_DIR
+
+OCR\uff08winrt\uff09\uff1a可用 · zh-Hans-CN — Windows.Media.Ocr ready via zh-Hans-CN; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language settings, or fall back to ASR.
+
+导入视频
+
+视频编码为 H.264，可作为播放基线。
+
+容器 mov,mp4,m4a,3gp,3g2,mj2 \u00b7 总时长 00:05
+
+音轨
+#1 aac · 1ch · und
+OCR 烧录/图形字幕（WinRT；无文本轨且未保护时优先于 ASR）
+开始（秒）
+结束（秒）
+提取音轨并写入素材
+honestEN=true statusLine=OCR\uff08winrt\uff09\uff1a可用 · zh-Hans-CN — Windows.Media.Ocr ready via zh-Hans-CN; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language settings, or fall back to ASR.
+OCR checkbox want=true after=true
+shot 21-ocr-fail-applied.png
+wait…
+item2 {"n":2,"asr":true,"ocr":true,"banner":"识别完成，共 2 句。ASR 结果仅供参考，请校对后再开始听写。 | 当前字幕来自语音识别（ASR），尚未校对，不应作为最终答案。去校对","prep":"← 返回\n\n素材准备\n\nspeech_nosubs 重命名\n00:05 · 音频已添加\n\n当前字幕来自语音识别（ASR），尚未校对，不应作为最终答案。\n去校对\n\n视频\n\nspeech_nosubs.mp4 · 片段 00:00–00:05\n\nffmpeg\\uff1aATTUNE_FFMPEG_DIR\n\nOCR\\uff08winrt\\uff09\\uff1a可用 · zh-Hans-CN — Windows.Media.Ocr ready via zh-Hans-CN; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language settings, or fall back to ASR.\n\n重新导入视频\n重新关联源文件\n♫\n音频"}
+shot 22-asr-fallback.png
+2 PASS=true honest=true asrFallback=true
+=== ITEM 3 text track P3 path ===
+video dialog {"code":0,"out":"DIALOG title=[��] hwnd=2362110\r\nCLICKED_OK"}
+shot 30-texttrack-probed.png
+probe3 视频
+
+可选：从本地视频提取音轨，沿用现有听写流程
+
+ffmpeg\uff1aATTUNE_FFMPEG_DIR
+
+OCR\uff08winrt\uff09\uff1a可用 · zh-Hans-CN — Windows.Media.Ocr ready via zh-Hans-CN; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language settings, or fall back to ASR.
+
+导入视频
+
+视频编码为 H.264，可作为播放基线。
+
+容器 matroska,webm \u00b7 总时长 00:03
+
+音轨
+#1 aac · 1ch
+字幕轨（文本轨提取；无文本轨时可改用 OCR）
+不选
+#2 subrip · eng
+OCR 烧录/图形字幕（WinRT；无文本轨且未保护时优先于 ASR）
+开始（秒）
+结束（秒）
+提取音轨并写入素材
+OCR checkbox want=true after=true
+shot 31-texttrack-applied.png
+item3 {"n":2,"embedded":true,"ocr":true,"asr":true,"ocrOn":true,"banner":"视频已写入（片段 00:00–00:03）。已缓存可播放副本。 已从内嵌字幕轨提取 2 句（subrip），请校对后再听写。 视频编码为 H.264，可作为播放基线。 | 当前字幕来自内嵌轨，尚未校对。去校对","prep":"← 返回\n\n素材准备\n\nh264_aac_subs 重命名\n00:03 · 音频已添加\n\n当前字幕来自内嵌轨，尚未校对。\n去校对\n\n视频\n\nh264_aac_subs.mkv · 片段 00:00–00:03\n\nffmpeg\\uff1aATTUNE_FFMPEG_DIR\n\nOCR\\uff08winrt\\uff09\\uff1a可用 · zh-Hans-CN — Windows.Media.Ocr ready via zh-Hans-CN; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language settings, or fal"}
+shot 32-texttrack-embedded.png
+3 PASS=true

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { isTextSubtitleCodec, toClipRelativeSegments } from '../src/domain/subtitle-source';
+import {
+  isBitmapSubtitleCodec,
+  isTextSubtitleCodec,
+  toClipRelativeSegments,
+} from '../src/domain/subtitle-source';
 
 describe('isTextSubtitleCodec', () => {
   it('accepts common text codecs', () => {
@@ -15,6 +19,21 @@ describe('isTextSubtitleCodec', () => {
     expect(isTextSubtitleCodec('pgssub')).toBe(false);
   });
 });
+
+describe('isBitmapSubtitleCodec', () => {
+  it('accepts common bitmap codecs', () => {
+    for (const c of ['hdmv_pgs_subtitle', 'pgssub', 'dvd_subtitle', 'dvdsub', 'dvb_subtitle', 'vobsub']) {
+      expect(isBitmapSubtitleCodec(c)).toBe(true);
+      expect(isTextSubtitleCodec(c)).toBe(false);
+    }
+  });
+
+  it('rejects text codecs', () => {
+    expect(isBitmapSubtitleCodec('subrip')).toBe(false);
+    expect(isBitmapSubtitleCodec('ass')).toBe(false);
+  });
+});
+
 
 describe('toClipRelativeSegments', () => {
   it('keeps already clip-relative cues', () => {

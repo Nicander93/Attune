@@ -18,6 +18,21 @@ export function isTextSubtitleCodec(codec: string): boolean {
   return TEXT_SUBTITLE_CODECS.has(codec.trim().toLowerCase());
 }
 
+const BITMAP_SUBTITLE_CODECS = new Set([
+  'hdmv_pgs_subtitle',
+  'pgssub',
+  'dvd_subtitle',
+  'dvdsub',
+  'dvb_subtitle',
+  'xsub',
+  'vobsub',
+]);
+
+export function isBitmapSubtitleCodec(codec: string): boolean {
+  return BITMAP_SUBTITLE_CODECS.has(codec.trim().toLowerCase());
+}
+
+
 /**
  * Normalize extracted cues into clip-relative seconds.
  * When ffmpeg left absolute source times (start >= clipStart), subtract the clip origin.

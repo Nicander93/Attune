@@ -2,6 +2,7 @@
 
 mod jobs;
 mod media;
+mod ocr;
 mod models;
 mod transcribe;
 
@@ -188,7 +189,10 @@ fn main() {
             media::media_extract_audio,
             media::media_extract_subtitles,
             media::media_prepare_playback,
-            media::media_clear_cache
+            media::media_clear_cache,
+            media::media_ocr_burned_in,
+            ocr::ocr_status_cmd,
+            ocr::ocr_recognize_image
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Attune");

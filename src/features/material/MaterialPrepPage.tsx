@@ -289,7 +289,9 @@ export function MaterialPrepPage({
             ? '\u5f53\u524d\u5b57\u5e55\u6765\u81ea\u8bed\u97f3\u8bc6\u522b\uff08ASR\uff09\uff0c\u5c1a\u672a\u6821\u5bf9\uff0c\u4e0d\u5e94\u4f5c\u4e3a\u6700\u7ec8\u7b54\u6848\u3002'
             : material.subtitleOrigin === 'embedded'
               ? '\u5f53\u524d\u5b57\u5e55\u6765\u81ea\u5185\u5d4c\u8f68\uff0c\u5c1a\u672a\u6821\u5bf9\u3002'
-              : '\u5b57\u5e55\u5c1a\u672a\u6821\u5bf9\u3002'}
+              : material.subtitleOrigin === 'ocr'
+                ? '\u5f53\u524d\u5b57\u5e55\u6765\u81ea OCR\uff08\u70e7\u5f55/\u56fe\u5f62\uff09\uff0c\u5c1a\u672a\u6821\u5bf9\uff0c\u4e0d\u5e94\u4f5c\u4e3a\u6700\u7ec8\u7b54\u6848\u3002'
+                : '\u5b57\u5e55\u5c1a\u672a\u6821\u5bf9\u3002'}
           <button onClick={onSubtitles}>{'\u53bb\u6821\u5bf9'}</button>
         </p>
       )}
