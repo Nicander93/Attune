@@ -2,7 +2,7 @@
 
 > Date: 2026-10-26 (Asia/Shanghai). Branch: `feat/video-p5-packaging` on `main` @ `1d6bad3` (P4 #9).
 > Scope: on-demand LGPL ffmpeg download + consent, video persist / reassociate / recovery, cache cleanup UI, audio/IDB regression, candidate Windows NSIS recipe + E2E human checklist.
-> **Out of scope:** merging this PR; shipping GPL Gyan essentials in the installer; full human E2E listen gate (documented; may run post-Draft).
+> **Out of scope:** merging this PR; shipping GPL Gyan essentials in the installer; full human E2E listen gate (documented; executed on LM before squash — see evidence).
 
 ## Product binding
 
@@ -75,6 +75,22 @@ Artifact (typical): `src-tauri\target\release\bundle\nsis\Attune_*_x64-setup.exe
 
 Automated substitute in this PR: `npm test`, `npm run test:rust` (incl. zip extract + LGPL pin asserts). Desktop CDP smoke optional on LM with `ATTUNE_FFMPEG_DIR`.
 
+## E2E human-eye results (2026-10-26 12:38 Asia/Shanghai)
+
+Run on LM (`c1c173b2-…`) via WebView2 CDP; PATH sanitized (no Winget/Gyan ffmpeg, no `ATTUNE_FFMPEG_DIR`) so item ① exercises consent download into `appData/tools/ffmpeg`.
+
+| # | Checklist | Result | Evidence |
+| --- | --- | --- | --- |
+| 1 | No ffmpeg → consent download → usable | **PASS** | `01-no-ffmpeg-banner.png` … `03-ffmpeg-installed.png` (source `app_data/tools/ffmpeg`) |
+| 2 | Import → subs → hide-video dictation → check with video → listen-read | **PASS** | `10-`…`18-listen-read.png` |
+| 3 | After restart: restore or rebuild playback | **PASS** | `20-`…`23-restored-dictation.png` (playback restored after process restart) |
+| 4 | Clear cache → recover | **PASS** | `30-after-clear-cache.png`, `31-after-rebuild.png` |
+| 5 | Old pure-audio materials: no regression | **PASS** | `40-`…`42-audio-playing.png` |
+
+Full machine notes: `docs/evidence/video-p5/SUMMARY.json`, `cdp-smoke-notes.txt`.
+
+**Do not treat old `v0.1.1` as the video acceptance package**; 主管 picks version after merge. This PR is Draft — no merge/tag from this gate.
+
 ## Acceptance checklist
 
 - [x] On-demand LGPL download + consent + failure copy
@@ -83,7 +99,7 @@ Automated substitute in this PR: `npm test`, `npm run test:rust` (incl. zip extr
 - [x] Cache cleanup UI (per-material + all)
 - [x] Audio / IDB regression tests green
 - [x] `docs/VIDEO-P5.md`
-- [ ] Human E2E listen path (may be post-Draft)
+- [x] Human E2E listen path ①–⑤ (LM CDP; evidence in `docs/evidence/video-p5/`)
 - [x] NSIS candidate built on LM (`Attune_0.1.1_x64-setup.exe` **3.54 MiB**) — size rules out ~201 MB essentials; ASCII scan found no `ffmpeg.exe` / `gyan` / `win64-gpl` payload markers
 
 ## Constraints carried forward
