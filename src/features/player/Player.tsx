@@ -1,10 +1,11 @@
+import type { RefObject, SyntheticEvent } from 'react';
 import type { Material } from '../../domain/types';
 import { formatTime } from '../../domain/types';
-import { PLAYBACK_RATES, useAudioPlayer } from './useAudioPlayer';
+import { PLAYBACK_RATES, useMediaPlayer } from './useMediaPlayer';
 
 type Props = {
   material: Material;
-  player: ReturnType<typeof useAudioPlayer>;
+  player: ReturnType<typeof useMediaPlayer>;
   /** Shown next to the transport, e.g. 第 3 / 6 句. */
   status?: string;
   /**
@@ -128,18 +129,45 @@ export function Player({ material, player, status, onStepSentence, hasPrevious, 
   );
 }
 
-/** One audio element lives above the pages so navigation cannot restart playback. */
-export function AudioOutput({ player }: { player: ReturnType<typeof useAudioPlayer> }) {
+const mediaEvents = (player: ReturnType<typeof useMediaPlayer>) => ({
+  onPlay: player.handlePlay,
+  onPause: player.handlePause,
+  onEnded: player.handlePause,
+  onError: player.handleError,
+  onLoadedMetadata: player.handleMetadata,
+  onTimeUpdate: (event: SyntheticEvent<HTMLMediaElement>) =>
+    player.handleTimeUpdate(event.currentTarget.currentTime),
+});
+
+/**
+ * One sounding media element lives above the pages so navigation cannot restart playback.
+ * Video materials use a managed asset-protocol URL; audio materials keep a blob `<audio>`.
+ * Hiding the video surface only toggles visibility — the element and clock stay alive.
+ */
+export function MediaOutput({ player }: { player: ReturnType<typeof useMediaPlayer> }) {
+  const events = mediaEvents(player);
+  if (player.kind === 'video' && player.videoSrc) {
+    const hidden = player.videoSurface === 'hidden';
+    return (
+      <div className={`media-output${hidden ? ' media-output--hidden' : ''}`} aria-hidden={hidden}>
+        <video
+          ref={player.mediaRef as RefObject<HTMLVideoElement>}
+          className="media-output__video"
+          src={player.videoSrc}
+          playsInline
+          {...events}
+        />
+      </div>
+    );
+  }
   return (
     <audio
-      ref={player.audioRef}
+      ref={player.mediaRef as RefObject<HTMLAudioElement>}
       src={player.src || undefined}
-      onPlay={player.handlePlay}
-      onPause={player.handlePause}
-      onEnded={player.handlePause}
-      onError={player.handleError}
-      onLoadedMetadata={player.handleMetadata}
-      onTimeUpdate={(event) => player.handleTimeUpdate(event.currentTarget.currentTime)}
+      {...events}
     />
   );
 }
+
+/** @deprecated Use MediaOutput. */
+export const AudioOutput = MediaOutput;

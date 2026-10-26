@@ -1,11 +1,12 @@
+import { useEffect } from 'react';
 import type { Material } from '../domain/types';
 import type { Route } from './routes';
 import { MaterialPrepPage } from '../features/material/MaterialPrepPage';
 import { SubtitleProofPage } from '../features/subtitles/SubtitleProofPage';
 import { StudyPage } from '../features/study/StudyPage';
 import { TranscriptPage } from '../features/reading/TranscriptPage';
-import { AudioOutput } from '../features/player/Player';
-import { useAudioPlayer } from '../features/player/useAudioPlayer';
+import { MediaOutput } from '../features/player/Player';
+import { useMediaPlayer } from '../features/player/useMediaPlayer';
 
 interface Props {
   material: Material;
@@ -17,15 +18,18 @@ interface Props {
 }
 
 export function MaterialWorkspace({ material, route, update, go, onBack, onNotice }: Props) {
-  const player = useAudioPlayer(
+  const player = useMediaPlayer(
     material,
     (seconds) => update((m) => ({ ...m, playbackPosition: seconds })),
     (settings) => update((m) => ({ ...m, playbackSettings: settings })),
     () => update((m) => ({ ...m, lastStudiedAt: new Date().toISOString() })),
   );
+  useEffect(() => {
+    if (route.name !== 'study') player.setVideoSurface('hidden');
+  }, [route.name, player.hasVideoSurface]);
   return (
     <>
-      <AudioOutput player={player} />
+      <MediaOutput player={player} />
       {route.name === 'study' && (
         <StudyPage
           material={material}

@@ -1691,7 +1691,6 @@ h1 {
   flex-direction: column;
 }
 
-
 .video-probe {
   display: grid;
   gap: 0.75rem;
@@ -1717,4 +1716,38 @@ h1 {
 .video-probe input,
 .video-probe select {
   min-width: 12rem;
+}
+
+/* P2: video surface — hide with opacity/visibility so the <video> clock stays alive. */
+.media-output {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #0b0b0b;
+  max-height: min(40vh, 360px);
+  overflow: hidden;
+}
+.media-output__video {
+  display: block;
+  max-width: 100%;
+  max-height: min(40vh, 360px);
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  background: #000;
+}
+.media-output--hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  overflow: hidden;
+  max-height: none;
+}
+.dictation__video-toggle {
+  margin: 0.5rem 0 0;
 }

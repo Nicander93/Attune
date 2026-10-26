@@ -66,6 +66,16 @@ export function StudyPage({
     if (!material.playbackSettings) player.setMode(next === 'reading' ? 'continuous' : 'segment');
   }
 
+  // Video surface: listen-read always shows; dictation hides by default (player stays alive).
+  useEffect(() => {
+    if (!player.hasVideoSurface) return;
+    if (view === 'reading') {
+      player.setVideoSurface('visible');
+      return;
+    }
+    player.setVideoSurface('hidden');
+  }, [view, editingId, player.hasVideoSurface]);
+
   function selectSentence(id: string, checked = false) {
     setEditingId(id);
     setChecked(checked);
@@ -434,6 +444,21 @@ export function StudyPage({
                   {extra > 0 && `多写或写错：${summary.extra.join('、')}`}
                   {' · Enter 下一句 · Esc 回到修改'}
                 </p>
+                {player.hasVideoSurface && (
+                  <p className="dictation__video-toggle">
+                    <button
+                      type="button"
+                      className="quiet"
+                      onClick={() =>
+                        player.setVideoSurface(
+                          player.videoSurface === 'visible' ? 'hidden' : 'visible',
+                        )
+                      }
+                    >
+                      {player.videoSurface === 'visible' ? '收起画面' : '看画面'}
+                    </button>
+                  </p>
+                )}
               </div>
             ) : (
               <div className="dictation__actions">

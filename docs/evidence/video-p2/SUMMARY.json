@@ -1,0 +1,12 @@
+{
+  "tip": "629a446cd86f22a3174bfb728143a16debe1d214",
+  "branch": "feat/video-p2-player",
+  "when": "2026-10-26T10:30:00+08:00",
+  "item1_dictation_audio_plays_video_hidden": "PASS",
+  "item2_show_hide_no_remount_clock": "PASS",
+  "item3_listen_read_sync_controls": "PASS",
+  "item4_pure_audio_no_regression": "PASS",
+  "all": "PASS",
+  "evidence_dir": "docs/evidence/video-p2/",
+  "ci": "frontend checks green on PR #7 tip 629a446"
+}
