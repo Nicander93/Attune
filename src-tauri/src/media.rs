@@ -79,6 +79,26 @@ pub struct PlaybackCopyResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ExtractSubtitlesRequest {
+    pub source_path: String,
+    pub material_id: String,
+    pub subtitle_stream: u32,
+    pub clip_start: f64,
+    pub clip_end: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExtractSubtitlesResult {
+    pub srt_path: String,
+    pub stream_index: u32,
+    pub codec_name: String,
+}
+
+
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FfmpegStatus {
     pub available: bool,
     pub ffmpeg: Option<String>,
@@ -98,6 +118,24 @@ fn media_dir(app: &AppHandle, material_id: &str) -> Result<PathBuf, String> {
     let dir = app_data(app)?.join("media").join(material_id);
     fs::create_dir_all(&dir).map_err(|e| format!("无法创建媒体缓存目录：{e}"))?;
     Ok(dir)
+}
+
+
+/// Text subtitle codecs ffmpeg can convert to SRT. Bitmap/PGS stays out (OCR = P4).
+pub fn is_text_subtitle_codec(codec: &str) -> bool {
+    matches!(
+        codec.to_ascii_lowercase().as_str(),
+        "subrip"
+            | "srt"
+            | "ass"
+            | "ssa"
+            | "mov_text"
+            | "text"
+            | "webvtt"
+            | "wvtt"
+            | "ttml"
+            | "subtitle"
+    )
 }
 
 fn validate_material_id(id: &str) -> Result<(), String> {
@@ -514,6 +552,77 @@ pub fn media_prepare_playback(
 }
 
 #[tauri::command]
+
+pub fn media_extract_subtitles(
+    app: AppHandle,
+    state: State<'_, MediaState>,
+    request: ExtractSubtitlesRequest,
+) -> Result<ExtractSubtitlesResult, String> {
+    if request.clip_end <= request.clip_start {
+        return Err("时间范围无效：结束时间必须大于开始时间。".into());
+    }
+    let full = allow_input(&app, &state, Path::new(&request.source_path))?;
+    let (ff, fp, _) = resolve_bins(&app)?;
+
+    // Fresh probe so we can refuse bitmap subtitle codecs (OCR = P4).
+    let args = vec![
+        "-v".into(),
+        "quiet".into(),
+        "-print_format".into(),
+        "json".into(),
+        "-show_streams".into(),
+        full.display().to_string(),
+    ];
+    let (stdout, _) = run_typed(&fp, &args)?;
+    let probe = parse_probe(&full.display().to_string(), &stdout)?;
+    let stream = probe
+        .streams
+        .iter()
+        .find(|s| s.index == request.subtitle_stream)
+        .ok_or_else(|| format!("找不到字幕流 #{}", request.subtitle_stream))?;
+    if stream.codec_type != "subtitle" {
+        return Err(format!("流 #{} 不是字幕轨。", request.subtitle_stream));
+    }
+    if !is_text_subtitle_codec(&stream.codec_name) {
+        return Err(format!(
+            "字幕编码 {} 是图像字幕，P3 只提取文字轨（SRT/ASS/mov_text 等）。OCR 留到 P4。",
+            stream.codec_name
+        ));
+    }
+
+    let out = media_dir(&app, &request.material_id)?.join("embedded.srt");
+    let out = allow_output(&app, &out)?;
+    let duration = request.clip_end - request.clip_start;
+    let extract_args = vec![
+        "-y".into(),
+        "-ss".into(),
+        format!("{:.3}", request.clip_start),
+        "-i".into(),
+        full.display().to_string(),
+        "-t".into(),
+        format!("{:.3}", duration),
+        "-map".into(),
+        format!("0:{}", request.subtitle_stream),
+        "-c:s".into(),
+        "srt".into(),
+        out.display().to_string(),
+    ];
+    run_typed(&ff, &extract_args)?;
+    if !out.is_file() {
+        return Err("提取后未找到字幕文件。".into());
+    }
+    let meta = fs::metadata(&out).map_err(|e| format!("无法读取字幕文件：{e}"))?;
+    if meta.len() == 0 {
+        return Err("字幕轨提取结果为空（可能该片段没有字幕）。".into());
+    }
+    Ok(ExtractSubtitlesResult {
+        srt_path: out.display().to_string(),
+        stream_index: request.subtitle_stream,
+        codec_name: stream.codec_name.clone(),
+    })
+}
+
+#[tauri::command]
 pub fn media_clear_cache(app: AppHandle, material_id: String) -> Result<(), String> {
     validate_material_id(&material_id)?;
     let dir = app_data(&app)?.join("media").join(&material_id);
@@ -554,5 +663,15 @@ mod tests {
         let probe = parse_probe(r"D:\a.mp4", json).unwrap();
         assert!(!probe.video_compatible);
         assert!(probe.needs_transcode);
+    }
+
+    #[test]
+    fn text_subtitle_codecs() {
+        assert!(is_text_subtitle_codec("subrip"));
+        assert!(is_text_subtitle_codec("ass"));
+        assert!(is_text_subtitle_codec("mov_text"));
+        assert!(is_text_subtitle_codec("webvtt"));
+        assert!(!is_text_subtitle_codec("hdmv_pgs_subtitle"));
+        assert!(!is_text_subtitle_codec("dvd_subtitle"));
     }
 }

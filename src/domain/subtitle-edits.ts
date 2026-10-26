@@ -206,15 +206,42 @@ export function mergeWithNext(
  * marker and completed sentence, and losing a round of work silently is worse than
  * making the user re-import.
  */
-export function replaceTimeline(material: Material, segments: SubtitleSegment[]): Material {
+/** True when replacing the whole timeline would orphan practice or reviewed work. */
+export function hasProtectedSubtitles(material: Material): boolean {
   const started = material.rounds.some(
     (r) => r.completedSegmentIds.length > 0 || Object.values(r.drafts).some((d) => d.trim()),
   );
-  if (started || material.bookmarkedSegmentIds.length)
-    fail('这段素材已经有听写记录或难句标记，换一份字幕会让旧记录的句子对不上。请新建素材再导入。');
+  if (started || material.bookmarkedSegmentIds.length) return true;
+  return material.subtitleReviewStatus === 'reviewed';
+}
+
+export function replaceTimeline(material: Material, segments: SubtitleSegment[]): Material {
+  if (hasProtectedSubtitles(material)) fail('这段素材已经有听写记录或难句标记，换一份字幕会让旧记录的句子对不上。请新建素材再导入。');
   return {
     ...material,
     segments: [...segments].sort((a, b) => a.start - b.start),
     rounds: material.rounds,
   };
 }
+
+/** Apply a full subtitle set and tag how it was produced (embedded / asr / external). */
+export function applySubtitleTimeline(
+  material: Material,
+  segments: SubtitleSegment[],
+  origin: NonNullable<Material['subtitleOrigin']>,
+  reviewStatus: NonNullable<Material['subtitleReviewStatus']>,
+): Material {
+  const next = replaceTimeline(material, segments);
+  return {
+    ...next,
+    subtitleOrigin: origin,
+    subtitleReviewStatus: reviewStatus,
+    video: next.video ? { ...next.video, subtitleOrigin: origin } : next.video,
+  };
+}
+
+export function markSubtitlesReviewed(material: Material): Material {
+  if (material.subtitleReviewStatus === 'reviewed') return material;
+  return { ...material, subtitleReviewStatus: 'reviewed' };
+}
+

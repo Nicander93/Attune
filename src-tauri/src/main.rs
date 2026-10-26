@@ -186,6 +186,7 @@ fn main() {
             media::media_authorize_path,
             media::media_probe,
             media::media_extract_audio,
+            media::media_extract_subtitles,
             media::media_prepare_playback,
             media::media_clear_cache
         ])
