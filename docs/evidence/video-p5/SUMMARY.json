@@ -1,7 +1,7 @@
 {
-  "tip": "fe68a7a4eeb98b44348fda7ab659f1320fb5e96c",
+  "tip": "71030af1d0c10a744600960f083e837024b3ba8f",
   "branch": "feat/video-p5-packaging",
-  "when": "2026-10-26T12:37:48.886217+08:00",
+  "when": "2026-10-26T12:41:22.720237+08:00",
   "item1_ffmpeg_consent_download": "PASS",
   "item2_import_study_listen": "PASS",
   "item3_restart_restore_or_rebuild": "PASS",
@@ -64,5 +64,15 @@
       }
     }
   },
-  "ci_note": "Check CI on tip after evidence push"
+  "ci_note": "Check CI on tip after evidence push",
+  "smoke_tip_at_run": "fe68a7a4eeb98b44348fda7ab659f1320fb5e96c",
+  "ci": {
+    "workflow": "Check",
+    "jobs": [
+      "frontend",
+      "frontend"
+    ],
+    "conclusion": "SUCCESS",
+    "on_tip": "71030af"
+  }
 }
