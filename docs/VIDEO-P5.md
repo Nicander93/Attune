@@ -84,7 +84,7 @@ Automated substitute in this PR: `npm test`, `npm run test:rust` (incl. zip extr
 - [x] Audio / IDB regression tests green
 - [x] `docs/VIDEO-P5.md`
 - [ ] Human E2E listen path (may be post-Draft)
-- [ ] NSIS candidate built on LM and spot-checked for no bundled ffmpeg (run recipe above)
+- [x] NSIS candidate built on LM (`Attune_0.1.1_x64-setup.exe` **3.54 MiB**) — size rules out ~201 MB essentials; ASCII scan found no `ffmpeg.exe` / `gyan` / `win64-gpl` payload markers
 
 ## Constraints carried forward
 
