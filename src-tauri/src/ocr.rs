@@ -112,12 +112,23 @@ fn winrt_status() -> OcrStatus {
     match winrt_list_languages() {
         Ok((langs, preferred)) => {
             let available = !langs.is_empty() && preferred.is_some();
+                        let en_ready = preferred
+                .as_ref()
+                .map(|tag| tag.to_ascii_lowercase().starts_with("en"))
+                .unwrap_or(false);
             let hint = if available {
-                "Windows.Media.Ocr ready (OS language pack).".into()
+                if en_ready {
+                    "Windows.Media.Ocr ready (English OS language pack).".into()
+                } else {
+                    format!(
+                        "Windows.Media.Ocr ready via {}; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language settings, or fall back to ASR.",
+                        preferred.as_deref().unwrap_or("unknown")
+                    )
+                }
             } else if langs.is_empty() {
                 "No OCR language packs installed. Add English (or another) OCR pack in Windows Language settings.".into()
             } else {
-                "OCR packs found but engine could not start. Check Windows Language → OCR.".into()
+                "OCR packs found but engine could not start. Check Windows Language settings / OCR.".into()
             };
             OcrStatus {
                 available,
@@ -316,4 +327,6 @@ mod tests {
         assert_eq!(backend_label(&OcrBackendKind::WinRt), "winrt");
         assert_eq!(backend_label(&OcrBackendKind::OnnxPack), "onnx");
     }
+    
+
 }

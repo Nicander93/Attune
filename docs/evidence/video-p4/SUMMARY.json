@@ -1,0 +1,24 @@
+{
+  "tip": "46a4a530be62e30e32ee532e875129cc640ac0d8",
+  "branch": "feat/video-p4-ocr",
+  "when": "2026-10-26T03:34:53.205Z",
+  "item1_burned_in_ocr_unreviewed": "PASS",
+  "item2_en_pack_missing_honest_asr_fallback": "PASS",
+  "item3_text_track_stays_p3": "PASS",
+  "item4_protected_no_ocr_overwrite": "PASS",
+  "all": "PASS",
+  "evidence_dir": "docs/evidence/video-p4/",
+  "ocr_status_probe": {
+    "hasOcrLine": true,
+    "mentionsZh": true,
+    "mentionsEnMissing": true,
+    "langsSnippet": "OCR\\uff08winrt\\uff09\\uff1a可用 · zh-Hans-CN — Windows.Media.Ocr ready via zh-Hans-CN; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language settings, or fall back to ASR."
+  },
+  "item2_detail": {
+    "honest": true,
+    "asrFallback": true,
+    "n": 2
+  },
+  "code_tip_smoke": "46a4a530be62e30e32ee532e875129cc640ac0d8",
+  "ci_note": "re-check frontend Check on PR #9 after this evidence commit"
+}

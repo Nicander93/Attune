@@ -322,7 +322,8 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
             OCR\uff08{ocr.backend}\uff09\uff1a
             {ocr.available
               ? `\u53ef\u7528 \u00b7 ${ocr.preferredLanguage ?? (ocr.languages.join(', ') || '\u8bed\u8a00\u5305\u5df2\u88c5')}`
-              : ocr.hint}
+              : ''}
+            {ocr.hint ? ` — ${ocr.hint}` : ''}
           </p>
         )}
       </div>

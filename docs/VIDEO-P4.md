@@ -50,7 +50,7 @@ probe
 - [x] ONNX env flag returns explicit “pack not installed” (no fat binary)
 - [x] UI does not change text→ASR when OCR checkbox off
 - [x] `docs/VIDEO-P4.md` + Draft PR (no merge, no P5)
-- [ ] Human desktop smoke on burned-in fixture (LM: zh-Hans pack present; EN pack may be missing — status hint must be honest)
+- [x] Human desktop smoke ①–④ PASS (see `docs/evidence/video-p4/`)
 
 ## Non-goals (later)
 
@@ -68,3 +68,14 @@ probe
 ## P0 alignment
 
 P0 marked OCR PoC **PARTIAL** and forbade shipping full Python PaddleOCR; preferred WinRT (~0 MB) with optional ONNX pack later. This Draft implements that preference.
+
+## Desktop acceptance (human-eye ①–④)
+
+Date: 2026-10-26 Asia/Shanghai. Evidence: `docs/evidence/video-p4/`.
+
+| # | Item | Result |
+| --- | --- | --- |
+| 1 | Burned-in English → OCR cues; UI shows ocr / unreviewed | PASS |
+| 2 | EN OCR pack missing → honest status hint; OCR miss → ASR fallback | PASS |
+| 3 | Text track present → P3 embedded path (OCR checkbox on does not steal) | PASS |
+| 4 | Protected (reviewed) → OCR does not overwrite | PASS |
