@@ -66,7 +66,7 @@ manual SRT/VTT import ───────────────────�
 
 ## Desktop acceptance (human-eye ①–④)
 
-Date: 2026-10-26 11:05 Asia/Shanghai. Tip: `ac1b5270ee39a19d4919b7c5a7db82ef1df29633`. Evidence: `docs/evidence/video-p3/`.
+Date: 2026-10-26 11:05 Asia/Shanghai. Tip: `e43691f7495e9ce1f553f6f6dbfb5bd536557168`. Evidence: `docs/evidence/video-p3/`.
 
 | # | Check | Result |
 | - | ----- | ------ |

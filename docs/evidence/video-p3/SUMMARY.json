@@ -1,5 +1,5 @@
 {
-  "tip": "ac1b5270ee39a19d4919b7c5a7db82ef1df29633",
+  "tip": "e43691f7495e9ce1f553f6f6dbfb5bd536557168",
   "branch": "feat/video-p3-subtitles",
   "when": "2026-10-26T11:05:17.485507+08:00",
   "item1_embedded_text_to_dictation": "PASS",
@@ -32,5 +32,6 @@
       "31-manual-video-applied.png",
       "32-manual-srt-imported.png"
     ]
-  }
+  },
+  "code_tip_smoke": "ac1b5270ee39a19d4919b7c5a7db82ef1df29633"
 }
