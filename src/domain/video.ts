@@ -20,3 +20,13 @@ export function defaultClipEnd(duration: number): number {
   if (!Number.isFinite(duration) || duration <= 0) return 0;
   return Math.min(duration, 20 * 60);
 }
+
+/** Drop managed playbackPath after cache wipe; keep source association. */
+export function clearPlaybackPath<T extends { video?: { playbackPath?: string } }>(
+  material: T,
+): T {
+  if (!material.video?.playbackPath) return material;
+  const { playbackPath: _removed, ...video } = material.video;
+  return { ...material, video };
+}
+

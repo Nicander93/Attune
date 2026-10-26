@@ -1,17 +1,22 @@
 //! Local media probe / extract / playback-copy via ffmpeg+ffprobe.
 //!
-//! Binaries are **not** shipped in the NSIS installer. Resolve order:
-//! 1. `ATTUNE_FFMPEG_DIR`
-//! 2. `{app_data}/tools/ffmpeg/`
-//! 3. `PATH`
+//! Binaries are **not** shipped in the NSIS installer (GPL essentials forbidden).
+//! Resolve order: `ATTUNE_FFMPEG_DIR` -> `{app_data}/tools/ffmpeg/` -> `PATH`.
+//! Release UI can download a pinned BtbN **LGPL** shared build into `tools/ffmpeg/`
+//! after user consent (see `FFMPEG_BUNDLE`).
 //!
 //! Commands use typed argv (no shell). Outputs only under `{app_data}/media/`.
 
+use crate::jobs::{is_cancelled, CANCELLED};
 use serde::{Deserialize, Serialize};
-use std::fs;
+use sha2::{Digest, Sha256};
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::AtomicBool;
 use std::sync::Mutex;
+use std::time::Duration;
 use tauri::{AppHandle, Manager, State};
 
 #[derive(Default)]
@@ -262,7 +267,7 @@ pub(crate) fn resolve_bins(app: &AppHandle) -> Result<(PathBuf, PathBuf, String)
     }
 
     Err(
-        "未找到 ffmpeg/ffprobe。开发环境可设置 ATTUNE_FFMPEG_DIR；正式版将按需下载 LGPL 构建到应用数据目录（安装包不附带 GPL ffmpeg）。"
+        "未找到 ffmpeg/ffprobe。可在准备页同意后下载 LGPL 构建到应用数据目录，或设置 ATTUNE_FFMPEG_DIR / PATH。安装包不附带 GPL ffmpeg。"
             .into(),
     )
 }
@@ -757,6 +762,243 @@ fn format_srt_time(seconds: f64) -> String {
 }
 
 
+
+/// Pinned BtbN win64 **LGPL shared** build (no libx264/x265). Encode uses `h264_mf`.
+/// Do not substitute Gyan essentials (GPL) in the installer or this download.
+pub struct FfmpegBundle {
+    pub id: &'static str,
+    pub label: &'static str,
+    pub file: &'static str,
+    pub url: &'static str,
+    pub size: u64,
+    pub sha256: &'static str,
+}
+
+pub const FFMPEG_BUNDLE: FfmpegBundle = FfmpegBundle {
+    id: "btbn-win64-lgpl-shared-2025-10-31",
+    label: "BtbN win64 LGPL shared（约 79 MB）",
+    file: "ffmpeg-N-121583-g4348bde2d2-win64-lgpl-shared.zip",
+    url: "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2025-10-31-13-40/ffmpeg-N-121583-g4348bde2d2-win64-lgpl-shared.zip",
+    size: 82_530_365,
+    sha256: "4506683103ef542a3c50016b464d7db0fa8c740806589975ae7ce5bc7216e218",
+};
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FfmpegBundleInfo {
+    pub id: String,
+    pub label: String,
+    pub size_bytes: u64,
+    pub url: String,
+}
+
+pub fn ffmpeg_bundle_info() -> FfmpegBundleInfo {
+    FfmpegBundleInfo {
+        id: FFMPEG_BUNDLE.id.into(),
+        label: FFMPEG_BUNDLE.label.into(),
+        size_bytes: FFMPEG_BUNDLE.size,
+        url: FFMPEG_BUNDLE.url.into(),
+    }
+}
+
+fn tools_ffmpeg_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    let dir = app_data(app)?.join("tools").join("ffmpeg");
+    fs::create_dir_all(&dir).map_err(|e| format!("无法创建 ffmpeg 工具目录：{e}"))?;
+    Ok(dir)
+}
+
+fn ffmpeg_part_path(dir: &Path) -> PathBuf {
+    dir.join(format!("{}.part", FFMPEG_BUNDLE.file))
+}
+
+fn sha256_file(path: &Path) -> io::Result<String> {
+    let mut file = File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 256 * 1024];
+    loop {
+        let n = file.read(&mut buffer)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buffer[..n]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn content_range_starts_at(header: Option<&str>, offset: u64) -> bool {
+    header
+        .and_then(|h| h.strip_prefix("bytes "))
+        .and_then(|h| h.split('-').next())
+        .and_then(|start| start.trim().parse::<u64>().ok())
+        == Some(offset)
+}
+
+fn fetch_ffmpeg_zip(
+    url: &str,
+    part: &Path,
+    offset: u64,
+    total: u64,
+    cancel: &AtomicBool,
+    progress: &mut impl FnMut(u64, u64),
+) -> Result<(), String> {
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(Duration::from_secs(15))
+        .timeout_read(Duration::from_secs(60))
+        .build();
+    let mut request = agent.get(url);
+    if offset > 0 {
+        request = request.set("Range", &format!("bytes={offset}-"));
+    }
+    let response = request
+        .call()
+        .map_err(|e| format!("下载 ffmpeg 失败：{e}"))?;
+    let resumed = offset > 0 && response.status() == 206;
+    if resumed && !content_range_starts_at(response.header("Content-Range"), offset) {
+        return Err("服务器返回的续传范围不正确，请稍后重试。".into());
+    }
+    let mut file = if resumed {
+        OpenOptions::new().append(true).open(part)
+    } else {
+        File::create(part)
+    }
+    .map_err(|e| format!("无法写入 ffmpeg 下载文件：{e}"))?;
+    let mut done = if resumed { offset } else { 0 };
+    let mut reader = response.into_reader();
+    let mut buffer = vec![0u8; 256 * 1024];
+    progress(done, total);
+    loop {
+        if is_cancelled(cancel) {
+            return Err(CANCELLED.into());
+        }
+        let n = reader
+            .read(&mut buffer)
+            .map_err(|e| format!("下载 ffmpeg 中断：{e}"))?;
+        if n == 0 {
+            break;
+        }
+        file.write_all(&buffer[..n])
+            .map_err(|e| format!("无法写入 ffmpeg 下载文件：{e}"))?;
+        done += n as u64;
+        progress(done, total);
+    }
+    if done < total {
+        return Err(format!(
+            "下载不完整：已收到 {done} / {total} 字节。请检查网络后重试（支持断点续传）。"
+        ));
+    }
+    Ok(())
+}
+
+/// Extract `*/bin/*` from a BtbN-style zip into `dest` (flat).
+pub fn install_ffmpeg_bin_from_zip(zip_path: &Path, dest: &Path) -> Result<(), String> {
+    fs::create_dir_all(dest).map_err(|e| format!("无法创建 ffmpeg 目录：{e}"))?;
+    let file = File::open(zip_path).map_err(|e| format!("无法打开 ffmpeg 压缩包：{e}"))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("无法读取 ffmpeg 压缩包：{e}"))?;
+    let mut extracted = 0usize;
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| format!("读取压缩包条目失败：{e}"))?;
+        if entry.is_dir() {
+            continue;
+        }
+        let name = entry.name().replace('\\', "/");
+        let lower = name.to_ascii_lowercase();
+        let bin_marker = "/bin/";
+        let Some(pos) = lower.rfind(bin_marker) else {
+            continue;
+        };
+        let relative = &name[pos + bin_marker.len()..];
+        if relative.is_empty() || relative.contains('/') || relative.contains("..") {
+            continue;
+        }
+        let out = dest.join(relative);
+        let mut out_file =
+            File::create(&out).map_err(|e| format!("无法写出 {}: {e}", out.display()))?;
+        io::copy(&mut entry, &mut out_file).map_err(|e| format!("解压失败：{e}"))?;
+        extracted += 1;
+    }
+    if extracted == 0 {
+        return Err("压缩包中未找到 bin/ 下的 ffmpeg 文件，可能不是受支持的 LGPL 构建。".into());
+    }
+    let ffmpeg_name = if cfg!(windows) { "ffmpeg.exe" } else { "ffmpeg" };
+    let ffprobe_name = if cfg!(windows) { "ffprobe.exe" } else { "ffprobe" };
+    if !dest.join(ffmpeg_name).is_file() || !dest.join(ffprobe_name).is_file() {
+        return Err(format!(
+            "解压后仍缺少 {ffmpeg_name} / {ffprobe_name}。请删除工具目录后重新下载。"
+        ));
+    }
+    Ok(())
+}
+
+fn verify_ffmpeg_part(part: &Path) -> Result<(), String> {
+    let size = fs::metadata(part).map(|m| m.len()).unwrap_or(0);
+    if size != FFMPEG_BUNDLE.size {
+        let _ = fs::remove_file(part);
+        return Err(format!(
+            "ffmpeg 校验失败：大小不符（{size} ≠ {}）。已删除不完整文件，请重新下载。",
+            FFMPEG_BUNDLE.size
+        ));
+    }
+    let digest = sha256_file(part).map_err(|e| format!("无法校验 ffmpeg：{e}"))?;
+    if digest != FFMPEG_BUNDLE.sha256 {
+        let _ = fs::remove_file(part);
+        return Err(
+            "ffmpeg 校验失败：SHA-256 不匹配（文件可能损坏或被替换）。已删除下载文件，请重新下载。"
+                .into(),
+        );
+    }
+    Ok(())
+}
+
+/// Download the pinned LGPL bundle into `{appData}/tools/ffmpeg/` (resumable).
+pub fn download_ffmpeg_bundle(
+    app: &AppHandle,
+    cancel: &AtomicBool,
+    mut progress: impl FnMut(u64, u64),
+) -> Result<(), String> {
+    let dest = tools_ffmpeg_dir(app)?;
+    let part = ffmpeg_part_path(&dest);
+    let mut offset = fs::metadata(&part).map(|m| m.len()).unwrap_or(0);
+    if offset > FFMPEG_BUNDLE.size {
+        fs::remove_file(&part).map_err(|e| format!("无法清理损坏的下载文件：{e}"))?;
+        offset = 0;
+    }
+    if offset < FFMPEG_BUNDLE.size {
+        fetch_ffmpeg_zip(
+            FFMPEG_BUNDLE.url,
+            &part,
+            offset,
+            FFMPEG_BUNDLE.size,
+            cancel,
+            &mut progress,
+        )?;
+    } else {
+        progress(FFMPEG_BUNDLE.size, FFMPEG_BUNDLE.size);
+    }
+    if is_cancelled(cancel) {
+        return Err(CANCELLED.into());
+    }
+    verify_ffmpeg_part(&part)?;
+    install_ffmpeg_bin_from_zip(&part, &dest)?;
+    let _ = fs::remove_file(&part);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn media_ffmpeg_bundle() -> FfmpegBundleInfo {
+    ffmpeg_bundle_info()
+}
+
+#[tauri::command]
+pub fn media_clear_all_cache(app: AppHandle) -> Result<(), String> {
+    let dir = app_data(&app)?.join("media");
+    if dir.exists() {
+        fs::remove_dir_all(&dir).map_err(|e| format!("清理媒体缓存失败：{e}"))?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn media_clear_cache(app: AppHandle, material_id: String) -> Result<(), String> {
     validate_material_id(&material_id)?;
@@ -811,5 +1053,50 @@ mod tests {
         assert!(is_bitmap_subtitle_codec("hdmv_pgs_subtitle"));
         assert!(is_bitmap_subtitle_codec("dvd_subtitle"));
         assert!(!is_bitmap_subtitle_codec("subrip"));
+    }
+
+    #[test]
+    fn ffmpeg_bundle_is_lgpl_not_gyan_essentials() {
+        assert!(FFMPEG_BUNDLE.url.contains("lgpl"));
+        assert!(!FFMPEG_BUNDLE.url.contains("win64-gpl"));
+        assert!(!FFMPEG_BUNDLE.file.contains("essentials"));
+        assert_eq!(FFMPEG_BUNDLE.size, 82_530_365);
+        assert_eq!(
+            FFMPEG_BUNDLE.sha256,
+            "4506683103ef542a3c50016b464d7db0fa8c740806589975ae7ce5bc7216e218"
+        );
+    }
+
+    #[test]
+    fn install_ffmpeg_bin_from_zip_extracts_bin_entries() {
+        use std::io::Write;
+        let root = std::env::temp_dir().join(format!(
+            "attune-ffmpeg-zip-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let zip_path = root.join("bundle.zip");
+        {
+            let file = File::create(&zip_path).unwrap();
+            let mut zip = zip::ZipWriter::new(file);
+            let opts = zip::write::SimpleFileOptions::default();
+            zip.start_file("ffmpeg-fake/bin/ffmpeg.exe", opts).unwrap();
+            zip.write_all(b"FF").unwrap();
+            zip.start_file("ffmpeg-fake/bin/ffprobe.exe", opts).unwrap();
+            zip.write_all(b"FP").unwrap();
+            zip.start_file("ffmpeg-fake/bin/avcodec-61.dll", opts).unwrap();
+            zip.write_all(b"DLL").unwrap();
+            zip.start_file("ffmpeg-fake/doc/readme.txt", opts).unwrap();
+            zip.write_all(b"skip").unwrap();
+            zip.finish().unwrap();
+        }
+        let dest = root.join("out");
+        install_ffmpeg_bin_from_zip(&zip_path, &dest).unwrap();
+        assert_eq!(fs::read(dest.join("ffmpeg.exe")).unwrap(), b"FF");
+        assert_eq!(fs::read(dest.join("ffprobe.exe")).unwrap(), b"FP");
+        assert_eq!(fs::read(dest.join("avcodec-61.dll")).unwrap(), b"DLL");
+        assert!(!dest.join("readme.txt").exists());
+        let _ = fs::remove_dir_all(&root);
     }
 }

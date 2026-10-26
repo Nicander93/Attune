@@ -1,4 +1,5 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { readFile } from '@tauri-apps/plugin-fs';
 import { isDesktop } from './desktop';
@@ -70,6 +71,11 @@ export async function pickAndProbeVideo(): Promise<MediaProbe> {
   if (!selected || Array.isArray(selected)) throw new Error('已取消选择视频。');
   const path = await invoke<string>('media_authorize_path', { path: selected });
   return invoke<MediaProbe>('media_probe', { path });
+}
+
+
+export async function authorizeMediaPath(path: string): Promise<string> {
+  return invoke<string>('media_authorize_path', { path });
 }
 
 export async function probeAuthorizedPath(path: string): Promise<MediaProbe> {
@@ -202,3 +208,47 @@ export function pickDefaultSubtitleStream(probe: MediaProbe): number | undefined
   const eng = subs.find((s) => (s.language || '').toLowerCase().startsWith('en'));
   return (eng ?? subs[0]).index;
 }
+
+export interface FfmpegBundleInfo {
+  id: string;
+  label: string;
+  sizeBytes: number;
+  url: string;
+}
+
+export interface FfmpegDownloadProgress {
+  modelId: string;
+  downloadedBytes: number;
+  totalBytes: number;
+}
+
+export async function ffmpegBundle(): Promise<FfmpegBundleInfo> {
+  if (!isDesktop()) {
+    return { id: '', label: '', sizeBytes: 0, url: '' };
+  }
+  return invoke<FfmpegBundleInfo>('media_ffmpeg_bundle');
+}
+
+/** Download pinned LGPL ffmpeg into appData/tools/ffmpeg after the UI collected consent. */
+export async function downloadFfmpeg(
+  onProgress: (progress: FfmpegDownloadProgress) => void,
+): Promise<FfmpegStatus> {
+  if (!isDesktop()) throw new Error('视频工具下载仅桌面版支持。');
+  const stop = await listen<FfmpegDownloadProgress>('ffmpeg-download-progress', (e) =>
+    onProgress(e.payload),
+  );
+  try {
+    return await invoke<FfmpegStatus>('download_ffmpeg');
+  } finally {
+    stop();
+  }
+}
+
+/** Shares the model-download cancel slot. */
+export const cancelFfmpegDownload = () => invoke('cancel_download');
+
+export async function clearAllMediaCache(): Promise<void> {
+  if (!isDesktop()) return;
+  await invoke('media_clear_all_cache');
+}
+

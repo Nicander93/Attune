@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { IDBFactory } from 'fake-indexeddb';
-import { clipDuration, defaultClipEnd, toClipTime, toSourceTime } from '../src/domain/video';
+import {
+  clearPlaybackPath,
+  clipDuration,
+  defaultClipEnd,
+  toClipTime,
+  toSourceTime,
+} from '../src/domain/video';
 import { closeDatabase, loadMaterials, saveMaterial } from '../src/storage/db';
 import { materialize } from './fixtures/material';
 
@@ -64,5 +70,29 @@ describe('video metadata persistence', () => {
     const [loaded] = await loadMaterials();
     expect(loaded.video).toBeUndefined();
     expect(loaded.audio.size).toBe(1);
+  });
+});
+
+describe('clearPlaybackPath', () => {
+  it('drops playbackPath but keeps other video fields', () => {
+    const material = {
+      id: 'm1',
+      video: {
+        originalName: 'a.mp4',
+        sourcePath: 'D:/videos/a.mp4',
+        playbackPath: 'D:/app/media/m1/playback.mp4',
+        clipStart: 0,
+        clipEnd: 10,
+      },
+    };
+    const next = clearPlaybackPath(material);
+    expect(next.video?.playbackPath).toBeUndefined();
+    expect(next.video?.sourcePath).toBe('D:/videos/a.mp4');
+    expect(material.video?.playbackPath).toBe('D:/app/media/m1/playback.mp4');
+  });
+
+  it('is a no-op for audio-only materials', () => {
+    const material = { id: 'a1', video: undefined as { playbackPath?: string } | undefined };
+    expect(clearPlaybackPath(material)).toBe(material);
   });
 });

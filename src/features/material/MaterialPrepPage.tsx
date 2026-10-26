@@ -6,6 +6,8 @@ import { applySubtitleTimeline } from '../../domain/subtitle-edits';
 import { isDesktop } from '../../desktop';
 import { RecognitionSettings } from '../../RecognitionSettings';
 import { useRecognition } from '../../useRecognition';
+import { clearPlaybackPath } from '../../domain/video';
+import { clearAllMediaCache } from '../../media';
 import { VideoImportPanel } from './VideoImportPanel';
 
 type Props = {
@@ -306,6 +308,39 @@ export function MaterialPrepPage({
             pendingAsr.current = true;
           }}
         />
+
+      {isDesktop() && (
+        <article className="prep__section">
+          <div className="prep__summary">
+            <h2>媒体缓存</h2>
+            <p className="muted">
+              清理应用数据目录下 media/ 中的播放副本与抽轨临时文件。IndexedDB 中的音频 Blob、字幕与练习记录不受影响。
+            </p>
+          </div>
+          <div className="prep__actions">
+            <button
+              className="quiet"
+              onClick={() => {
+                if (
+                  !window.confirm(
+                    '清理全部媒体缓存？视频素材需要时请在准备页重建播放副本。',
+                  )
+                )
+                  return;
+                void clearAllMediaCache()
+                  .then(() => {
+                    update((m) => clearPlaybackPath(m));
+                    onNotice('已清理全部媒体缓存。');
+                  })
+                  .catch((err) => setError(String(err)));
+              }}
+            >
+              清理全部媒体缓存
+            </button>
+          </div>
+        </article>
+      )}
+
         {hasAudio ? (
           <div className="prep__section-list">
             <article
