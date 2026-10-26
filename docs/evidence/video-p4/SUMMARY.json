@@ -1,5 +1,5 @@
 {
-  "tip": "46a4a530be62e30e32ee532e875129cc640ac0d8",
+  "tip": "e5d97a18242ce9f3118b11262643f2380d0e81f5",
   "branch": "feat/video-p4-ocr",
   "when": "2026-10-26T03:34:53.205Z",
   "item1_burned_in_ocr_unreviewed": "PASS",
@@ -19,6 +19,6 @@
     "asrFallback": true,
     "n": 2
   },
-  "code_tip_smoke": "46a4a530be62e30e32ee532e875129cc640ac0d8",
+  "code_tip_smoke": "e5d97a18242ce9f3118b11262643f2380d0e81f5",
   "ci_note": "re-check frontend Check on PR #9 after this evidence commit"
 }
