@@ -1,0 +1,5 @@
+# keep screenshots in git for evidence
+!*.png
+!*.json
+!*.txt
+!README.md

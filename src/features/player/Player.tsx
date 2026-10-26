@@ -122,7 +122,9 @@ export function Player({ material, player, status, onStepSentence, hasPrevious, 
       />
       {player.unreadable && (
         <p className="player__warning" role="alert">
-          这段素材的音频无法读取，请重新导入。
+          {material.video
+            ? '播放副本无法读取。请回准备页「重建播放副本」或「重新关联源文件」；仍可用片段音频继续听写。'
+            : '本素材的音频无法读取，请重新导入。'}
         </p>
       )}
     </div>

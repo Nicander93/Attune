@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Material } from '../../domain/types';
 import { formatTime } from '../../domain/types';
-import { defaultClipEnd } from '../../domain/video';
+import { clearPlaybackPath, defaultClipEnd } from '../../domain/video';
 import { parseSrt } from '../../domain/subtitles';
 import { applySubtitleTimeline, hasProtectedSubtitles } from '../../domain/subtitle-edits';
 import {
@@ -11,8 +11,13 @@ import {
 } from '../../domain/subtitle-source';
 import { isDesktop } from '../../desktop';
 import {
+  authorizeMediaPath,
+  cancelFfmpegDownload,
+  clearMediaCache,
+  downloadFfmpeg,
   extractClipAudio,
   extractEmbeddedSubtitles,
+  ffmpegBundle,
   ffmpegStatus,
   loadSrtText,
   ocrBurnedInSubtitles,
@@ -21,6 +26,7 @@ import {
   pickDefaultAudioStream,
   pickDefaultSubtitleStream,
   preparePlayback,
+  type FfmpegBundleInfo,
   type FfmpegStatus,
   type MediaProbe,
   type OcrStatus,
@@ -56,11 +62,16 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
   const [busy, setBusy] = useState(false);
   /** Prefer burned-in/bitmap OCR over ASR when no text track was applied. */
   const [wantOcr, setWantOcr] = useState(false);
+  const [bundle, setBundle] = useState<FfmpegBundleInfo | null>(null);
+  const [downloadLabel, setDownloadLabel] = useState('');
 
   useEffect(() => {
     void ffmpegStatus()
       .then(setStatus)
       .catch((err) => setStatus({ available: false, source: 'error', hint: String(err) }));
+    void ffmpegBundle()
+      .then(setBundle)
+      .catch(() => setBundle(null));
     void ocrStatus()
       .then(setOcr)
       .catch((err) =>
@@ -91,6 +102,100 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
       ).length ?? 0,
     [probe],
   );
+
+
+  async function installFfmpeg() {
+    onError('');
+    const info = bundle ?? (await ffmpegBundle().catch(() => null));
+    const label = info?.label || 'BtbN LGPL ffmpeg';
+    const mb = info ? Math.round(info.sizeBytes / (1024 * 1024)) : 79;
+    const ok = window.confirm(
+      `\u5c06\u4e0b\u8f7d ${label}\uff08\u7ea6 ${mb} MB\uff09\u5230\u672c\u673a\u5e94\u7528\u6570\u636e\u76ee\u5f55 tools/ffmpeg/\u3002\n\n\u8be5\u6784\u5efa\u4e3a LGPL\uff08\u975e Gyan essentials / GPL\uff09\uff0c\u4ec5\u7528\u4e8e\u672c\u5730\u89c6\u9891\u5904\u7406\u3002\u662f\u5426\u540c\u610f\uff1f`,
+    );
+    if (!ok) {
+      onNotice('\u5df2\u53d6\u6d88\u4e0b\u8f7d\u3002');
+      return;
+    }
+    setBusy(true);
+    setDownloadLabel('\u51c6\u5907\u4e0b\u8f7d\u2026');
+    try {
+      const next = await downloadFfmpeg((p) => {
+        const pct = p.totalBytes
+          ? Math.min(100, Math.floor((p.downloadedBytes / p.totalBytes) * 100))
+          : 0;
+        setDownloadLabel(`\u4e0b\u8f7d ffmpeg\uff1a${pct}%`);
+      });
+      setStatus(next);
+      setDownloadLabel('');
+      if (next.available) {
+        onNotice('\u5df2\u5b89\u88c5 LGPL ffmpeg\uff0c\u53ef\u4ee5\u5bfc\u5165\u89c6\u9891\u3002');
+      } else {
+        onError(next.hint || '\u4e0b\u8f7d\u5b8c\u6210\u4f46\u4ecd\u672a\u68c0\u6d4b\u5230 ffmpeg\u3002');
+      }
+    } catch (err) {
+      const message = String(err);
+      setDownloadLabel('');
+      if (message.includes('\u53d6\u6d88')) {
+        onNotice('\u5df2\u53d6\u6d88\u4e0b\u8f7d\uff1b\u4e0b\u6b21\u53ef\u7ee7\u7eed\u3002');
+      } else {
+        onError(
+          `\u4e0b\u8f7d ffmpeg \u5931\u8d25\uff1a${message}\u3002\u53ef\u68c0\u67e5\u7f51\u7edc\u540e\u91cd\u8bd5\uff0c\u6216\u624b\u52a8\u8bbe\u7f6e ATTUNE_FFMPEG_DIR\u3002`,
+        );
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function rebuildPlayback() {
+    if (!material.video?.sourcePath) {
+      onError('\u6e90\u6587\u4ef6\u8def\u5f84\u7f3a\u5931\uff0c\u8bf7\u5148\u300c\u91cd\u65b0\u5173\u8054\u6e90\u6587\u4ef6\u300d\u3002');
+      return;
+    }
+    onError('');
+    setBusy(true);
+    try {
+      const sourcePath = await authorizeMediaPath(material.video.sourcePath);
+      const playback = await preparePlayback({
+        sourcePath,
+        materialId: material.id,
+      });
+      update((m) =>
+        m.video
+          ? { ...m, video: { ...m.video, playbackPath: playback.playbackPath } }
+          : m,
+      );
+      onNotice(
+        playback.transcoded
+          ? '\u5df2\u91cd\u5efa\u64ad\u653e\u526f\u672c\uff08\u5df2\u8f6c\u7801\uff09\u3002'
+          : '\u5df2\u91cd\u5efa\u64ad\u653e\u526f\u672c\u3002',
+      );
+    } catch (err) {
+      onError(
+        `\u91cd\u5efa\u64ad\u653e\u526f\u672c\u5931\u8d25\uff1a${String(err)}\u3002\u82e5\u6e90\u6587\u4ef6\u5df2\u79fb\u52a8\uff0c\u8bf7\u5148\u91cd\u65b0\u5173\u8054\u3002`,
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function clearThisCache() {
+    const ok = window.confirm(
+      '\u6e05\u7406\u672c\u7d20\u6750\u7684\u5a92\u4f53\u7f13\u5b58\uff08\u64ad\u653e\u526f\u672c / \u62bd\u8f68 WAV / OCR \u5e27\uff09\uff1f\u97f3\u9891 Blob \u4e0e\u5b57\u5e55\u4ecd\u4fdd\u7559\u5728 IndexedDB\u3002',
+    );
+    if (!ok) return;
+    onError('');
+    setBusy(true);
+    try {
+      await clearMediaCache(material.id);
+      update((m) => clearPlaybackPath(m));
+      onNotice('\u5df2\u6e05\u7406\u672c\u7d20\u6750\u5a92\u4f53\u7f13\u5b58\u3002\u9700\u8981\u89c6\u9891\u753b\u9762\u65f6\u8bf7\u300c\u91cd\u5efa\u64ad\u653e\u526f\u672c\u300d\u3002');
+    } catch (err) {
+      onError(String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function chooseVideo() {
     onError('');
@@ -314,8 +419,23 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
             {status.hint || '\u672a\u627e\u5230 ffmpeg/ffprobe'}
           </p>
         )}
+        {downloadLabel && (
+          <p className="banner" role="status">
+            {downloadLabel}{' '}
+            <button className="quiet" type="button" onClick={() => void cancelFfmpegDownload()}>
+              {'\u53d6\u6d88'}
+            </button>
+          </p>
+        )}
         {status?.available && (
           <p className="muted prep__hint">ffmpeg\uff1a{status.source}</p>
+        )}
+        {material.video && !material.video.playbackPath && (
+          <p className="banner banner--error" role="alert">
+            {
+              '\u64ad\u653e\u526f\u672c\u7f3a\u5931\uff08\u53ef\u80fd\u88ab\u6e05\u7406\u6216\u5bfc\u5165\u65f6\u5931\u8d25\uff09\u3002\u53ef\u300c\u91cd\u5efa\u64ad\u653e\u526f\u672c\u300d\uff1b\u82e5\u6e90\u6587\u4ef6\u5df2\u79fb\u52a8\u8bf7\u5148\u91cd\u65b0\u5173\u8054\u3002'
+            }
+          </p>
         )}
         {ocr && (
           <p className="muted prep__hint">
@@ -328,8 +448,13 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
         )}
       </div>
       <div className="prep__actions">
+        {status && !status.available && (
+          <button className="primary" disabled={busy} onClick={() => void installFfmpeg()}>
+            {downloadLabel ? '\u4e0b\u8f7d\u4e2d\u2026' : '\u4e0b\u8f7d LGPL ffmpeg'}
+          </button>
+        )}
         <button disabled={busy || status?.available === false} onClick={() => void chooseVideo()}>
-          {busy
+          {busy && !downloadLabel
             ? '\u5904\u7406\u4e2d\u2026'
             : material.video
               ? '\u91cd\u65b0\u5bfc\u5165\u89c6\u9891'
@@ -338,6 +463,20 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
         {material.video && (
           <button className="quiet" disabled={busy} onClick={() => void reassociate()}>
             {'\u91cd\u65b0\u5173\u8054\u6e90\u6587\u4ef6'}
+          </button>
+        )}
+        {material.video && (
+          <button
+            className="quiet"
+            disabled={busy || status?.available === false}
+            onClick={() => void rebuildPlayback()}
+          >
+            {'\u91cd\u5efa\u64ad\u653e\u526f\u672c'}
+          </button>
+        )}
+        {material.video && (
+          <button className="quiet" disabled={busy} onClick={() => void clearThisCache()}>
+            {'\u6e05\u7406\u672c\u7d20\u6750\u7f13\u5b58'}
           </button>
         )}
       </div>

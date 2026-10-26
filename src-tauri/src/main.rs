@@ -89,6 +89,31 @@ async fn download_model(
 }
 
 #[tauri::command]
+async fn download_ffmpeg(app: AppHandle, jobs: State<'_, Jobs>) -> Result<media::FfmpegStatus, String> {
+    let job = jobs
+        .download
+        .start("已有下载任务进行中，请等待完成或取消。")?;
+    let cancel = job.cancel.clone();
+    run_blocking(move || {
+        let mut last_emit = Instant::now() - Duration::from_secs(1);
+        media::download_ffmpeg_bundle(&app, &cancel, |downloaded_bytes, total_bytes| {
+            let finished = downloaded_bytes >= total_bytes;
+            if finished || last_emit.elapsed() >= Duration::from_millis(200) {
+                last_emit = Instant::now();
+                let progress = DownloadProgress {
+                    model_id: media::FFMPEG_BUNDLE.id,
+                    downloaded_bytes,
+                    total_bytes,
+                };
+                let _ = app.emit("ffmpeg-download-progress", progress);
+            }
+        })?;
+        Ok(media::media_ffmpeg_status(app))
+    })
+    .await
+}
+
+#[tauri::command]
 fn cancel_download(jobs: State<'_, Jobs>) {
     jobs.download.cancel();
 }
@@ -184,12 +209,15 @@ fn main() {
             recognize,
             cancel_recognition,
             media::media_ffmpeg_status,
+            media::media_ffmpeg_bundle,
+            download_ffmpeg,
             media::media_authorize_path,
             media::media_probe,
             media::media_extract_audio,
             media::media_extract_subtitles,
             media::media_prepare_playback,
             media::media_clear_cache,
+            media::media_clear_all_cache,
             media::media_ocr_burned_in,
             ocr::ocr_status_cmd,
             ocr::ocr_recognize_image

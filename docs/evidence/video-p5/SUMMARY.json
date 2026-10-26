@@ -1,0 +1,78 @@
+{
+  "tip": "71030af1d0c10a744600960f083e837024b3ba8f",
+  "branch": "feat/video-p5-packaging",
+  "when": "2026-10-26T12:41:22.720237+08:00",
+  "item1_ffmpeg_consent_download": "PASS",
+  "item2_import_study_listen": "PASS",
+  "item3_restart_restore_or_rebuild": "PASS",
+  "item4_clear_cache_recover": "PASS",
+  "item5_pure_audio_no_regression": "PASS",
+  "all": "PASS",
+  "evidence_dir": "docs/evidence/video-p5/",
+  "detail": {
+    "item1": {
+      "consent_download": true,
+      "toolsExist": true,
+      "source": "app_data/tools/ffmpeg",
+      "shots": [
+        "01-no-ffmpeg-banner.png",
+        "02-download-started.png",
+        "03-ffmpeg-installed.png"
+      ],
+      "note": "Fresh PATH-sanitized launch; LGPL zip consented+installed to appData/tools/ffmpeg"
+    },
+    "item2": {
+      "sub2": {
+        "n": 2,
+        "prep": "← 返回\n\n素材准备\n\nh264_aac_subs 重命名\n00:03 · 音频已添加\n\n当前字幕来自内嵌轨，尚未校对。\n去校对\n\n视频\n\nh264_aac_subs.mkv · 片段 00:00–00:03\n\nffmpeg\\uff1aapp_data/tools/ffmpeg\n\nOCR\\uff08winrt\\uff09\\uff1a可用 · zh-Hans-CN — Windows.Media.Ocr ready via zh-Hans-CN; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language settings, or fall back to ASR.\n\n重新导入视频\n重新关联源文件\n重建播放副本\n清理本素材缓存\n媒体缓存\n\n清理应用数据目录下 media/ 中的播放副本与抽轨临时文件。IndexedDB 中的音频 Blob、字幕与练习记录不受影响。\n\n清理全部媒体缓存\n♫\n音频\n\nh264_aac_subs.mkv · 00:03\n\n更换音频\n拖入音频以更换\n≡\n字幕\n\n已导入 2 句 · 可继续校对\n\n导入字幕\n校对字幕\n拖入 SRT / VTT 文件\n文\n中文翻译\n\n未提供译文，可导入双语字幕；听读时"
+      },
+      "d1": {
+        "videoCount": 1,
+        "wrapHidden": true,
+        "videoSrc": "http://asset.localhost/%5C%5C%3F%5CC%3A%5CUsers%5CPC%5CAppData%5CRoaming%5Cdev.attune.desktop%5Cmedia%5C8b9667c1-acef-4233-be73-96b741b3dc5f%5Cplayback.mp4"
+      },
+      "dPlay": {
+        "tag": "VIDEO",
+        "paused": false,
+        "t": 1.311412,
+        "wrapHidden": true
+      },
+      "toggleOk": false,
+      "listenOk": true
+    },
+    "item3": {
+      "missingPlayback": false,
+      "restoredOrRebuilt": true,
+      "sec": "视频\n\nh264_aac_subs.mkv · 片段 00:00–00:03\n\nffmpeg\\uff1aapp_data/tools/ffmpeg\n\nOCR\\uff08winrt\\uff09\\uff1a可用 · zh-Hans-CN — Windows.Media.Ocr ready via zh-Hans-CN; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language settings, or fall back to ASR.\n\n重新导入视频\n重新关联源文件\n重建播放副本\n清理本素材缓存"
+    },
+    "item4": {
+      "clearedBanner": true,
+      "rebuilt": true,
+      "hasPlayback": true,
+      "banner": "已重建播放副本。 | 当前字幕来自内嵌轨，尚未校对。去校对"
+    },
+    "item5": {
+      "a1": {
+        "videoCount": 0,
+        "audioCount": 1,
+        "hasVideoToggle": false
+      },
+      "aPlay": {
+        "paused": false,
+        "t": 0.818972,
+        "tagOnlyAudio": true
+      }
+    }
+  },
+  "ci_note": "Check CI on tip after evidence push",
+  "smoke_tip_at_run": "fe68a7a4eeb98b44348fda7ab659f1320fb5e96c",
+  "ci": {
+    "workflow": "Check",
+    "jobs": [
+      "frontend",
+      "frontend"
+    ],
+    "conclusion": "SUCCESS",
+    "on_tip": "71030af"
+  }
+}
