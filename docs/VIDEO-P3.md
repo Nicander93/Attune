@@ -62,3 +62,17 @@ manual SRT/VTT import ───────────────────�
 | ASR overwrites curated timeline | `hasProtectedSubtitles` blocks replace |
 | Bitmap track selected historically | UI lists text codecs only; Rust refuses bitmap |
 | Large ASR jobs on long clips | Existing cancel + model settings; clip range already limited at import |
+
+
+## Desktop acceptance (human-eye ①–④)
+
+Date: 2026-10-26 11:05 Asia/Shanghai. Tip: `ac1b5270ee39a19d4919b7c5a7db82ef1df29633`. Evidence: `docs/evidence/video-p3/`.
+
+| # | Check | Result |
+| - | ----- | ------ |
+| ① | Video with embedded English text subs → formal dictation/check without manual SRT | **PASS** |
+| ② | No suitable track → ASR path; UI shows asr / unreviewed | **PASS** |
+| ③ | Protected (draft/check/bookmark/reviewed) → auto extract does NOT overwrite | **PASS** |
+| ④ | Manual SRT import still works | **PASS** |
+
+CI: see PR #8 checks (frontend). Do not merge until product + CI gate.

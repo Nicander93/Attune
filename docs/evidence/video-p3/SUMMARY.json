@@ -1,0 +1,36 @@
+{
+  "tip": "ac1b5270ee39a19d4919b7c5a7db82ef1df29633",
+  "branch": "feat/video-p3-subtitles",
+  "when": "2026-10-26T11:05:17.485507+08:00",
+  "item1_embedded_text_to_dictation": "PASS",
+  "item2_asr_fallback_unreviewed": "PASS",
+  "item3_protected_no_overwrite": "PASS",
+  "item4_manual_srt_import": "PASS",
+  "all": "PASS",
+  "evidence_dir": "docs/evidence/video-p3/",
+  "ci_note": "frontend Check was SUCCESS on PR #8 tip ac1b527; re-verify after this evidence commit",
+  "shots": {
+    "1": [
+      "01-embedded-probed.png",
+      "02-embedded-applied.png",
+      "03-embedded-subs-ready.png",
+      "04-dictation-no-manual-srt.png"
+    ],
+    "2": [
+      "20-nosubs-probed.png",
+      "21-nosubs-applied.png",
+      "22-asr-result.png"
+    ],
+    "3": [
+      "10-proof-before-mark.png",
+      "11-proof-marked.png",
+      "12-protect-reprobe.png",
+      "13-protect-reapplied.png"
+    ],
+    "4": [
+      "30-manual-video-probed.png",
+      "31-manual-video-applied.png",
+      "32-manual-srt-imported.png"
+    ]
+  }
+}
