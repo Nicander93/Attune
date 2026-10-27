@@ -7,3 +7,7 @@ playwright-report/
 .env*
 src-tauri/gen/schemas/
 opencode-debug.log
+
+# Video P0 local extracts / logs (keep tiny source fixtures)
+fixtures/video-p0/extracted/
+fixtures/video-p0/embedded.srt

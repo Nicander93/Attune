@@ -1,0 +1,86 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Attune Video P0 WebView2 Harness</title>
+<style>
+body{font-family:Segoe UI,sans-serif;margin:16px;background:#111;color:#eee}
+video{width:320px;background:#000;margin:4px}
+.row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.card{border:1px solid #444;padding:8px;border-radius:8px;width:340px}
+pre{white-space:pre-wrap;font-size:12px;background:#222;padding:8px;max-height:180px;overflow:auto}
+button{margin:2px}
+.hidden-vis{visibility:hidden}
+.hidden-op{opacity:0}
+</style>
+</head>
+<body>
+<h1>Video P0 — WebView2 / Edge harness</h1>
+<p>UA: <span id="ua"></span></p>
+<div class="row" id="cards"></div>
+<div class="card" style="width:100%">
+  <h3>Hide-surface while audio continues</h3>
+  <video id="hideVid" controls src="./h264_aac.mp4"></video>
+  <div>
+    <button id="btnVis">toggle visibility:hidden</button>
+    <button id="btnOp">toggle opacity:0</button>
+    <button id="btnPlay">play</button>
+  </div>
+  <pre id="hideLog"></pre>
+</div>
+<script>
+document.getElementById('ua').textContent = navigator.userAgent;
+const files = [
+  {id:'h264', src:'./h264_aac.mp4', expect:'play'},
+  {id:'h265', src:'./h265_aac.mp4', expect:'maybe'},
+  {id:'mkv', src:'./h264_aac_subs.mkv', expect:'maybe'},
+  {id:'h265fixed', src:'./extracted/h265_to_h264.mp4', expect:'play'},
+];
+const cards = document.getElementById('cards');
+const results = {};
+function card(f){
+  const d=document.createElement('div'); d.className='card'; d.id='card-'+f.id;
+  d.innerHTML = `<strong>${f.id}</strong> (${f.expect})<br/><video id="v-${f.id}" controls preload="auto" src="${f.src}"></video><pre id="log-${f.id}">...</pre>`;
+  cards.appendChild(d);
+  const v=document.getElementById('v-'+f.id);
+  const log=document.getElementById('log-'+f.id);
+  const lines=[];
+  const push=(m)=>{lines.push(`[${(performance.now()/1000).toFixed(2)}s] ${m}`); log.textContent=lines.join('\n'); results[f.id]={lines:[...lines], error:v.error&&v.error.code, networkState:v.networkState, readyState:v.readyState}; window.__P0_RESULTS=results;};
+  ['loadstart','loadedmetadata','loadeddata','canplay','canplaythrough','playing','error','stalled','abort'].forEach(ev=>{
+    v.addEventListener(ev, ()=>{
+      if(ev==='error') push(`ERROR code=${v.error&&v.error.code} message=${v.error&&v.error.message}`);
+      else push(`${ev} ready=${v.readyState} net=${v.networkState} dur=${v.duration}`);
+    });
+  });
+  // try autoplay muted to force decode
+  v.muted=true;
+  v.play().then(()=>push('play() resolved')).catch(e=>push('play() rejected: '+e.message));
+}
+files.forEach(card);
+
+// Hide surface test
+const hv=document.getElementById('hideVid');
+const hl=document.getElementById('hideLog');
+const hlines=[];
+const hpush=(m)=>{hlines.push(m); hl.textContent=hlines.join('\n'); window.__P0_HIDE=hlines.slice();};
+document.getElementById('btnPlay').onclick=()=>{hv.muted=false; hv.play();};
+document.getElementById('btnVis').onclick=()=>{hv.classList.toggle('hidden-vis'); hpush('visibility hidden='+hv.classList.contains('hidden-vis')+' t='+hv.currentTime.toFixed(2)+' paused='+hv.paused);};
+document.getElementById('btnOp').onclick=()=>{hv.classList.toggle('hidden-op'); hpush('opacity0='+hv.classList.contains('hidden-op')+' t='+hv.currentTime.toFixed(2)+' paused='+hv.paused);};
+hv.addEventListener('playing',()=>{
+  hpush('playing start t='+hv.currentTime.toFixed(2));
+  setTimeout(()=>{ hv.classList.add('hidden-vis'); hpush('auto visibility:hidden t='+hv.currentTime.toFixed(2)+' paused='+hv.paused); }, 500);
+  setTimeout(()=>{ hpush('after 1.5s hide: t='+hv.currentTime.toFixed(2)+' paused='+hv.paused); window.__P0_HIDE_PASS = (!hv.paused && hv.currentTime>1.0); }, 1500);
+  setTimeout(()=>{ hv.classList.remove('hidden-vis'); hv.classList.add('hidden-op'); hpush('switch to opacity:0 t='+hv.currentTime.toFixed(2)+' paused='+hv.paused); }, 2000);
+  setTimeout(()=>{ hpush('final t='+hv.currentTime.toFixed(2)+' paused='+hv.paused); window.__P0_HIDE_PASS = window.__P0_HIDE_PASS && (!hv.paused); document.title='P0_DONE '+JSON.stringify({results:Object.keys(results), hidePass:window.__P0_HIDE_PASS}); }, 2800);
+});
+hv.muted=true; hv.play().catch(e=>hpush('hide play reject '+e.message));
+
+// dump results for automation after 4s
+setTimeout(()=>{
+  const dump={ua:navigator.userAgent, results, hide:window.__P0_HIDE, hidePass:window.__P0_HIDE_PASS};
+  document.body.insertAdjacentHTML('beforeend','<pre id="dump">'+JSON.stringify(dump,null,2)+'</pre>');
+  // also write via download trick is blocked; title encodes status
+}, 4000);
+</script>
+</body>
+</html>
