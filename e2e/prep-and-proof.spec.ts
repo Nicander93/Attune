@@ -8,7 +8,7 @@ const goToPrep = async (page: Page) => {
   const shortcut = page.getByRole('button', { name: '去准备字幕' });
   if (await shortcut.isVisible().catch(() => false)) await shortcut.click();
   else await page.getByRole('button', { name: '素材设置' }).click();
-  await expect(page.getByText('素材准备')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入素材' })).toBeVisible();
 };
 
 /** Opens the inline editor for a sentence and returns its textarea. */
@@ -42,7 +42,7 @@ test.describe('material preparation', () => {
         buffer: wav(9),
       });
     // A material with no name yet takes the audio file's name.
-    await expect(page.getByRole('heading', { name: 'lesson', exact: true })).toBeVisible();
+    await expect(page.locator('.import__file-info strong')).toHaveText('lesson');
 
     // A subtitle file is only imported when the user picks it.
     await page
@@ -130,7 +130,8 @@ test.describe('material preparation', () => {
     await page.locator('.materials__row').first().click();
     await expect(page.getByText('这段素材还没有字幕')).toBeVisible();
     await page.getByRole('button', { name: '去准备字幕' }).click();
-    await expect(page.getByText('没有字幕时无法核对答案')).toBeVisible();
+    await expect(page.getByText('字幕待校对')).toBeVisible();
+    await expect(page.getByRole('button', { name: '开始听写 →' })).toBeDisabled();
   });
 });
 

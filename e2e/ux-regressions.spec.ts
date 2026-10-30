@@ -21,7 +21,7 @@ test('new material opens preparation directly and returns to its actual source',
 }) => {
   await seed(page, []);
   await page.getByRole('button', { name: /导入素材/ }).first().click();
-  await expect(page.getByText('素材准备')).toBeVisible();
+  await expect(page.getByRole('heading', { name: '导入素材' })).toBeVisible();
   await page.getByRole('button', { name: '← 返回' }).click();
   await expect(page.getByRole('heading', { name: '继续学习' })).toBeVisible();
 });
@@ -204,7 +204,8 @@ test('replacement audio persists after reload and reading starts in reading mode
     .setInputFiles({ name: 'replacement.wav', mimeType: 'audio/wav', buffer: wav(12) });
   await expect(page.getByText('音频已导入：replacement.wav')).toBeVisible();
   await settled(page);
-  await page.getByRole('button', { name: '开始听读' }).click();
+  await page.getByRole('button', { name: '更多 ···' }).click();
+  await page.getByRole('menuitem', { name: '开始听读' }).click();
   await expect(page.getByRole('tab', { name: '听读' })).toHaveAttribute('aria-selected', 'true');
   await page.reload();
   await page.getByRole('button', { name: '素材库' }).first().click();
@@ -228,7 +229,7 @@ for (const viewport of [
       const layout = await page.evaluate(() => {
         const main = document.querySelector('.page');
         const controls = [
-          ...document.querySelectorAll('.player, .study__foot, .flow, .prep__foot'),
+          ...document.querySelectorAll('.player, .study__foot, .flow, .import__actions'),
         ];
         return {
           scroll: main.scrollHeight > main.clientHeight + 1,

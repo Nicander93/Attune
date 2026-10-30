@@ -1,0 +1,71 @@
+{
+  "tip": "99f35a2e98cfdd0b2344376e598621550af83583",
+  "branch": "feat/ui-s2-import",
+  "when": "2026-10-30T10:38:07.814Z",
+  "item1_empty_to_ready": "PASS",
+  "item2_review_ctas": "PASS",
+  "item3_more_video_cache": "PASS",
+  "item4_pure_audio_no_regression": "PASS",
+  "all": "PASS",
+  "evidence_dir": "docs/evidence/ui-s2/",
+  "detail": {
+    "emptyDropzone": true,
+    "audioPick": {
+      "method": "setInputFiles",
+      "ok": true
+    },
+    "afterAudio": {
+      "hasFileCard": true,
+      "hasStart": true,
+      "bodySlice": "Attune\n首页\n素材库\n音频已导入：h264_audio.wav\n← 返回\n导入素材\n♫\nh264_audio\n00:03 · 音频 · h264_audio.wav\n更换\n\n字幕待校对\n\n更多 ···\n开始听写 →"
+    },
+    "readyState": {
+      "hasFileCard": true,
+      "displayName": "h264_audio",
+      "status": "字幕待校对",
+      "hasStart": true
+    },
+    "srtPick": {
+      "method": "setInputFiles",
+      "ok": true
+    },
+    "materialId": "3b8c2a51-0a6e-448c-acbd-75ff7a5a4c26",
+    "ctaState": {
+      "proofVisible": true,
+      "proofDisabled": false,
+      "startVisible": true,
+      "startDisabled": false,
+      "status": "字幕待校对",
+      "banner": "字幕尚未校对。去校对",
+      "bodySlice": "Attune\n首页\n素材库\n← 返回\n导入素材\n♫\nh264_audio\n00:03 · 音频 · h264_audio.wav\n更换\n\n字幕待校对\n\n字幕尚未校对。\n去校对\n\n更多 ···\n校对字幕\n开始听写 →"
+    },
+    "moreItems": [
+      "校对字幕",
+      "导入字幕文件",
+      "识别设置",
+      "导入视频",
+      "缓存管理",
+      "重命名",
+      "开始听读"
+    ],
+    "videoPanel": {
+      "hasSection": true,
+      "heading": "导入视频",
+      "hasVideoImportHints": true,
+      "slice": "导入视频\n收起\n视频\n\n可选：从本地视频提取音轨，沿用现有听写流程\n\nffmpeg\\uff1aapp_data/tools/ffmpeg\n\nOCR\\uff08winrt\\uff09\\uff1a可用 · zh-Hans-CN — Windows.Media.Ocr ready via zh-Hans-CN; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language settings, or fall back to ASR.\n\n导入视频"
+    },
+    "cachePanel": {
+      "hasSection": true,
+      "heading": "缓存管理",
+      "hasClear": true,
+      "slice": "缓存管理\n收起\n\n清理应用数据目录下 media/ 中的播放副本与抽轨临时文件。IndexedDB 中的音频 Blob、字幕与练习记录不受影响。\n\n清理全部媒体缓存"
+    },
+    "study": {
+      "hasStudy": true,
+      "hasPlay": false,
+      "hasBack": true,
+      "noVideoRequired": true,
+      "bodySlice": "Attune\n首页\n素材库\n← 返回\n已听写 0 / 2 句\nh264_audio\n第 1 / 2 句\n⏮\n▶\n⏭\n↻ 重听本句\n0.5×\n0.75×\n1×\n1.25×\n1.5×\n 单句循环\n 按句\n 连续\n00:01 / 00:03\n听写听读\n 只看难句（0）\n 按键音\n轮次\n第 1 / 2 句\n00:00 — 00:01\n☆ 标记难句\n听完这句，写下来…\n完整原文 ↗\n核对答案 Enter\nEnter 核对 / 下一句 · Space 播放 · Esc 退出输入后 ← → 切句\n字幕校对\n素材设置"
+    }
+  }
+}
