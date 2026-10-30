@@ -1,8 +1,9 @@
 # UI S3 focus evidence
 
-Branch: `feat/ui-s3-focus` · tip recorded in `SUMMARY.json`.
+Branch: eat/ui-s3-focus · tip recorded in SUMMARY.json.
 
-Desktop smoke on Windows LM via CDP WebView2 (`scripts/_cdp_s3_smoke.mjs`), app from this worktree (`npm run desktop` + `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`).
+Desktop smoke on Windows LM via CDP WebView2 (scripts/_cdp_s3_smoke.mjs), app from this worktree (
+pm run desktop + WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222).
 
 Product gate (human/screenshot):
 
@@ -13,4 +14,6 @@ Product gate (human/screenshot):
 | 3 | 听写 ↔ 听读 mode switch in same shell | PASS | 20–21 |
 | 4 | Enter / Space / ←→ / Esc no regression | PASS | 30 |
 
-See `SUMMARY.json` and `cdp-smoke-notes.txt`.
+Code tip smoked: c1d7ac0. Evidence commit tip: see PR head.
+
+See SUMMARY.json and cdp-smoke-notes.txt.
