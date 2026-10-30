@@ -1,0 +1,24 @@
+tip 99f35a2e98cfdd0b2344376e598621550af83583
+waiting CDP 9222...
+page http://localhost:1420/
+shot 01-import-empty.png
+1 empty dropzone=true
+setInputFiles ok accept~audio
+shot 02-import-ready.png
+1 ready=PASS {"hasFileCard":true,"displayName":"h264_audio","status":"字幕待校对","hasStart":true}
+shot 03-more-menu-before-srt.png
+setInputFiles ok accept~.srt
+shot 04-after-srt.png
+marked unreviewed id=3b8c2a51-0a6e-448c-acbd-75ff7a5a4c26
+shot 10-needs-review-ctas.png
+2 ctas {"proofVisible":true,"proofDisabled":false,"startVisible":true,"startDisabled":false,"status":"字幕待校对","banner":"字幕尚未校对。去校对","bodySlice":"Attune\n首页\n素材库\n← 返回\n导入素材\n♫\nh264_audio\n00:03 · 音频 · h264_audio.wav\n更换\n\n字幕待校对\n\n字幕尚未校对。\n去校对\n\n更多 ···\n校对字幕\n开始听写 →"} => PASS
+shot 20-more-menu.png
+more items ["校对字幕","导入字幕文件","识别设置","导入视频","缓存管理","重命名","开始听读"]
+shot 21-more-video-panel.png
+video panel {"hasSection":true,"heading":"导入视频","hasVideoImportHints":true,"slice":"导入视频\n收起\n视频\n\n可选：从本地视频提取音轨，沿用现有听写流程\n\nffmpeg\\uff1aapp_data/tools/ffmpeg\n\nOCR\\uff08winrt\\uff09\\uff1a可用 · zh-Hans-CN — Windows.Media.Ocr ready via zh-Hans-CN; English OCR pack not installed - English hardsubs may be weaker. Install an English OCR pack in Windows Language settings, or fall back to ASR.\n\n导入视频"}
+shot 20b-more-menu-for-cache.png
+shot 22-more-cache-panel.png
+cache panel {"hasSection":true,"heading":"缓存管理","hasClear":true,"slice":"缓存管理\n收起\n\n清理应用数据目录下 media/ 中的播放副本与抽轨临时文件。IndexedDB 中的音频 Blob、字幕与练习记录不受影响。\n\n清理全部媒体缓存"}
+3 more video/cache => PASS
+shot 30-audio-dictation.png
+4 pure audio => PASS
