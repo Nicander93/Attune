@@ -19,6 +19,8 @@ type Props = {
   onNotice: (message: string) => void;
 };
 
+type AdvancedPanel = 'more' | 'settings' | 'cache' | 'video' | null;
+
 /** Reads the real duration so a material is never created without knowing its length. */
 async function readAudioDuration(file: File): Promise<number> {
   const url = URL.createObjectURL(file);
@@ -38,8 +40,15 @@ async function readAudioDuration(file: File): Promise<number> {
   }
 }
 
-const dropHint = '点击选择，或把文件拖到这里';
+function isVideoFile(file: File): boolean {
+  if (file.type.startsWith('video/')) return true;
+  return /\.(mp4|mkv|mov|webm|avi|m4v)$/i.test(file.name);
+}
 
+/**
+ * S2 import converge (V2): drag/choose → ready → 校对字幕 / 开始听写.
+ * Advanced items (字幕文件、识别、缓存、视频/ffmpeg) live under「更多」, not parallel prep panes.
+ */
 export function MaterialPrepPage({
   material,
   update,
@@ -51,21 +60,21 @@ export function MaterialPrepPage({
   const audioInput = useRef<HTMLInputElement>(null);
   const subtitleInput = useRef<HTMLInputElement>(null);
   const renameInput = useRef<HTMLInputElement>(null);
+  const moreWrap = useRef<HTMLDivElement>(null);
   const [error, setError] = useState('');
   const [audioBusy, setAudioBusy] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [advanced, setAdvanced] = useState<AdvancedPanel>(null);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(material.displayName);
-  const [dragging, setDragging] = useState<'audio' | 'subtitle' | null>(null);
-
-    const pendingAsr = useRef(false);
+  const [dragging, setDragging] = useState(false);
+  const pendingAsr = useRef(false);
 
   const recognition = useRecognition({
     onRecognized: (_id, segments) => {
       try {
         update((m) => applySubtitleTimeline(m, segments, 'asr', 'unreviewed'));
         onNotice(
-          `\u8bc6\u522b\u5b8c\u6210\uff0c\u5171 ${segments.length} \u53e5\u3002ASR \u7ed3\u679c\u4ec5\u4f9b\u53c2\u8003\uff0c\u8bf7\u6821\u5bf9\u540e\u518d\u5f00\u59cb\u542c\u5199\u3002`,
+          `识别完成，共 ${segments.length} 句。ASR 结果仅供参考，请校对后再开始听写。`,
         );
       } catch (err) {
         setError(String(err));
@@ -77,6 +86,17 @@ export function MaterialPrepPage({
 
   const hasAudio = material.duration > 0;
   const hasSubtitles = material.segments.some((s) => s.reference.trim());
+  const needsReview =
+    !hasSubtitles || material.subtitleReviewStatus === 'unreviewed';
+  const processing = audioBusy || !!recognition.task;
+  const kind = material.video ? 'video' : 'audio';
+  const statusText = processing
+    ? recognition.task?.label || '正在准备…'
+    : !hasAudio
+      ? ''
+      : needsReview
+        ? '字幕待校对'
+        : '已就绪';
 
   useEffect(() => {
     if (!pendingAsr.current) return;
@@ -85,8 +105,33 @@ export function MaterialPrepPage({
     recognition.start(material);
   }, [material, hasAudio, hasSubtitles, recognition]);
 
+  useEffect(() => {
+    if (advanced !== 'more') return;
+    function onDocClick(event: MouseEvent) {
+      if (!moreWrap.current?.contains(event.target as Node)) setAdvanced(null);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setAdvanced(null);
+    }
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [advanced]);
+
   async function importAudio(file?: File) {
     if (!file) return;
+    if (isVideoFile(file)) {
+      if (!isDesktop()) {
+        setError('视频导入需要桌面版；请用「更多 → 导入视频」或改用音频文件。');
+        return;
+      }
+      setAdvanced('video');
+      onNotice('请在下方视频面板选择本地视频（桌面版走 ffmpeg 探测与抽轨）。');
+      return;
+    }
     setError('');
     setAudioBusy(true);
     try {
@@ -132,6 +177,7 @@ export function MaterialPrepPage({
   function beginRename() {
     setRenameValue(material.displayName);
     setRenaming(true);
+    setAdvanced(null);
     requestAnimationFrame(() => {
       renameInput.current?.focus();
       renameInput.current?.select();
@@ -156,280 +202,310 @@ export function MaterialPrepPage({
     setRenaming(false);
   }
 
-  function openRecognitionSettings() {
-    const open = !settingsOpen;
-    setSettingsOpen(open);
-    if (open) void recognition.refreshModels().catch((err) => setError(String(err)));
+  function openAdvanced(panel: Exclude<AdvancedPanel, 'more' | null>) {
+    setAdvanced(panel);
+    if (panel === 'settings') {
+      void recognition.refreshModels().catch((err) => setError(String(err)));
+    }
   }
 
-  function renderAudioDropzone() {
-    return (
-      <article
-        className={`dropzone${dragging === 'audio' ? ' is-dragging' : ''}`}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragging('audio');
-        }}
-        onDragLeave={() => setDragging(null)}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragging(null);
-          void importAudio(event.dataTransfer.files[0]);
-        }}
-      >
-        <h2>
-          音频 <span className="caption">必需</span>
-        </h2>
-        <p className="muted">{material.originalFileName || '还没有音频'}</p>
-        <p className="muted">{formatTime(material.duration)}</p>
-        <button
-          className="primary"
-          disabled={audioBusy}
-          onClick={() => audioInput.current?.click()}
-        >
-          {audioBusy ? '正在读取…' : '选择音频'}
-        </button>
-        <p className="muted prep__hint">{dropHint} · MP3 / WAV / M4A</p>
-      </article>
-    );
+  function clearAllCache() {
+    if (!window.confirm('清理全部媒体缓存？视频素材需要时请在「更多 → 导入视频」中重建播放副本。'))
+      return;
+    void clearAllMediaCache()
+      .then(() => {
+        update((m) => clearPlaybackPath(m));
+        onNotice('已清理全部媒体缓存。');
+        setAdvanced(null);
+      })
+      .catch((err) => setError(String(err)));
   }
 
-  function renderSubtitleDropzone() {
-    return (
-      <article
-        className={`dropzone${dragging === 'subtitle' ? ' is-dragging' : ''}`}
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragging('subtitle');
-        }}
-        onDragLeave={() => setDragging(null)}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragging(null);
-          void importSubtitles(event.dataTransfer.files[0]);
-        }}
+  const moreMenu = (
+    <div className="menu-wrap" ref={moreWrap}>
+      <button
+        type="button"
+        className="quiet"
+        aria-expanded={advanced === 'more'}
+        aria-haspopup="menu"
+        onClick={() => setAdvanced(advanced === 'more' ? null : 'more')}
       >
-        <h2>
-          字幕 <span className="caption">可选</span>
-        </h2>
-        <p className="muted">
-          {hasSubtitles ? `已导入 ${material.segments.length} 句` : '还没有字幕'}
-        </p>
-        <p className="muted">
-          {hasSubtitles ? '可以随时换成别的字幕文件。' : '没有字幕也能听，但无法核对答案。'}
-        </p>
-        <div className="row">
-          <button onClick={() => subtitleInput.current?.click()}>选择字幕文件</button>
+        更多 ···
+      </button>
+      {advanced === 'more' && (
+        <div className="menu menu--right" role="menu">
+          {hasSubtitles && (
+            <button type="button" role="menuitem" onClick={() => { setAdvanced(null); onSubtitles(); }}>
+              校对字幕
+            </button>
+          )}
           <button
-            disabled={!isDesktop() || !!recognition.task || !hasAudio}
-            title={isDesktop() ? undefined : '语音识别需要桌面版'}
-            onClick={openRecognitionSettings}
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setAdvanced(null);
+              subtitleInput.current?.click();
+            }}
           >
+            导入字幕文件
+          </button>
+          <button type="button" role="menuitem" onClick={() => openAdvanced('settings')}>
             识别设置
           </button>
-          {hasSubtitles && <button onClick={onSubtitles}>校对字幕</button>}
-        </div>
-        <p className="muted prep__hint">{dropHint} · SRT / VTT，双语字幕会自动分成英文和中文两行</p>
-      </article>
-    );
-  }
-
-  return (
-    <section className="prep">
-      <header className="prep__head">
-        <button className="quiet back" onClick={onBack}>
-          ← 返回
-        </button>
-        <div className="prep__summary">
-          <p className="eyebrow">素材准备</p>
-          {renaming ? (
-            <div className="prep__rename-form">
-              <input
-                ref={renameInput}
-                className="prep__rename"
-                aria-label="素材名称"
-                value={renameValue}
-                onChange={(event) => setRenameValue(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-                  if (event.key === 'Enter') saveRename();
-                  if (event.key === 'Escape') cancelRename();
-                }}
-              />
-              <button onClick={saveRename}>保存</button>
-              <button className="quiet" onClick={cancelRename}>
-                取消
-              </button>
-            </div>
-          ) : (
-            <h1 aria-label={material.displayName}>
-              {material.displayName}{' '}
-              <button className="quiet prep__rename" onClick={beginRename}>
-                重命名
-              </button>
-            </h1>
+          {isDesktop() && (
+            <button type="button" role="menuitem" onClick={() => openAdvanced('video')}>
+              导入视频
+            </button>
+          )}
+          {isDesktop() && (
+            <button type="button" role="menuitem" onClick={() => openAdvanced('cache')}>
+              缓存管理
+            </button>
+          )}
+          {hasAudio && (
+            <button type="button" role="menuitem" onClick={beginRename}>
+              重命名
+            </button>
+          )}
+          {hasAudio && (
+            <button
+              type="button"
+              role="menuitem"
+              disabled={!hasAudio}
+              onClick={() => {
+                setAdvanced(null);
+                onStudy('reading');
+              }}
+            >
+              开始听读
+            </button>
           )}
         </div>
-        <span className="muted">
-          {hasAudio ? `${formatTime(material.duration)} · 音频已添加` : '缺少音频'}
-        </span>
-      </header>
-
-      {error && (
-        <p className="banner banner--error" role="alert">
-          {error}
-          <button className="quiet" onClick={() => setError('')}>
-            关闭
-          </button>
-        </p>
       )}
+    </div>
+  );
 
-      
-      {material.subtitleOrigin && material.subtitleReviewStatus === 'unreviewed' && hasSubtitles && (
-        <p className="banner" role="status">
-          {material.subtitleOrigin === 'asr'
-            ? '\u5f53\u524d\u5b57\u5e55\u6765\u81ea\u8bed\u97f3\u8bc6\u522b\uff08ASR\uff09\uff0c\u5c1a\u672a\u6821\u5bf9\uff0c\u4e0d\u5e94\u4f5c\u4e3a\u6700\u7ec8\u7b54\u6848\u3002'
-            : material.subtitleOrigin === 'embedded'
-              ? '\u5f53\u524d\u5b57\u5e55\u6765\u81ea\u5185\u5d4c\u8f68\uff0c\u5c1a\u672a\u6821\u5bf9\u3002'
-              : material.subtitleOrigin === 'ocr'
-                ? '\u5f53\u524d\u5b57\u5e55\u6765\u81ea OCR\uff08\u70e7\u5f55/\u56fe\u5f62\uff09\uff0c\u5c1a\u672a\u6821\u5bf9\uff0c\u4e0d\u5e94\u4f5c\u4e3a\u6700\u7ec8\u7b54\u6848\u3002'
-                : '\u5b57\u5e55\u5c1a\u672a\u6821\u5bf9\u3002'}
-          <button onClick={onSubtitles}>{'\u53bb\u6821\u5bf9'}</button>
-        </p>
-      )}
+  return (
+    <section className="prep import">
+      <div className="import__body">
+        <button type="button" className="quiet back import__back" onClick={onBack}>
+          ← 返回
+        </button>
+        <h1 className="import__heading">导入素材</h1>
 
-      <div className="prep__content">
-        <VideoImportPanel
-          material={material}
-          update={update}
-          onNotice={onNotice}
-          onError={setError}
-          onNeedAsr={() => {
-            pendingAsr.current = true;
-          }}
-        />
+        {error && (
+          <p className="banner banner--error" role="alert">
+            {error}
+            <button type="button" className="quiet" onClick={() => setError('')}>
+              关闭
+            </button>
+          </p>
+        )}
 
-      {isDesktop() && (
-        <article className="prep__section">
-          <div className="prep__summary">
-            <h2>媒体缓存</h2>
+        {!hasAudio && (
+          <div
+            className={`dropzone import__drop${dragging ? ' is-dragging' : ''}`}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragging(false);
+              void importAudio(event.dataTransfer.files[0]);
+            }}
+          >
+            <div className="import__upload-title">音频或视频</div>
+            <button
+              type="button"
+              className="secondary"
+              disabled={audioBusy}
+              onClick={() => audioInput.current?.click()}
+            >
+              {audioBusy ? '正在读取…' : '选择文件'}
+            </button>
+            <p className="muted import__hint">或拖入文件 · MP3 / WAV / M4A；视频请用「更多 → 导入视频」</p>
+            <div className="import__empty-more">{moreMenu}</div>
+          </div>
+        )}
+
+        {hasAudio && (
+          <>
+            <div className="import__file">
+              <span className="import__file-icon" aria-hidden="true">
+                {kind === 'video' ? '▣' : '♫'}
+              </span>
+              <div className="import__file-info">
+                {renaming ? (
+                  <div className="prep__rename-form">
+                    <input
+                      ref={renameInput}
+                      className="prep__rename"
+                      aria-label="素材名称"
+                      value={renameValue}
+                      onChange={(event) => setRenameValue(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+                        if (event.key === 'Enter') saveRename();
+                        if (event.key === 'Escape') cancelRename();
+                      }}
+                    />
+                    <button type="button" onClick={saveRename}>
+                      保存
+                    </button>
+                    <button type="button" className="quiet" onClick={cancelRename}>
+                      取消
+                    </button>
+                  </div>
+                ) : (
+                  <strong>{material.displayName}</strong>
+                )}
+                <span>
+                  {formatTime(material.duration)} · {kind === 'video' ? '视频' : '音频'}
+                  {material.originalFileName ? ` · ${material.originalFileName}` : ''}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="quiet"
+                disabled={audioBusy}
+                onClick={() => audioInput.current?.click()}
+              >
+                更换
+              </button>
+            </div>
+
+            {statusText && (
+              <p className={`import__status${needsReview && !processing ? ' import__status--warn' : ''}`}>
+                {statusText}
+              </p>
+            )}
+
+            {material.subtitleOrigin &&
+              material.subtitleReviewStatus === 'unreviewed' &&
+              hasSubtitles && (
+                <p className="banner" role="status">
+                  {material.subtitleOrigin === 'asr'
+                    ? '当前字幕来自语音识别（ASR），尚未校对，不应作为最终答案。'
+                    : material.subtitleOrigin === 'embedded'
+                      ? '当前字幕来自内嵌轨，尚未校对。'
+                      : material.subtitleOrigin === 'ocr'
+                        ? '当前字幕来自 OCR（烧录/图形），尚未校对，不应作为最终答案。'
+                        : '字幕尚未校对。'}
+                  <button type="button" onClick={onSubtitles}>
+                    去校对
+                  </button>
+                </p>
+              )}
+
+            <div className="import__actions">
+              {moreMenu}
+              <div className="import__actions-right">
+                {needsReview && hasSubtitles && !processing && (
+                  <button type="button" className="secondary" onClick={onSubtitles}>
+                    校对字幕
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={!hasSubtitles || !hasAudio || processing}
+                  title={!hasSubtitles ? '请先导入字幕或完成识别' : undefined}
+                  onClick={() => onStudy('dictation')}
+                >
+                  开始听写 →
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {recognition.task && (
+          <p className="banner" role="status">
+            {recognition.task.label}
+            {recognition.task.percent !== undefined && (
+              <progress max={100} value={recognition.task.percent} />
+            )}
+            {recognition.task.cancel && (
+              <button type="button" className="quiet" onClick={recognition.task.cancel}>
+                取消
+              </button>
+            )}
+          </p>
+        )}
+
+        {advanced === 'settings' && (
+          <section className="import__advanced" aria-label="识别设置">
+            <div className="import__advanced-head">
+              <h2>识别设置</h2>
+              <button type="button" className="quiet" onClick={() => setAdvanced(null)}>
+                收起
+              </button>
+            </div>
+            <p className="muted">仅在默认识别失败时才需要调整音轨、OCR 或语音识别选项。</p>
+            <RecognitionSettings
+              settings={recognition.settings}
+              models={recognition.models}
+              busy={!!recognition.task}
+              onChange={recognition.changeSettings}
+              onDownload={recognition.downloadSelected}
+              onImport={recognition.importLocal}
+              onClose={() => setAdvanced(null)}
+            />
+            <button
+              type="button"
+              className="primary"
+              disabled={!isDesktop() || !!recognition.task || !hasAudio}
+              title={isDesktop() ? undefined : '语音识别需要桌面版'}
+              onClick={() => recognition.start(material)}
+            >
+              开始识别
+            </button>
+          </section>
+        )}
+
+        {advanced === 'cache' && isDesktop() && (
+          <section className="import__advanced" aria-label="缓存管理">
+            <div className="import__advanced-head">
+              <h2>缓存管理</h2>
+              <button type="button" className="quiet" onClick={() => setAdvanced(null)}>
+                收起
+              </button>
+            </div>
             <p className="muted">
               清理应用数据目录下 media/ 中的播放副本与抽轨临时文件。IndexedDB 中的音频 Blob、字幕与练习记录不受影响。
             </p>
-          </div>
-          <div className="prep__actions">
-            <button
-              className="quiet"
-              onClick={() => {
-                if (
-                  !window.confirm(
-                    '清理全部媒体缓存？视频素材需要时请在准备页重建播放副本。',
-                  )
-                )
-                  return;
-                void clearAllMediaCache()
-                  .then(() => {
-                    update((m) => clearPlaybackPath(m));
-                    onNotice('已清理全部媒体缓存。');
-                  })
-                  .catch((err) => setError(String(err)));
-              }}
-            >
+            <button type="button" className="quiet" onClick={clearAllCache}>
               清理全部媒体缓存
             </button>
-          </div>
-        </article>
-      )}
+          </section>
+        )}
 
-        {hasAudio ? (
-          <div className="prep__section-list">
-            <article
-              className={`prep__section${dragging === 'audio' ? ' is-dragging' : ''}`}
-              onDragOver={(event) => {
-                event.preventDefault();
-                setDragging('audio');
+        {advanced === 'video' && (
+          <section className="import__advanced import__advanced--video" aria-label="导入视频">
+            <div className="import__advanced-head">
+              <h2>导入视频</h2>
+              <button type="button" className="quiet" onClick={() => setAdvanced(null)}>
+                收起
+              </button>
+            </div>
+            <VideoImportPanel
+              material={material}
+              update={update}
+              onNotice={onNotice}
+              onError={setError}
+              onNeedAsr={() => {
+                pendingAsr.current = true;
               }}
-              onDragLeave={() => setDragging(null)}
-              onDrop={(event) => {
-                event.preventDefault();
-                setDragging(null);
-                void importAudio(event.dataTransfer.files[0]);
-              }}
-            >
-              <span className="prep__symbol" aria-hidden="true">
-                ♫
-              </span>
-              <div className="prep__summary">
-                <h2>音频</h2>
-                <p className="muted">
-                  {material.originalFileName} · {formatTime(material.duration)}
-                </p>
-              </div>
-              <div className="prep__actions">
-                <button disabled={audioBusy} onClick={() => audioInput.current?.click()}>
-                  {audioBusy ? '正在读取…' : '更换音频'}
-                </button>
-                <span className="muted prep__hint">拖入音频以更换</span>
-              </div>
-            </article>
-
-            <article
-              className={`prep__section${dragging === 'subtitle' ? ' is-dragging' : ''}`}
-              onDragOver={(event) => {
-                event.preventDefault();
-                setDragging('subtitle');
-              }}
-              onDragLeave={() => setDragging(null)}
-              onDrop={(event) => {
-                event.preventDefault();
-                setDragging(null);
-                void importSubtitles(event.dataTransfer.files[0]);
-              }}
-            >
-              <span className="prep__symbol" aria-hidden="true">
-                ≡
-              </span>
-              <div className="prep__summary">
-                <h2>字幕</h2>
-                <p className="muted">
-                  {hasSubtitles
-                    ? `已导入 ${material.segments.length} 句 · 可继续校对`
-                    : '尚无字幕，可以导入或自动生成'}
-                </p>
-              </div>
-              <div className="prep__actions">
-                <button onClick={() => subtitleInput.current?.click()}>导入字幕</button>
-                {hasSubtitles && <button onClick={onSubtitles}>校对字幕</button>}
-                <span className="muted prep__hint">拖入 SRT / VTT 文件</span>
-              </div>
-            </article>
-
-            <article className="prep__section">
-              <span className="prep__symbol" aria-hidden="true">
-                文
-              </span>
-              <div className="prep__summary">
-                <h2>中文翻译</h2>
-                <p className="muted">
-                  {material.segments.some((s) => s.translation?.trim())
-                    ? '部分字幕已有译文'
-                    : '未提供译文，可导入双语字幕；听读时显示英文'}
-                </p>
-              </div>
-              <span className="muted">可选</span>
-            </article>
-          </div>
-        ) : (
-          <div className="prep__panes">
-            {renderAudioDropzone()}
-            {renderSubtitleDropzone()}
-          </div>
+            />
+          </section>
         )}
 
         <input
           ref={audioInput}
           type="file"
-          accept="audio/*,.mp3,.wav,.m4a,.ogg,.flac"
+          accept="audio/*,video/*,.mp3,.wav,.m4a,.ogg,.flac,.mp4,.mkv,.mov,.webm"
           hidden
           onChange={(event) => {
             void importAudio(event.target.files?.[0]);
@@ -446,72 +522,7 @@ export function MaterialPrepPage({
             event.target.value = '';
           }}
         />
-
-        {recognition.task && (
-          <p className="banner" role="status">
-            {recognition.task.label}
-            {recognition.task.percent !== undefined && (
-              <progress max={100} value={recognition.task.percent} />
-            )}
-            {recognition.task.cancel && (
-              <button className="quiet" onClick={recognition.task.cancel}>
-                取消
-              </button>
-            )}
-          </p>
-        )}
-
-        <section className="prep__recognition">
-          <button
-            className="quiet prep__recognition-toggle"
-            aria-expanded={settingsOpen}
-            onClick={openRecognitionSettings}
-          >
-            {settingsOpen ? '收起识别设置' : '本地识别原文'}
-            <span aria-hidden="true">{settingsOpen ? '−' : '+'}</span>
-          </button>
-          {settingsOpen && (
-            <div className="prep__recognition-content">
-              <RecognitionSettings
-                settings={recognition.settings}
-                models={recognition.models}
-                busy={!!recognition.task}
-                onChange={recognition.changeSettings}
-                onDownload={recognition.downloadSelected}
-                onImport={recognition.importLocal}
-                onClose={() => setSettingsOpen(false)}
-              />
-              <button
-                className="primary"
-                disabled={!isDesktop() || !!recognition.task || !hasAudio}
-                title={isDesktop() ? undefined : '语音识别需要桌面版'}
-                onClick={() => recognition.start(material)}
-              >
-                开始识别
-              </button>
-            </div>
-          )}
-        </section>
       </div>
-
-      <footer className="prep__foot">
-        <p className="muted">
-          {hasSubtitles ? '准备完成，可以开始听写。' : '没有字幕时无法核对答案，但可以先听音频。'}
-        </p>
-        <div className="prep__actions">
-          <button
-            className="primary"
-            onClick={() => onStudy('dictation')}
-            disabled={!hasSubtitles || !hasAudio}
-            title={!hasSubtitles ? '请先导入字幕或完成识别' : undefined}
-          >
-            开始听写
-          </button>
-          <button onClick={() => onStudy('reading')} disabled={!hasAudio}>
-            开始听读
-          </button>
-        </div>
-      </footer>
     </section>
   );
 }
