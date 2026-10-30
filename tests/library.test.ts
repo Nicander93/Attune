@@ -7,6 +7,7 @@ import {
   folderRows,
   materialRow,
   progressLabel,
+  libraryStatusLabel,
   sortMaterials,
 } from '../src/features/library/listing';
 
@@ -144,5 +145,46 @@ describe('rename default', () => {
   it('offers the file name without its extension', () => {
     expect(defaultRenameValue(make('a', { displayName: 'lesson.mp3' }))).toBe('lesson');
     expect(defaultRenameValue(make('b', { displayName: 'lesson' }))).toBe('lesson');
+  });
+});
+
+describe('library status', () => {
+  it('prefers 待校对 over progress when subtitles are unreviewed', () => {
+    const row = materialRow(
+      make('a', {
+        subtitleReviewStatus: 'unreviewed',
+        segments: [{ id: 's1', start: 0, end: 1, reference: 'Hi.', words: [] }],
+        rounds: [round(['s1'])],
+        activeRoundId: 'r1',
+      }),
+    );
+    expect(row.needsReview).toBe(true);
+    expect(libraryStatusLabel(row)).toBe('待校对');
+  });
+
+  it('shows compact progress when reviewed or legacy', () => {
+    const row = materialRow(
+      make('a', {
+        subtitleReviewStatus: 'reviewed',
+        segments: [{ id: 's1', start: 0, end: 1, reference: 'Hi.', words: [] }],
+        rounds: [round(['s1'])],
+        activeRoundId: 'r1',
+      }),
+    );
+    expect(libraryStatusLabel(row)).toBe('1 / 1');
+  });
+
+  it('marks video materials', () => {
+    const row = materialRow(
+      make('v', {
+        video: {
+          originalName: 'clip.mp4',
+          sourcePath: 'D:/x.mp4',
+          clipStart: 0,
+          clipEnd: 10,
+        },
+      }),
+    );
+    expect(row.kind).toBe('video');
   });
 });

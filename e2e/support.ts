@@ -29,40 +29,53 @@ export function wav(seconds = 4): Buffer {
  * for a migration. The audio is rebuilt inside the page because a Node Buffer would
  * arrive as a plain object rather than a Blob.
  */
-export async function seed(page: Page, materials: { audio: Buffer; [key: string]: unknown }[]) {
+export async function seed(
+  page: Page,
+  materials: { audio: Buffer; [key: string]: unknown }[],
+  folders: { id: string; name: string; createdAt?: string }[] = [],
+) {
   await page.goto('/');
   const rows = materials.map((m) => ({ ...m, audio: m.audio.toString('base64') }));
-  await page.evaluate(async (data) => {
-    await new Promise<void>((resolve, reject) => {
-      const open = indexedDB.open('attune', 3);
-      open.onupgradeneeded = () => {
-        const db = open.result;
-        for (const name of ['materials', 'folders', 'audio'])
-          if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' });
-        if (!db.transaction!.objectStore('materials').indexNames.contains('by-folder'))
-          db.transaction!.objectStore('materials').createIndex('by-folder', 'folderId');
-      };
-      open.onerror = () => reject(open.error);
-      open.onsuccess = () => {
-        const db = open.result;
-        const tx = db.transaction(['materials', 'audio'], 'readwrite');
-        for (const row of data as any[]) {
-          const { audio, ...record } = row;
-          const bytes = Uint8Array.from(atob(audio), (c) => c.charCodeAt(0));
-          tx.objectStore('materials').put(record);
-          tx.objectStore('audio').put({
-            id: record.id,
-            blob: new Blob([bytes], { type: 'audio/wav' }),
-          });
-        }
-        tx.onerror = () => reject(tx.error);
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
+  await page.evaluate(
+    async ({ data, folderRows }) => {
+      await new Promise((resolve, reject) => {
+        const open = indexedDB.open('attune', 3);
+        open.onupgradeneeded = () => {
+          const db = open.result;
+          for (const name of ['materials', 'folders', 'audio'])
+            if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' });
+          if (!db.transaction.objectStore('materials').indexNames.contains('by-folder'))
+            db.transaction.objectStore('materials').createIndex('by-folder', 'folderId');
         };
-      };
-    });
-  }, rows);
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result;
+          const tx = db.transaction(['materials', 'audio', 'folders'], 'readwrite');
+          for (const row of data) {
+            const { audio, ...record } = row;
+            const bytes = Uint8Array.from(atob(audio), (c) => c.charCodeAt(0));
+            tx.objectStore('materials').put(record);
+            tx.objectStore('audio').put({
+              id: record.id,
+              blob: new Blob([bytes], { type: 'audio/wav' }),
+            });
+          }
+          for (const folder of folderRows) {
+            tx.objectStore('folders').put({
+              createdAt: '2026-03-01T08:00:00Z',
+              ...folder,
+            });
+          }
+          tx.onerror = () => reject(tx.error);
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+        };
+      });
+    },
+    { data: rows, folderRows: folders },
+  );
   await page.reload();
 }
 

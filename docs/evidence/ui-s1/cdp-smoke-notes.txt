@@ -1,0 +1,17 @@
+tip ee7fedd1f417e9f2d89c8b6de2817c2287f02f68
+waiting CDP 9222...
+page http://localhost:1420/
+shot 01-home-shell.png
+nav ["首页","素材库"] import=true
+resume {"resumeTitle":"h264_aac_subs","hasContinue":true}
+shot 02-home-continue-card.png
+shot 03-after-continue-study.png
+1 continue entered=true
+shot 10-library-all.png
+shot 11-library-search.png
+shot 14-library-search-empty.png
+shot 12-library-folder.png
+shot 13-library-sort-name.png
+2 searchPass=true folder=true sort=true
+shot 20-opened-existing.png
+3 open 未命名素材 ok=true

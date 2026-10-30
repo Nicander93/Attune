@@ -1,0 +1,91 @@
+{
+  "tip": "ee7fedd1f417e9f2d89c8b6de2817c2287f02f68",
+  "branch": "feat/ui-s1-shell",
+  "when": "2026-10-30T09:56:08.932Z",
+  "item1_home_continue_card": "PASS",
+  "item2_library_search_folder_sort": "PASS",
+  "item3_open_existing_material": "PASS",
+  "shell_nav_home_library_only": "PASS",
+  "cta_import_material": "PASS",
+  "all": "PASS",
+  "evidence_dir": "docs/evidence/ui-s1/",
+  "detail": {
+    "navButtons": [
+      "首页",
+      "素材库"
+    ],
+    "hasImportCta": true,
+    "resumeTitle": "h264_aac_subs",
+    "hasContinue": true,
+    "afterContinue": {
+      "hasStudy": true,
+      "hasBack": true,
+      "h1": "第 1 / 2 句",
+      "bodySlice": "Attune\n首页\n素材库\n← 返回\n已听写 1 / 2 句\nh264_aac_subs\n第 1 / 2 句\n⏮\n▶\n⏭\n↻ 重听本句\n0.5×\n0.75×\n1×\n1.25×\n1.5×\n 单句循环\n 按句\n 连续\n00:03 / 00:03\n听写听读\n 只看难句（0）\n 按键音\n轮次\n第 1 / 2 句\n00:00 — 00:01\n☆ 标记难句\nHello\n\n核对结果\n\nHello from embedded subtitle\n\n漏写：from、embedded、subtitle · Enter 下一句 · Esc 回到修改\n\n看画面\n\nEnter 核对 / 下一句 · Space 播放 · Esc 退出输入后 ← → 切句\n完整原文 ↗\n字幕校对\n素材设置"
+    },
+    "libraryBefore": {
+      "beforeCountText": "当前文件夹 · 25 段",
+      "beforeRows": 25
+    },
+    "firstMaterialName": "h264_audio",
+    "search": {
+      "probe": "h264",
+      "afterSearchRows": 11,
+      "afterSearchCount": "搜索「h264」，已忽略文件夹 · 11 段"
+    },
+    "nonsenseRows": 0,
+    "folderOptions": [
+      "全部素材",
+      "未分类"
+    ],
+    "sortOptions": [
+      "最近学习",
+      "名称",
+      "时长"
+    ],
+    "folder": {
+      "pick": {
+        "value": "__uncategorized__",
+        "text": "未分类"
+      },
+      "folderRows": 25,
+      "folderCountText": "当前文件夹 · 25 段",
+      "allCount": 25
+    },
+    "sort": {
+      "namesBefore": [
+        "h264_audio",
+        "h264_aac_subs",
+        "h264_aac_subs",
+        "h264_aac_subs",
+        "h264_aac_subs",
+        "h264_audio",
+        "h264_aac",
+        "未命名素材"
+      ],
+      "namesAfter": [
+        "未命名素材",
+        "未命名素材",
+        "未命名素材",
+        "未命名素材",
+        "未命名素材",
+        "未命名素材",
+        "a82baaf4-0a91-4d43-8ab6-78f72cef8fce.mp3",
+        "burned_in_en"
+      ]
+    },
+    "item2": {
+      "searchPass": true,
+      "folderControlPresent": true,
+      "sortControlPresent": true,
+      "folderFilterWorked": true,
+      "afterSearchRows": 11
+    },
+    "opened": {
+      "openName": "未命名素材",
+      "body": "Attune\n首页\n素材库\n← 返回\n未命名素材\n未命名素材\n0 句 · 英语听写\n⏮\n▶\n⏭\n↻ 重听本句\n0.5×\n0.75×\n1×\n1.25×\n1.5×\n 单句循环\n 按句\n 连续\n00:00 / 00:00\n\n本素材的音频无法读取，请重新导入。\n\n这段素材还没有字幕，可以先听音频，但无法核对答案。\n\n去准备字幕",
+      "hasBack": true,
+      "notLibrary": true
+    }
+  }
+}
