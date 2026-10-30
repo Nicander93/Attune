@@ -55,13 +55,18 @@ export function StudyPage({
   const [showHistory, setShowHistory] = useState(false);
   const [keySounds, setKeySounds] = useState(material.studySettings?.keySounds ?? false);
   const [volume, setVolume] = useState(material.studySettings?.volume ?? 0.25);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [sentenceOpen, setSentenceOpen] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
+  const menuWrap = useRef<HTMLDivElement>(null);
   function updateStudySettings(settings: NonNullable<Material['studySettings']>) {
     update((m) => ({ ...m, studySettings: { ...m.studySettings, ...settings } }));
   }
 
   function changeView(next: 'dictation' | 'reading') {
     setView(next);
+    setMenuOpen(false);
+    setSentenceOpen(false);
     update((m) => ({ ...m, lastView: next }));
     if (!material.playbackSettings) player.setMode(next === 'reading' ? 'continuous' : 'segment');
   }
@@ -79,6 +84,7 @@ export function StudyPage({
   function selectSentence(id: string, checked = false) {
     setEditingId(id);
     setChecked(checked);
+    setSentenceOpen(false);
     update((m) => {
       const next = ensureRound(m);
       return {
@@ -207,6 +213,20 @@ export function StudyPage({
     }
   }, [scope, editingId]);
 
+  useEffect(() => {
+    if (!menuOpen && !sentenceOpen) return;
+    const onPointer = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (menuWrap.current?.contains(target)) return;
+      if (target?.closest('.study__sentence-pop')) return;
+      if (target?.closest('.study__count')) return;
+      setMenuOpen(false);
+      setSentenceOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer);
+    return () => document.removeEventListener('mousedown', onPointer);
+  }, [menuOpen, sentenceOpen]);
+
   // Arrow keys navigate sentences only when nothing is being typed into, so ← and →
   // keep moving the caret while the user is writing.
   useEffect(() => {
@@ -220,6 +240,21 @@ export function StudyPage({
         )
       )
         return;
+      if (event.key === 'Escape') {
+        if (menuOpen || sentenceOpen) {
+          event.preventDefault();
+          setMenuOpen(false);
+          setSentenceOpen(false);
+          return;
+        }
+        if (checked && view === 'dictation') {
+          event.preventDefault();
+          selectSentence(editingId);
+          field.current?.focus();
+          return;
+        }
+        return;
+      }
       if (event.key === 'ArrowLeft') {
         event.preventDefault();
         goTo(index - 1);
@@ -232,7 +267,7 @@ export function StudyPage({
       } else if (event.key === 'Enter' && !(target instanceof HTMLButtonElement)) {
         event.preventDefault();
         if (checked) goTo(index + 1);
-        else check();
+        else if (view === 'dictation') check();
       }
     };
     document.addEventListener('keydown', onKey);
@@ -313,28 +348,19 @@ export function StudyPage({
     );
   }
 
+  const bookmarked = segment ? material.bookmarkedSegmentIds.includes(segment.id) : false;
+
   return (
-    <section className="study study--workbench">
-      <header className="study__head">
+    <section className="study study--workbench study--focus">
+      <header className="study__head study__head--focus">
         <button className="quiet back" onClick={onBack}>
           ← 返回
         </button>
-        <span className="muted">
-          已听写 {round?.completedSegmentIds.length ?? 0} / {material.segments.length} 句
+        <span className="study__file muted" title={material.displayName}>
+          {material.displayName}
         </span>
-      </header>
-
-      <Player
-        material={material}
-        player={player}
-        onStepSentence={stepSentence}
-        hasPrevious={index > 0}
-        hasNext={index >= 0 && index < scope.length - 1}
-        status={`第 ${index + 1} / ${scope.length} 句`}
-      />
-
-      <div className="tabs">
-        <div className="mode" role="tablist">
+        <span className="study__head-spacer" />
+        <div className="mode study__mode" role="tablist" aria-label="学习模式">
           <button
             role="tab"
             aria-selected={view === 'dictation'}
@@ -350,6 +376,191 @@ export function StudyPage({
             听读
           </button>
         </div>
+        <div className="study__menu-wrap" ref={menuWrap}>
+          <button
+            type="button"
+            className="quiet study__more"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            aria-label="更多"
+            title="更多"
+            onClick={() => {
+              setSentenceOpen(false);
+              setMenuOpen((open) => !open);
+            }}
+          >
+            ···
+          </button>
+          {menuOpen && (
+            <div className="study__menu" role="menu">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setSentenceOpen(true);
+                }}
+              >
+                句子列表
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setBookmarkedOnly(!bookmarkedOnly);
+                  updateStudySettings({ bookmarkedOnly: !bookmarkedOnly });
+                  setChecked(false);
+                  setMenuOpen(false);
+                }}
+              >
+                {bookmarkedOnly ? '查看全部句子' : '只看难句'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setKeySounds(!keySounds);
+                  updateStudySettings({ keySounds: !keySounds });
+                }}
+              >
+                {keySounds ? '关闭按键音' : '开启按键音'}
+              </button>
+              {keySounds && (
+                <label className="study__menu-volume" role="none">
+                  音量
+                  <input
+                    type="range"
+                    aria-label="按键音量"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={volume}
+                    onChange={(event) => {
+                      setVolume(Number(event.target.value));
+                      updateStudySettings({ volume: Number(event.target.value) });
+                    }}
+                  />
+                </label>
+              )}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setShowHistory(true);
+                }}
+              >
+                练习轮次
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onSubtitles();
+                }}
+              >
+                校对字幕
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onTranscript();
+                }}
+              >
+                完整原文
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onPrepare();
+                }}
+              >
+                素材设置
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onNotice(
+                    'Enter：核对 / 下一句；Space：播放 / 暂停（输入框外）；左右方向键：切句（输入框外）；Esc：从核对返回修改。',
+                  );
+                }}
+              >
+                快捷键
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
+
+      <div className="study__status">
+        <button
+          type="button"
+          className="study__count"
+          aria-expanded={sentenceOpen}
+          onClick={() => {
+            setMenuOpen(false);
+            setSentenceOpen((open) => !open);
+          }}
+        >
+          <strong>{String(index + 1).padStart(2, '0')}</strong>
+          <span> / {String(scope.length).padStart(2, '0')}</span>
+          <span aria-hidden="true"> ⌄</span>
+        </button>
+        {segment && (
+          <button
+            className={`quiet study__star${bookmarked ? ' is-selected' : ''}`}
+            aria-pressed={bookmarked}
+            onClick={() => update((m) => toggleBookmark(m, segment.id))}
+          >
+            {bookmarked ? '★ 难句' : '☆ 标记难句'}
+          </button>
+        )}
+        <span className="muted study__progress-label">
+          已听写 {round?.completedSegmentIds.length ?? 0} / {material.segments.length} 句
+        </span>
+      </div>
+
+      {sentenceOpen && (
+        <div className="study__sentence-pop" role="listbox" aria-label="句子列表">
+          {scope.map((s, i) => (
+            <button
+              key={s.id}
+              type="button"
+              role="option"
+              aria-selected={s.id === editingId}
+              className={s.id === editingId ? 'is-current' : undefined}
+              onClick={() => {
+                selectSentence(s.id);
+                player.goToSegment(s.id);
+              }}
+            >
+              <strong>{String(i + 1).padStart(2, '0')}</strong>
+              <span>
+                {completed.has(s.id) ? '已听写' : '未听写'}
+                {material.bookmarkedSegmentIds.includes(s.id) ? ' · ★' : ''}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <Player
+        material={material}
+        player={player}
+        onStepSentence={stepSentence}
+        hasPrevious={index > 0}
+        hasNext={index >= 0 && index < scope.length - 1}
+        status={`第 ${index + 1} / ${scope.length} 句`}
+      />
+
+      <div className="tabs study__tools">
         <label className="muted">
           <input
             type="checkbox"
@@ -363,31 +574,6 @@ export function StudyPage({
           只看难句（{material.bookmarkedSegmentIds.length}）
         </label>
         <span className="player__spacer" />
-        <label className="muted">
-          <input
-            type="checkbox"
-            checked={keySounds}
-            onChange={(event) => {
-              setKeySounds(event.target.checked);
-              updateStudySettings({ keySounds: event.target.checked });
-            }}
-          />{' '}
-          按键音
-        </label>
-        {keySounds && (
-          <input
-            type="range"
-            aria-label="按键音量"
-            min="0"
-            max="1"
-            step="0.05"
-            value={volume}
-            onChange={(event) => {
-              setVolume(Number(event.target.value));
-              updateStudySettings({ volume: Number(event.target.value) });
-            }}
-          />
-        )}
         <button className="quiet" onClick={() => setShowHistory(true)}>
           轮次
         </button>
@@ -404,13 +590,6 @@ export function StudyPage({
                 {formatTime(segment.start)} — {formatTime(segment.end)}
                 {stale.has(segment.id) ? ' · 待重新核对' : ''}
               </span>
-              <button
-                className="quiet"
-                aria-pressed={material.bookmarkedSegmentIds.includes(segment.id)}
-                onClick={() => update((m) => toggleBookmark(m, segment.id))}
-              >
-                {material.bookmarkedSegmentIds.includes(segment.id) ? '★ 难句' : '☆ 标记难句'}
-              </button>
             </div>
 
             <WordFlowEditor
@@ -455,7 +634,7 @@ export function StudyPage({
                         )
                       }
                     >
-                      {player.videoSurface === 'visible' ? '收起画面' : '看画面'}
+                      {player.videoSurface === 'visible' ? '收起画面' : '显示画面'}
                     </button>
                   </p>
                 )}
@@ -464,6 +643,9 @@ export function StudyPage({
               <div className="dictation__actions">
                 <button className="quiet" onClick={onTranscript}>
                   完整原文 ↗
+                </button>
+                <button className="quiet" onClick={player.replay}>
+                  ↻ 重听
                 </button>
                 <button
                   className="primary"

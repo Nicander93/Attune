@@ -54,30 +54,38 @@ export function App() {
     [library, material],
   );
 
+  const focusStudy = route.name === 'study';
+
   return (
-    <div className="app" data-saving={library.saving ? 'true' : 'false'}>
-      <header className="topbar">
-        <button className="brand" onClick={() => go({ name: 'home' })}>
-          <img className="brand__mark" src={logoUrl} alt="" width={20} height={20} />
-          Attune
-        </button>
-        <nav className="topbar__nav" aria-label="主导航">
-          <button
-            className="quiet"
-            aria-current={route.name === 'home' ? 'page' : undefined}
-            onClick={() => go({ name: 'home' })}
-          >
-            首页
+    <div
+      className="app"
+      data-saving={library.saving ? 'true' : 'false'}
+      data-focus={focusStudy ? 'study' : undefined}
+    >
+      {!focusStudy && (
+        <header className="topbar">
+          <button className="brand" onClick={() => go({ name: 'home' })}>
+            <img className="brand__mark" src={logoUrl} alt="" width={20} height={20} />
+            Attune
           </button>
-          <button
-            className="quiet"
-            aria-current={route.name === 'library' ? 'page' : undefined}
-            onClick={() => go({ name: 'library', folderId: null })}
-          >
-            素材库
-          </button>
-        </nav>
-      </header>
+          <nav className="topbar__nav" aria-label="主导航">
+            <button
+              className="quiet"
+              aria-current={route.name === 'home' ? 'page' : undefined}
+              onClick={() => go({ name: 'home' })}
+            >
+              首页
+            </button>
+            <button
+              className="quiet"
+              aria-current={route.name === 'library' ? 'page' : undefined}
+              onClick={() => go({ name: 'library', folderId: null })}
+            >
+              素材库
+            </button>
+          </nav>
+        </header>
+      )}
 
       {library.error && (
         <div className="banner banner--error" role="alert">
