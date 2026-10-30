@@ -73,14 +73,14 @@ test.describe('library', () => {
       [{ id: 'f1', name: '播客' }],
     );
     await page.getByRole('button', { name: '素材库' }).first().click();
-    await page.getByLabel('文件夹').selectOption({ label: '播客' });
+    await page.locator('select[aria-label="文件夹"]').selectOption({ label: '播客' });
     await expect(page.locator('.materials__row')).toContainText('podcast.mp3');
 
     page.once('dialog', (dialog) => void dialog.accept());
     await page.getByLabel('删除文件夹 播客').click();
 
     // The folder is gone; the material falls back to 未分类 and keeps its audio.
-    await page.getByLabel('文件夹').selectOption({ label: '未分类' });
+    await page.locator('select[aria-label="文件夹"]').selectOption({ label: '未分类' });
     await expect(page.locator('.materials__row')).toContainText('podcast.mp3');
     const kept = await storedMaterial(page, 'm1');
     expect(kept.displayName).toBe('podcast.mp3');
