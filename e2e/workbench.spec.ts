@@ -33,8 +33,9 @@ test.describe('home', () => {
     await expect(resume).toContainText('已听的.mp3');
     await expect(resume).toContainText('听写 · 2 / 3 句');
     await expect(page.locator('.home__title')).toContainText('已听的.mp3');
-    await expect(page.locator('.recent')).not.toContainText('已听的.mp3');
-    await expect(page.locator('.recent')).not.toContainText('只导入的.mp3');
+    // Resume is outside .home-recent; with only one studied item .recent is empty.
+    await expect(page.locator('.home-recent')).not.toContainText('已听的.mp3');
+    await expect(page.locator('.home-recent')).not.toContainText('只导入的.mp3');
   });
 });
 
@@ -71,6 +72,9 @@ test.describe('library', () => {
     await page.getByLabel('新建文件夹').click();
     await page.getByLabel('新文件夹名称').fill('播客');
     await page.getByLabel('新文件夹名称').press('Enter');
+    // Creating a folder selects it; return to all materials so the row stays visible.
+    await page.locator('.library-tools select.select').first().selectOption('all');
+    await settled(page);
     // Move the material in first, then delete the folder it lives in.
     await page.getByLabel('podcast.mp3 的更多操作').click();
     await page.getByRole('menuitem', { name: '移动到文件夹' }).click();
