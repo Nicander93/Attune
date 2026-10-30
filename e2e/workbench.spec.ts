@@ -139,6 +139,20 @@ test.describe('library', () => {
   });
 });
 
+test.describe('focus shell S3', () => {
+  test('hides global home/library nav while studying', async ({ page }) => {
+    await seed(page, [material({ audio: wav() })]);
+    await page.getByRole('button', { name: '素材库' }).first().click();
+    await page.locator('.materials__row').first().click();
+    await expect(page.getByRole('heading', { name: '第 1 / 3 句' })).toBeVisible();
+    await expect(page.locator('.topbar')).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: '主导航' })).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: '听写' })).toHaveAttribute('aria-selected', 'true');
+    await page.getByRole('button', { name: '← 返回' }).click();
+    await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible();
+  });
+});
+
 test.describe('dictation', () => {
   const study = async (page: Page) => {
     await seed(page, [material({ audio: wav() })]);

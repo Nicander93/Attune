@@ -3,7 +3,7 @@ export default defineConfig({
   testDir: './e2e',
   use: { baseURL: 'http://127.0.0.1:1421', headless: true },
   webServer: {
-    // S1 tauri/vite often holds 1420; keep S2 e2e on a free port.
+    // Keep e2e on 1421 to avoid tauri/vite holding 1420.
     command: 'npx vite --host 127.0.0.1 --port 1421 --strictPort',
     url: 'http://127.0.0.1:1421',
     reuseExistingServer: !process.env.CI,
