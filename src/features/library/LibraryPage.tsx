@@ -3,12 +3,13 @@ import type { Folder, Material } from '../../domain/types';
 import { formatTime } from '../../domain/types';
 import {
   UNCATEGORIZED,
+  LIBRARY_SORT_OPTIONS,
   SORT_LABELS,
   defaultRenameValue,
   filterMaterials,
   folderRows,
+  libraryStatusLabel,
   materialRow,
-  progressLabel,
   sortMaterials,
   type SortOrder,
 } from './listing';
@@ -53,15 +54,19 @@ export const blank = (): Material => ({
   activeRoundId: '',
 });
 
+/**
+ * S1 library shell aligned to V2: search + folder + sort in one tools row, compact
+ * rows with kind mark and 待校对-first status. Folder CRUD stays on labeled controls
+ * next to the folder select so existing capabilities are not removed.
+ */
 export function LibraryPage(props: Props) {
   const { query, onQueryChange: setQuery, order, onOrderChange: setOrder } = props;
-  const [sortOpen, setSortOpen] = useState(false);
   const [menuFor, setMenuFor] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [folderFor, setFolderFor] = useState<string | null>(null);
-  const [folderName, setFolderName] = useState('');
   const [addingFolder, setAddingFolder] = useState(false);
+  const [folderName, setFolderName] = useState('');
   const selected = props.selectedId;
   const searchRef = useRef<HTMLInputElement>(null);
   const renameRef = useRef<HTMLInputElement>(null);
@@ -72,19 +77,32 @@ export function LibraryPage(props: Props) {
     [props.materials, scope, query],
   );
   const rows = useMemo(() => sortMaterials(list, order), [list, order]);
-  const rowsView = useMemo(() => rows.map(materialRow), [rows]);
+  const rowsView = useMemo(
+    () => rows.map((material) => materialRow(material, props.folders)),
+    [rows, props.folders],
+  );
   const folders = useMemo(
     () => folderRows(props.folders, props.materials),
     [props.folders, props.materials],
   );
 
-  // Library-scoped shortcuts only. Playback and sentence navigation belong to study
-  // pages, so Ctrl+F and F2 must not leak out of this screen.
+  const folderSelectValue =
+    props.selectedFolder === null
+      ? 'all'
+      : props.selectedFolder === UNCATEGORIZED
+        ? UNCATEGORIZED
+        : props.selectedFolder;
+
+  const activeFolder =
+    props.selectedFolder && props.selectedFolder !== UNCATEGORIZED
+      ? props.folders.find((f) => f.id === props.selectedFolder)
+      : undefined;
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.isComposing) return;
       const inputFocused = (event.target as HTMLElement | null)?.closest(
-        'input, textarea, [contenteditable]',
+        'input, textarea, [contenteditable], select',
       );
       if (inputFocused) return;
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
@@ -99,8 +117,8 @@ export function LibraryPage(props: Props) {
       }
       if (event.key === 'Escape') {
         setMenuFor(null);
-        setSortOpen(false);
         setFolderFor(null);
+        setAddingFolder(false);
       }
     };
     document.addEventListener('keydown', onKey);
@@ -126,7 +144,6 @@ export function LibraryPage(props: Props) {
     const material = props.materials.find((m) => m.id === id);
     setMenuFor(null);
     if (!material) return;
-    // Deleting throws away audio, drafts and bookmarks, so it always asks.
     if (
       !window.confirm(
         `删除「${material.displayName}」？音频、草稿和难句标记都会一并删除，无法恢复。`,
@@ -139,10 +156,7 @@ export function LibraryPage(props: Props) {
 
   async function confirmDeleteFolder(id: string) {
     const folder = props.folders.find((f) => f.id === id);
-    setFolderFor(null);
-    setAddingFolder(false);
     if (!folder) return;
-    // Deleting a folder never deletes what is inside it.
     if (
       !window.confirm(
         `删除文件夹「${folder.name}」？其中的素材会移到「未分类」，音频和学习记录都会保留。`,
@@ -150,6 +164,7 @@ export function LibraryPage(props: Props) {
     )
       return;
     await props.onDeleteFolder(id);
+    props.onSelectFolder(null);
     props.onNotice(`已删除文件夹「${folder.name}」，其中素材已移到未分类。`);
   }
 
@@ -164,327 +179,256 @@ export function LibraryPage(props: Props) {
           disabled={!props.ready}
           onClick={() => void props.onCreate(blank()).catch(() => undefined)}
         >
-          ＋ 新建素材
+          ＋ 导入素材
         </button>
       </div>
 
-      <div className="library__body">
-        <aside className="folders" aria-label="文件夹">
-          <div className="folders__head">
-            <span className="caption">文件夹</span>
-            <button
-              className="quiet"
-              aria-label="新建文件夹"
-              onClick={() => {
-                setAddingFolder(true);
-                setFolderName('');
-              }}
-            >
-              ＋
-            </button>
-          </div>
-          <ul>
-            {folders.map((row) => {
-              const id =
-                row.virtual === 'all'
-                  ? null
-                  : row.virtual === 'uncategorized'
-                    ? UNCATEGORIZED
-                    : row.id;
-              const active =
-                (row.virtual === 'all' && props.selectedFolder === null) ||
-                (row.virtual === 'uncategorized' && props.selectedFolder === UNCATEGORIZED) ||
-                (row.id === props.selectedFolder && !row.virtual);
-              return (
-                <li key={row.id}>
-                  <button
-                    className={`folders__item${active ? ' is-active' : ''}`}
-                    aria-current={active ? 'true' : undefined}
-                    onClick={() =>
-                      props.onSelectFolder(
-                        row.virtual === 'all'
-                          ? null
-                          : row.virtual === 'uncategorized'
-                            ? UNCATEGORIZED
-                            : row.id,
-                      )
-                    }
-                  >
-                    <span>{row.name}</span>
-                    <span className="muted">{row.count ?? ''}</span>
-                  </button>
-                  {!row.virtual && (
-                    <span className="folders__actions">
-                      <button
-                        className="quiet"
-                        aria-label={`重命名文件夹 ${row.name}`}
-                        onClick={() => {
-                          setFolderName(row.name);
-                          setFolderFor(row.id);
-                        }}
-                      >
-                        ⋯
-                      </button>
-                      {folderFor === row.id && (
-                        <span className="menu" role="menu">
-                          <button
-                            role="menuitem"
-                            onClick={() => {
-                              const next = window.prompt('文件夹名称', folderName);
-                              if (next?.trim()) void props.onRenameFolder(row.id, next);
-                              setFolderFor(null);
-                            }}
-                          >
-                            重命名
-                          </button>
-                          <button role="menuitem" onClick={() => void confirmDeleteFolder(row.id)}>
-                            删除文件夹
-                          </button>
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </li>
+      <div className="library__content">
+        <div className="library-tools">
+          <input
+            ref={searchRef}
+            className="search"
+            type="search"
+            aria-label="搜索素材"
+            placeholder="搜索素材"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+          <select
+            className="select"
+            aria-label="文件夹"
+            value={folderSelectValue}
+            onChange={(event) => {
+              const value = event.target.value;
+              props.onSelectFolder(
+                value === 'all' ? null : value === UNCATEGORIZED ? UNCATEGORIZED : value,
               );
-            })}
-          </ul>
-          {addingFolder && (
-            <form
-              className="folders__new"
-              onSubmit={async (event) => {
-                event.preventDefault();
-                if (folderName.trim()) {
-                  await props.onCreateFolder(folderName);
-                  setAddingFolder(false);
+            }}
+          >
+            {folders.map((row) => (
+              <option
+                key={row.id || 'all'}
+                value={
+                  row.virtual === 'all'
+                    ? 'all'
+                    : row.virtual === 'uncategorized'
+                      ? UNCATEGORIZED
+                      : row.id
                 }
-              }}
-            >
-              <input
-                aria-label="新文件夹名称"
-                value={folderName}
-                autoFocus
-                onChange={(event) => setFolderName(event.target.value)}
-                onBlur={() => setAddingFolder(false)}
-              />
-            </form>
-          )}
-        </aside>
-
-        <div className="library__list">
-          <div className="library__toolbar">
-            <input
-              ref={searchRef}
-              type="search"
-              aria-label="搜索全部素材"
-              placeholder="搜索全部素材"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-            <div className="sortmenu">
-              <button
-                className="quiet icon"
-                aria-label={`排序：${SORT_LABELS[order]}`}
-                aria-expanded={sortOpen}
-                onClick={() => setSortOpen((open) => !open)}
               >
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  aria-hidden="true"
-                >
-                  <path d="M4 6h10M4 12h7M4 18h4M18 5v14m-3-3 3 3 3-3" />
-                </svg>
+                {row.name}
+              </option>
+            ))}
+          </select>
+          <select
+            className="select"
+            aria-label="排序"
+            value={LIBRARY_SORT_OPTIONS.includes(order) ? order : 'recent'}
+            onChange={(event) => setOrder(event.target.value as SortOrder)}
+          >
+            {LIBRARY_SORT_OPTIONS.map((value) => (
+              <option key={value} value={value}>
+                {SORT_LABELS[value]}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="quiet"
+            aria-label="新建文件夹"
+            onClick={() => {
+              setAddingFolder(true);
+              setFolderName('');
+            }}
+          >
+            ＋ 文件夹
+          </button>
+          {activeFolder && (
+            <span className="library-folder-actions">
+              <button
+                type="button"
+                className="quiet"
+                aria-label={`重命名文件夹 ${activeFolder.name}`}
+                onClick={() => {
+                  const next = window.prompt('文件夹名称', activeFolder.name);
+                  if (next?.trim()) void props.onRenameFolder(activeFolder.id, next);
+                }}
+              >
+                重命名
               </button>
-              {sortOpen && (
-                <ul className="menu" role="menu">
-                  {(Object.keys(SORT_LABELS) as SortOrder[]).map((value) => (
-                    <li key={value}>
-                      <button
-                        role="menuitemradio"
-                        aria-checked={order === value}
-                        onClick={() => {
-                          setOrder(value);
-                          setSortOpen(false);
-                        }}
-                      >
-                        {SORT_LABELS[value]}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
+              <button
+                type="button"
+                className="quiet"
+                aria-label={`删除文件夹 ${activeFolder.name}`}
+                onClick={() => void confirmDeleteFolder(activeFolder.id)}
+              >
+                删除
+              </button>
+            </span>
+          )}
+        </div>
 
-          <p className="muted library__count">
-            {scoped ? '当前文件夹' : `搜索「${query.trim()}」，已忽略文件夹`} · {rows.length} 段
-          </p>
+        {addingFolder && (
+          <form
+            className="folders__new"
+            onSubmit={async (event) => {
+              event.preventDefault();
+              if (folderName.trim()) {
+                const created = await props.onCreateFolder(folderName);
+                props.onSelectFolder(created.id);
+                setAddingFolder(false);
+              }
+            }}
+          >
+            <input
+              aria-label="新文件夹名称"
+              value={folderName}
+              autoFocus
+              onChange={(event) => setFolderName(event.target.value)}
+              onBlur={() => {
+                if (!folderName.trim()) setAddingFolder(false);
+              }}
+            />
+          </form>
+        )}
 
-          <ul className="materials">
-            {rowsView.map((row) => {
-              const material = props.materials.find((m) => m.id === row.id)!;
-              return (
-                <li key={row.id}>
-                  {renaming === row.id ? (
-                    <form
-                      className="materials__rename"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        if (renameValue.trim()) props.onRename(row.id, renameValue);
-                        setRenaming(null);
-                      }}
-                    >
-                      <input
-                        ref={renameRef}
-                        aria-label={`重命名 ${row.displayName}`}
-                        value={renameValue}
-                        onChange={(event) => setRenameValue(event.target.value)}
-                        onBlur={() => setRenaming(null)}
-                      />
-                    </form>
-                  ) : (
-                    <div
-                      className={`materials__row${selected === row.id ? ' is-selected' : ''}`}
-                      tabIndex={0}
-                      role="button"
+        <p className="muted library__count">
+          {scoped ? '当前文件夹' : `搜索「${query.trim()}」，已忽略文件夹`} · {rows.length} 段
+        </p>
+
+        <ul className="materials">
+          {rowsView.map((row) => {
+            const material = props.materials.find((m) => m.id === row.id)!;
+            const status = libraryStatusLabel(row);
+            return (
+              <li key={row.id} className="library-item">
+                {renaming === row.id ? (
+                  <form
+                    className="materials__rename"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      if (renameValue.trim()) props.onRename(row.id, renameValue);
+                      setRenaming(null);
+                    }}
+                  >
+                    <input
+                      ref={renameRef}
+                      aria-label={`重命名 ${row.displayName}`}
+                      value={renameValue}
+                      onChange={(event) => setRenameValue(event.target.value)}
+                      onBlur={() => setRenaming(null)}
+                    />
+                  </form>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className={`materials__row item-main${selected === row.id ? ' is-selected' : ''}`}
                       onClick={() => {
                         props.onSelect(row.id);
                         props.onOpen(row.id);
                       }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' || event.key === ' ') {
-                          event.preventDefault();
-                          props.onOpen(row.id);
-                        }
-                      }}
                     >
-                      <span className="material-symbol" aria-hidden="true">
-                        ♫
+                      <span className="item-mark" aria-hidden="true">
+                        {row.kind === 'video' ? '▣' : '♫'}
                       </span>
-                      <span className="materials__main">
+                      <span className="materials__main item-meta">
                         <strong>{row.displayName}</strong>
-                        <span className="muted">
-                          {formatTime(row.duration)} · {progressLabel(row)}
+                        <small className="muted">
+                          {row.folderName} · {formatTime(row.duration)}
                           {row.hasSubtitles ? '' : ' · 无字幕'}
                           {row.stale > 0 ? ` · ${row.stale} 句待重新核对` : ''}
-                        </span>
+                        </small>
                       </span>
-                      <span className="materials__actions">
-                        {!row.hasSubtitles && (
-                          <button
-                            className="quiet"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              props.onPrepare(row.id);
-                            }}
-                          >
-                            准备
-                          </button>
-                        )}
-                        {row.started ? (
-                          <button
-                            className="quiet"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              props.onOpen(row.id);
-                            }}
-                          >
-                            继续
-                          </button>
-                        ) : (
-                          <button
-                            className="quiet"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              props.onOpen(row.id);
-                            }}
-                          >
-                            开始
-                          </button>
-                        )}
+                      <span className={`item-state${row.needsReview ? ' item-state--review' : ''}`}>
+                        {status}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      className="quiet icon more-row"
+                      aria-label={`${row.displayName} 的更多操作`}
+                      aria-expanded={menuFor === row.id}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setMenuFor(menuFor === row.id ? null : row.id);
+                        setFolderFor(null);
+                      }}
+                    >
+                      ···
+                    </button>
+                    {menuFor === row.id && (
+                      <div className="menu menu--right" role="menu">
                         <button
-                          className="quiet icon"
-                          aria-label={`${row.displayName} 的更多操作`}
-                          aria-expanded={menuFor === row.id}
+                          role="menuitem"
                           onClick={(event) => {
                             event.stopPropagation();
-                            setMenuFor(menuFor === row.id ? null : row.id);
+                            beginRename(row.id);
                           }}
                         >
-                          ⋯
+                          重命名
                         </button>
-                        {menuFor === row.id && (
-                          <div className="menu menu--right" role="menu">
-                            <button
-                              role="menuitem"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                beginRename(row.id);
-                              }}
-                            >
-                              重命名
-                            </button>
-                            <button
-                              role="menuitem"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setFolderFor(row.id);
-                                setMenuFor(null);
-                              }}
-                            >
-                              移动到文件夹
-                            </button>
-                            <button role="menuitem" onClick={() => props.onPrepare(row.id)}>
-                              素材准备
-                            </button>
-                            <button role="menuitem" onClick={() => void confirmDelete(row.id)}>
-                              删除
-                            </button>
-                          </div>
-                        )}
-                      </span>
-                    </div>
-                  )}
-                  {folderFor === row.id && (
-                    <div className="menu menu--right" role="menu">
-                      <button
-                        role="menuitem"
-                        onClick={() => {
-                          props.onMove(row.id, null);
-                          setFolderFor(null);
-                        }}
-                      >
-                        未分类
-                      </button>
-                      {props.folders.map((folder) => (
                         <button
-                          key={folder.id}
+                          role="menuitem"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setFolderFor(row.id);
+                            setMenuFor(null);
+                          }}
+                        >
+                          移动到文件夹
+                        </button>
+                        <button
                           role="menuitem"
                           onClick={() => {
-                            props.onMove(row.id, folder.id);
+                            setMenuFor(null);
+                            props.onPrepare(row.id);
+                          }}
+                        >
+                          素材准备
+                        </button>
+                        <button role="menuitem" onClick={() => void confirmDelete(row.id)}>
+                          删除
+                        </button>
+                      </div>
+                    )}
+                    {folderFor === row.id && (
+                      <div className="menu menu--right" role="menu">
+                        <button
+                          role="menuitem"
+                          onClick={() => {
+                            props.onMove(row.id, null);
                             setFolderFor(null);
                           }}
                         >
-                          {folder.name}
+                          未分类
                         </button>
-                      ))}
-                    </div>
-                  )}
-                  <span className="sr-only">{material.originalFileName}</span>
-                </li>
-              );
-            })}
-          </ul>
-          {rowsView.length === 0 && (
-            <p className="muted empty-row">
-              {query.trim() ? '没有匹配的素材。' : '这个文件夹还是空的。'}
-            </p>
-          )}
-        </div>
+                        {props.folders.map((folder) => (
+                          <button
+                            key={folder.id}
+                            role="menuitem"
+                            onClick={() => {
+                              props.onMove(row.id, folder.id);
+                              setFolderFor(null);
+                            }}
+                          >
+                            {folder.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+                <span className="sr-only">{material.originalFileName}</span>
+              </li>
+            );
+          })}
+        </ul>
+        {rowsView.length === 0 && (
+          <p className="muted empty-row empty-state">
+            {query.trim() ? '没有找到素材' : '这个文件夹还是空的。'}
+          </p>
+        )}
       </div>
       <p className="library__hint muted">
         快捷键：<kbd>Ctrl</kbd>+<kbd>F</kbd> 搜索 · <kbd>F2</kbd> 重命名 · <kbd>Esc</kbd> 关闭菜单

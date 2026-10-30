@@ -38,7 +38,7 @@ test('new material keeps independent upload areas and switches to preparation af
   page,
 }) => {
   await seed(page, []);
-  await page.getByRole('button', { name: '＋ 新建素材', exact: true }).click();
+  await page.getByRole('button', { name: '＋ 导入素材', exact: true }).click();
   await expect(page.locator('.dropzone')).toHaveCount(2);
   await expect(page.getByRole('button', { name: '开始听写' })).toBeDisabled();
   await page

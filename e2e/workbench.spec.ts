@@ -3,7 +3,7 @@ import { material, openStudy, seed, settled, storedMaterial, wav } from './suppo
 test.describe('home', () => {
   test('shows an empty state when nothing has been studied', async ({ page }) => {
     await seed(page, [material({ audio: wav() })]);
-    await expect(page.getByRole('heading', { name: '首页' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '继续学习' })).toBeVisible();
     // An imported-but-never-opened material must not pretend to be a study session.
     await expect(page.getByText('还没有开始听写')).toBeVisible();
     await expect(page.getByText('podcast.mp3')).toHaveCount(0);
@@ -29,10 +29,11 @@ test.describe('home', () => {
       material({ id: 'm2', displayName: '只导入的.mp3' }),
     ]);
     await expect(page.getByRole('heading', { name: '继续学习' })).toBeVisible();
-    const resume = page.locator('.resume');
+    const resume = page.locator('.home__current');
     await expect(resume).toContainText('已听的.mp3');
-    await expect(resume).toContainText('已听写 2 / 3 句');
-    await expect(page.locator('.recent')).toContainText('已听的.mp3');
+    await expect(resume).toContainText('听写 · 2 / 3 句');
+    await expect(page.locator('.home__title')).toContainText('已听的.mp3');
+    await expect(page.locator('.recent')).not.toContainText('已听的.mp3');
     await expect(page.locator('.recent')).not.toContainText('只导入的.mp3');
   });
 });
@@ -75,16 +76,14 @@ test.describe('library', () => {
     await page.getByRole('menuitem', { name: '移动到文件夹' }).click();
     await page.locator('.menu').getByRole('menuitem', { name: '播客' }).click();
     await settled(page);
-    await page.locator('.folders__item', { hasText: '播客' }).click();
+    await page.getByLabel('文件夹').selectOption({ label: '播客' });
     await expect(page.locator('.materials__row')).toContainText('podcast.mp3');
 
     page.once('dialog', (dialog) => void dialog.accept());
-    await page.getByLabel('重命名文件夹 播客').click();
-    await page.getByRole('menuitem', { name: '删除文件夹' }).click();
+    await page.getByLabel('删除文件夹 播客').click();
 
     // The folder is gone; the material falls back to 未分类 and keeps its audio.
-    await expect(page.locator('.folders').getByRole('button', { name: /未分类/ })).toBeVisible();
-    await page.locator('.folders__item', { hasText: '未分类' }).click();
+    await page.getByLabel('文件夹').selectOption({ label: '未分类' });
     await expect(page.locator('.materials__row')).toContainText('podcast.mp3');
     const kept = await storedMaterial(page, 'm1');
     expect(kept.displayName).toBe('podcast.mp3');
@@ -94,7 +93,7 @@ test.describe('library', () => {
   test('searches across every folder and says so', async ({ page }) => {
     await seed(page, [material({ id: 'm1', displayName: '英语课程.mp3', folderId: 'f1' })]);
     await page.getByRole('button', { name: '素材库' }).first().click();
-    await page.getByLabel('搜索全部素材').fill('英语');
+    await page.getByLabel('搜索素材').fill('英语');
     await expect(page.locator('.library__count')).toContainText('已忽略文件夹');
     await expect(page.locator('.materials__row')).toContainText('英语课程.mp3');
   });
@@ -118,15 +117,11 @@ test.describe('library', () => {
     await page.getByRole('button', { name: '素材库' }).first().click();
     // 最近学习 is the default and puts the only studied material first.
     await expect(page.locator('.materials__row').first()).toContainText('bbb.mp3');
-    await page.getByLabel(/排序：/).click();
-    await page.getByRole('menuitemradio', { name: '名称 A–Z' }).click();
+    await page.getByLabel('排序').selectOption('name');
     await expect(page.locator('.materials__row').first()).toContainText('aaa.mp3');
-    await page.getByLabel(/排序：/).click();
-    await page.getByRole('menuitemradio', { name: '时长' }).click();
+    await page.getByLabel('排序').selectOption('duration');
     await expect(page.locator('.materials__row').first()).toContainText('bbb.mp3');
-    await page.getByLabel(/排序：/).click();
-    await page.getByRole('menuitemradio', { name: '最近导入' }).click();
-    // bbb was also imported first, so the two orders agree here by data, not by luck.
+    await page.getByLabel('排序').selectOption('recent');
     await expect(page.locator('.materials__row')).toHaveCount(2);
   });
 
@@ -135,7 +130,7 @@ test.describe('library', () => {
     await page.getByRole('button', { name: '素材库' }).first().click();
 
     await page.keyboard.press('Control+f');
-    await expect(page.getByLabel('搜索全部素材')).toBeFocused();
+    await expect(page.getByLabel('搜索素材')).toBeFocused();
     await page.keyboard.press('Escape');
 
     // Opening a material keeps it selected, so F2 works once the user comes back.
