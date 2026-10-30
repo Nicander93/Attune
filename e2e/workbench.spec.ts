@@ -67,19 +67,12 @@ test.describe('library', () => {
   });
 
   test('keeps a material when its folder is deleted', async ({ page }) => {
-    await seed(page, [material({ audio: wav() })]);
+    await seed(
+      page,
+      [material({ audio: wav(), folderId: 'f1' })],
+      [{ id: 'f1', name: '播客' }],
+    );
     await page.getByRole('button', { name: '素材库' }).first().click();
-    await page.getByLabel('新建文件夹').click();
-    await page.getByLabel('新文件夹名称').fill('播客');
-    await page.getByLabel('新文件夹名称').press('Enter');
-    // Creating a folder selects it; return to all materials so the row stays visible.
-    await page.locator('.library-tools select.select').first().selectOption('all');
-    await settled(page);
-    // Move the material in first, then delete the folder it lives in.
-    await page.getByLabel('podcast.mp3 的更多操作').click();
-    await page.getByRole('menuitem', { name: '移动到文件夹' }).click();
-    await page.locator('.menu').getByRole('menuitem', { name: '播客' }).click();
-    await settled(page);
     await page.getByLabel('文件夹').selectOption({ label: '播客' });
     await expect(page.locator('.materials__row')).toContainText('podcast.mp3');
 
