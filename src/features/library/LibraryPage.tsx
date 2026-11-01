@@ -55,9 +55,8 @@ export const blank = (): Material => ({
 });
 
 /**
- * S1 library shell aligned to V2: search + folder + sort in one tools row, compact
- * rows with kind mark and 待校对-first status. Folder CRUD stays on labeled controls
- * next to the folder select so existing capabilities are not removed.
+ * S4 library tools: search + folder + sort alone on the primary row. Folder CRUD and
+ * the count line sit on a quieter meta row so they do not dominate the toolbar.
  */
 export function LibraryPage(props: Props) {
   const { query, onQueryChange: setQuery, order, onOrderChange: setOrder } = props;
@@ -232,40 +231,48 @@ export function LibraryPage(props: Props) {
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            className="quiet"
-            aria-label="新建文件夹"
-            onClick={() => {
-              setAddingFolder(true);
-              setFolderName('');
-            }}
-          >
-            ＋ 文件夹
-          </button>
-          {activeFolder && (
-            <span className="library-folder-actions">
-              <button
-                type="button"
-                className="quiet"
-                aria-label={`重命名文件夹 ${activeFolder.name}`}
-                onClick={() => {
-                  const next = window.prompt('文件夹名称', activeFolder.name);
-                  if (next?.trim()) void props.onRenameFolder(activeFolder.id, next);
-                }}
-              >
-                重命名
-              </button>
-              <button
-                type="button"
-                className="quiet"
-                aria-label={`删除文件夹 ${activeFolder.name}`}
-                onClick={() => void confirmDeleteFolder(activeFolder.id)}
-              >
-                删除
-              </button>
-            </span>
-          )}
+        </div>
+
+        <div className="library-tools-meta">
+          <p className="muted library__count">
+            {scoped ? '当前文件夹' : `搜索「${query.trim()}」，已忽略文件夹`} · {rows.length} 段
+          </p>
+          <div className="library-tools-meta__actions">
+            <button
+              type="button"
+              className="quiet textbtn"
+              aria-label="新建文件夹"
+              onClick={() => {
+                setAddingFolder(true);
+                setFolderName('');
+              }}
+            >
+              ＋ 文件夹
+            </button>
+            {activeFolder && (
+              <span className="library-folder-actions">
+                <button
+                  type="button"
+                  className="quiet textbtn"
+                  aria-label={`重命名文件夹 ${activeFolder.name}`}
+                  onClick={() => {
+                    const next = window.prompt('文件夹名称', activeFolder.name);
+                    if (next?.trim()) void props.onRenameFolder(activeFolder.id, next);
+                  }}
+                >
+                  重命名
+                </button>
+                <button
+                  type="button"
+                  className="quiet textbtn"
+                  aria-label={`删除文件夹 ${activeFolder.name}`}
+                  onClick={() => void confirmDeleteFolder(activeFolder.id)}
+                >
+                  删除
+                </button>
+              </span>
+            )}
+          </div>
         </div>
 
         {addingFolder && (
@@ -291,10 +298,6 @@ export function LibraryPage(props: Props) {
             />
           </form>
         )}
-
-        <p className="muted library__count">
-          {scoped ? '当前文件夹' : `搜索「${query.trim()}」，已忽略文件夹`} · {rows.length} 段
-        </p>
 
         <ul className="materials">
           {rowsView.map((row) => {

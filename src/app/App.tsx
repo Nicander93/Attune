@@ -2,7 +2,6 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useLibrary } from './useLibrary';
 import type { Route } from './routes';
 import { ErrorBoundary } from './ErrorBoundary';
-import logoUrl from '../assets/logo.svg';
 import { HomePage } from '../features/home/HomePage';
 import { blank, LibraryPage } from '../features/library/LibraryPage';
 import { MaterialWorkspace } from './MaterialWorkspace';
@@ -64,8 +63,13 @@ export function App() {
     >
       {!focusStudy && (
         <header className="topbar">
-          <button className="brand" onClick={() => go({ name: 'home' })}>
-            <img className="brand__mark" src={logoUrl} alt="" width={20} height={20} />
+          <button className="brand" onClick={() => go({ name: 'home' })} aria-label="Attune 首页">
+            <span className="brand__bars" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+              <i />
+            </span>
             Attune
           </button>
           <nav className="topbar__nav" aria-label="主导航">

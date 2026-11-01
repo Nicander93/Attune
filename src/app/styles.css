@@ -1,21 +1,22 @@
 /*
- * Attune V3 reference: white surfaces, quiet green accents and compact controls.
+ * Attune shell (S4): paper feel from 克制版交互原型 V2.
  * Layout is built so a 1024x640 window still reaches
  * every control: the page never scrolls, only long lists do.
  */
 :root {
-  --bg: #ffffff;
+  --bg: #fbfbf9;
   --paper: #fff;
-  --ink: #29372f;
-  --sub: #738278;
-  --faint: #9aa79d;
-  --line: #e0e8e1;
-  --accent: #305b46;
-  --tint: #eef5ef;
-  --err: #c0574f;
+  --ink: #242b27;
+  --sub: #758078;
+  --faint: #a2aaa3;
+  --line: #e8ebe6;
+  --line-strong: #d6ddd5;
+  --accent: #315843;
+  --tint: #edf3ee;
+  --err: #b9534e;
   --errbg: #fdf0ee;
-  --shadow: 0 8px 28px rgba(36, 66, 47, 0.08);
-  --radius: 10px;
+  --shadow: 0 12px 32px rgba(32, 42, 35, 0.055);
+  --radius: 14px;
 }
 
 * {
@@ -130,19 +131,45 @@ kbd {
 }
 .topbar__nav {
   display: flex;
-  gap: 4px;
+  gap: 25px;
   margin-left: auto;
+  align-items: center;
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 16px;
-  font-weight: 600;
+  gap: 12px;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: -0.045em;
 }
 .brand__mark {
   display: block;
+}
+.brand__bars {
+  width: 25px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+.brand__bars i {
+  display: block;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+.brand__bars i:nth-child(1),
+.brand__bars i:nth-child(4) {
+  height: 7px;
+}
+.brand__bars i:nth-child(2) {
+  height: 16px;
+}
+.brand__bars i:nth-child(3) {
+  height: 21px;
 }
 
 .page {
@@ -1092,8 +1119,21 @@ button.quiet {
   font-size: 12px;
 }
 button[aria-current='page'] {
+  color: var(--ink);
+  font-weight: 600;
+  background: transparent;
+}
+.topbar__nav button.quiet {
+  padding: 9px 0;
+  font-size: 13px;
+  color: var(--sub);
+}
+.topbar__nav button.quiet:hover:not(:disabled) {
   color: var(--accent);
-  background: var(--tint);
+  background: transparent;
+}
+.topbar__nav button.quiet[aria-current='page'] {
+  color: var(--ink);
 }
 input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
 select {
@@ -2297,5 +2337,105 @@ h1 {
   }
   .study__file {
     max-width: 28vw;
+  }
+}
+
+/* ---------- S4 shell visual: paper palette + quieter library meta ---------- */
+.topbar {
+  height: 66px;
+  padding-inline: max(32px, calc((100vw - 1000px) / 2));
+}
+.page-heading {
+  height: auto;
+  min-height: 66px;
+  align-items: center;
+  padding: 18px max(32px, calc((100% - 900px) / 2));
+  margin-bottom: 0;
+}
+.page-heading h1 {
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 1.4;
+}
+.home__current {
+  /* progress sits under the title|继续 row — not a disconnected card */
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+  display: block;
+  padding: 4px max(32px, calc((100% - 810px) / 2)) 43px;
+  margin-top: 8px;
+  max-width: none;
+  border-bottom: 1px solid var(--line);
+}
+.home__row {
+  margin-top: 19px;
+}
+.progress-track {
+  margin-top: 27px;
+  height: 2px;
+  width: min(560px, 100%);
+}
+.library-tools {
+  margin-bottom: 10px;
+  flex-wrap: nowrap;
+}
+.library-tools-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+  min-height: 28px;
+}
+.library-tools-meta .library__count {
+  margin: 0;
+  font-size: 12px;
+  color: var(--faint);
+}
+.library-tools-meta__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.library-tools-meta .textbtn {
+  font-size: 12px;
+  color: var(--faint);
+  padding: 4px 6px;
+}
+.library-tools-meta .textbtn:hover:not(:disabled) {
+  color: var(--sub);
+  background: transparent;
+}
+.import__upload-icon {
+  color: var(--accent);
+  margin-bottom: 15px;
+}
+.import__drop {
+  border: 1px dashed #d1dad2;
+  background: var(--paper);
+  gap: 0;
+}
+.import__drop .secondary {
+  margin-top: 19px;
+}
+.import__upload-title {
+  margin-top: 0;
+}
+.import__hint {
+  margin-top: 15px;
+}
+.import__empty-more {
+  margin-top: 22px;
+}
+@media (max-width: 720px) {
+  .library-tools {
+    flex-wrap: wrap;
+  }
+  .library-tools-meta {
+    flex-wrap: wrap;
   }
 }
