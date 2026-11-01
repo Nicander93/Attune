@@ -1,0 +1,61 @@
+{
+  "tip": "90614a44a070827f05c5bdceccab212331b7613b",
+  "branch": "feat/ui-s4-shell-visual",
+  "when": "2026-11-01T11:01:58.814Z",
+  "item1_home_resume_card": "PASS",
+  "item2_library_tools_row": "PASS",
+  "item3_import_empty": "PASS",
+  "all": "PASS",
+  "evidence_dir": "docs/evidence/ui-s4/",
+  "detail": {
+    "home": {
+      "hasCard": true,
+      "title": "h264_aac_subs",
+      "subtitle": "听读 · 1 / 2 句",
+      "hasContinue": true,
+      "continueText": "继续 →",
+      "hasProgressBelow": true,
+      "rowHasTitleAndContinue": true,
+      "navBtns": [
+        "首页",
+        "素材库"
+      ],
+      "brandBarCount": 0,
+      "paperBg": "#fbfbf9",
+      "bodySlice": "Attune\n首页\n素材库\n继续学习\n＋ 导入素材\n上次学习\nh264_aac_subs\n听读 · 1 / 2 句\n继续 →\n最近学习\n全部素材 →\nh264_aac_subs\n00:03 · 10/30\n1 / 2\n›\nburned_in_en\n00:03 · 10/30\n1 / 1\n›\nh264_aac_subs\n00:03 · 10/26\n1 / 2\n›"
+    },
+    "library": {
+      "hasTools": true,
+      "hasSearch": true,
+      "selectCount": 2,
+      "folderLabels": [
+        "全部素材",
+        "未分类"
+      ],
+      "sortLabels": [
+        "最近学习",
+        "名称",
+        "时长"
+      ],
+      "hasMeta": true,
+      "metaCount": "当前文件夹 · 29 段",
+      "toolsKids": [
+        "INPUT.search",
+        "SELECT.select",
+        "SELECT.select"
+      ],
+      "toolsText": "全部素材 未分类 最近学习 名称 时长",
+      "primaryHasCount": false,
+      "primaryHasAddFolder": false
+    },
+    "importEmpty": {
+      "hasDrop": true,
+      "hasIcon": true,
+      "title": "音频或视频",
+      "hint": "或拖入文件",
+      "hasAudioOrVideoCopy": true,
+      "hasDragHint": true,
+      "bodySlice": "Attune\n首页\n素材库\n← 返回\n导入素材\n音频或视频\n选择文件\n\n或拖入文件\n\n更多 ···"
+    }
+  }
+}
