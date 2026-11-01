@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { material, wav } from './support';
+import { material, openStudyMenu, wav } from './support';
 
 const shot = (name: string) => resolve(process.cwd(), 'screenshots', `${name}.png`);
 
@@ -127,21 +127,21 @@ test('capture every page at 1280x720 and 1024x640', async ({ page }) => {
   await expect(page.locator('.diff')).toBeVisible();
   await page.screenshot({ path: shot('dictation-checked') });
 
-  await page.getByRole('tab', { name: '听读' }).click();
+  await page.getByRole('button', { name: '听读', exact: true }).click();
   await page.waitForTimeout(300);
   await page.screenshot({ path: shot('reading') });
 
-  await page.getByRole('button', { name: '完整原文 ↗' }).click();
+  await openStudyMenu(page, '完整原文');
   await page.waitForTimeout(300);
   await page.screenshot({ path: shot('transcript') });
 
   await page.getByRole('button', { name: '← 返回' }).click();
-  await page.getByRole('button', { name: '素材设置' }).click();
+  await openStudyMenu(page, '素材设置');
   await page.waitForTimeout(300);
   await page.screenshot({ path: shot('prepare') });
 
   await page.getByRole('button', { name: '← 返回' }).click();
-  await page.getByRole('button', { name: '字幕校对' }).click();
+  await openStudyMenu(page, '校对字幕');
   await page.waitForTimeout(300);
   await page.screenshot({ path: shot('subtitles') });
 

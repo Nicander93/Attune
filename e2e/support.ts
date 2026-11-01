@@ -128,6 +128,12 @@ export async function openStudy(page: Page) {
   await expect(page.getByRole('heading', { name: /第 1 \/ 3 句/ })).toBeVisible();
 }
 
+/** Opens the focus-shell ··· menu and clicks a menuitem by accessible name. */
+export async function openStudyMenu(page: Page, item: string | RegExp) {
+  await page.getByRole('button', { name: '更多', exact: true }).click();
+  await page.getByRole('menuitem', { name: item }).click();
+}
+
 export const srt = [
   '1\n00:00:00,000 --> 00:00:03,000\nHello world.\n',
   '2\n00:00:03,000 --> 00:00:06,000\nNice to meet you.\n',

@@ -10,8 +10,13 @@ type Props = {
   activeWord: number;
   /** Revealed only for sentences already checked, or when the user asks for them. */
   revealAll: boolean;
+  /** When false, auto-follow is off (S5 menu owns the toggle in light chrome). */
+  following?: boolean;
+  /** light = EN/双语 only; full keeps legacy checkbox chrome. */
+  chrome?: 'full' | 'light';
   completed: Set<string>;
   onRevealAll: (reveal: boolean) => void;
+  onFollowingChange?: (following: boolean) => void;
   onSeekWord: (segmentId: string, wordIndex: number) => void;
   onSettingsChange: (settings: NonNullable<Material['studySettings']>) => void;
 };
@@ -24,6 +29,11 @@ const LANG_LABELS: { value: Lang; label: string }[] = [
   { value: 'both', label: '双语' },
 ];
 
+const LIGHT_LANG_LABELS: { value: Lang; label: string }[] = [
+  { value: 'en', label: '英文' },
+  { value: 'both', label: '双语' },
+];
+
 /**
  * 听读 reads as continuous prose with the current sentence highlighted, not as a stack
  * of sentence cards. Auto-follow is a separate switch from showing the original text,
@@ -31,8 +41,10 @@ const LANG_LABELS: { value: Lang; label: string }[] = [
  */
 export function ReadingView(props: Props) {
   const { material } = props;
+  const chrome = props.chrome ?? 'full';
   const [lang, setLang] = useState<Lang>(material.studySettings?.language ?? 'en');
-  const [following, setFollowing] = useState(material.studySettings?.following ?? true);
+  const [followingLocal, setFollowingLocal] = useState(material.studySettings?.following ?? true);
+  const following = props.following ?? followingLocal;
   const list = useRef<HTMLOListElement>(null);
   const suppressedUntil = useRef(0);
   const [suppressed, setSuppressed] = useState(false);
@@ -65,14 +77,21 @@ export function ReadingView(props: Props) {
     setSuppressed(true);
   };
 
+  function setFollowing(value: boolean) {
+    setFollowingLocal(value);
+    props.onFollowingChange?.(value);
+    props.onSettingsChange({ following: value });
+  }
+
   const showEnglish = lang !== 'zh' || !translated;
   const showChinese = lang !== 'en';
+  const langButtons = chrome === 'light' ? LIGHT_LANG_LABELS : LANG_LABELS;
 
   return (
-    <div className="reading">
+    <div className={`reading${chrome === 'light' ? ' reading--light' : ''}`}>
       <div className="reading__bar">
         <div className="mode" role="group" aria-label="显示语言">
-          {LANG_LABELS.map(({ value, label }) => (
+          {langButtons.map(({ value, label }) => (
             <button
               key={value}
               aria-pressed={lang === value}
@@ -85,25 +104,26 @@ export function ReadingView(props: Props) {
             </button>
           ))}
         </div>
-        <label className="muted">
-          <input
-            type="checkbox"
-            checked={following}
-            onChange={(event) => {
-              setFollowing(event.target.checked);
-              props.onSettingsChange({ following: event.target.checked });
-            }}
-          />{' '}
-          自动跟随
-        </label>
-        <label className="muted">
-          <input
-            type="checkbox"
-            checked={props.revealAll}
-            onChange={(event) => props.onRevealAll(event.target.checked)}
-          />{' '}
-          显示未听写的原文
-        </label>
+        {chrome === 'full' && (
+          <>
+            <label className="muted">
+              <input
+                type="checkbox"
+                checked={following}
+                onChange={(event) => setFollowing(event.target.checked)}
+              />{' '}
+              自动跟随
+            </label>
+            <label className="muted">
+              <input
+                type="checkbox"
+                checked={props.revealAll}
+                onChange={(event) => props.onRevealAll(event.target.checked)}
+              />{' '}
+              显示未听写的原文
+            </label>
+          </>
+        )}
         {(!following || suppressed) && props.currentId && (
           <button
             className="quiet"
@@ -111,7 +131,6 @@ export function ReadingView(props: Props) {
               suppressedUntil.current = 0;
               setSuppressed(false);
               setFollowing(true);
-              props.onSettingsChange({ following: true });
             }}
           >
             回到当前句

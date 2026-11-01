@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { material, openStudy, seed, settled, srt, storedMaterial, vtt, wav } from './support';
+import { material, openStudy, openStudyMenu, seed, settled, srt, storedMaterial, vtt, wav } from './support';
 
 const goToPrep = async (page: Page) => {
   await page.getByRole('button', { name: '素材库' }).first().click();
@@ -7,7 +7,7 @@ const goToPrep = async (page: Page) => {
   // Without subtitles the workbench only offers the prep page directly.
   const shortcut = page.getByRole('button', { name: '去准备字幕' });
   if (await shortcut.isVisible().catch(() => false)) await shortcut.click();
-  else await page.getByRole('button', { name: '素材设置' }).click();
+  else await openStudyMenu(page, '素材设置');
   await expect(page.getByRole('heading', { name: '导入素材' })).toBeVisible();
 };
 
@@ -111,7 +111,7 @@ test.describe('material preparation', () => {
       }),
     ]);
     await openStudy(page);
-    await page.getByRole('button', { name: '素材设置' }).click();
+    await openStudyMenu(page, '素材设置');
     await page
       .locator('input[type=file]')
       .nth(1)
@@ -153,7 +153,7 @@ test.describe('subtitle proofing', () => {
   const openProof = async (page: Page) => {
     await seed(page, [studied]);
     await openStudy(page);
-    await page.getByRole('button', { name: '字幕校对' }).click();
+    await openStudyMenu(page, '校对字幕');
     await expect(page.getByText('字幕校对')).toBeVisible();
   };
 
@@ -233,7 +233,7 @@ test.describe('subtitle proofing', () => {
       }),
     ]);
     await openStudy(page);
-    await page.getByRole('button', { name: '字幕校对' }).click();
+    await openStudyMenu(page, '校对字幕');
     page.once('dialog', (dialog) => void dialog.accept());
     await page.getByRole('button', { name: '与下一句合并' }).first().click();
     await expect(page.getByText(/标记为待重新核对/)).toBeVisible();
@@ -260,7 +260,7 @@ test.describe('transcript and rounds', () => {
     await page.getByLabel('第 1 句听写').pressSequentially('Hello world');
     await page.locator('h1').first().click();
 
-    await page.getByRole('button', { name: '完整原文 ↗' }).click();
+    await openStudyMenu(page, '完整原文');
     await expect(page.getByText('完整原文')).toBeVisible();
     await expect(page.locator('.transcript__list')).toContainText('See you later.');
 
@@ -287,7 +287,7 @@ test.describe('transcript and rounds', () => {
     await openStudy(page);
     await expect(page.getByText('已听写 2 / 3 句')).toBeVisible();
 
-    await page.getByRole('button', { name: '轮次' }).click();
+    await openStudyMenu(page, '练习轮次');
     await expect(page.getByRole('heading', { name: '练习轮次' })).toBeVisible();
     await page.getByRole('button', { name: '重新听写' }).click();
     await settled(page);
@@ -305,7 +305,7 @@ test.describe('transcript and rounds', () => {
   test('restricts navigation to 难句 when asked', async ({ page }) => {
     await seed(page, [material({ audio: wav(), bookmarkedSegmentIds: ['s2'] })]);
     await openStudy(page);
-    await page.getByLabel('只看难句').check();
+    await openStudyMenu(page, '只看难句');
     await expect(page.getByRole('heading', { name: '第 1 / 1 句' })).toBeVisible();
     await expect(page.locator('.dictation__head')).toContainText('00:03');
   });

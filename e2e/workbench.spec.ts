@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { material, openStudy, seed, settled, storedMaterial, wav } from './support';
+import { material, openStudy, openStudyMenu, seed, settled, storedMaterial, wav } from './support';
 test.describe('home', () => {
   test('shows an empty state when nothing has been studied', async ({ page }) => {
     await seed(page, [material({ audio: wav() })]);
@@ -147,7 +147,7 @@ test.describe('focus shell S3', () => {
     await expect(page.getByRole('heading', { name: '第 1 / 3 句' })).toBeVisible();
     await expect(page.locator('.topbar')).toHaveCount(0);
     await expect(page.getByRole('navigation', { name: '主导航' })).toHaveCount(0);
-    await expect(page.getByRole('tab', { name: '听写' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('button', { name: '听读', exact: true })).toBeVisible();
     await page.getByRole('button', { name: '← 返回' }).click();
     await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible();
   });
@@ -261,12 +261,12 @@ test.describe('player and views', () => {
     const field = page.getByLabel('第 1 句听写');
     await field.click();
     await field.pressSequentially('Hello world');
-    await page.getByRole('tab', { name: '听读' }).click();
+    await page.getByRole('button', { name: '听读', exact: true }).click();
     // Undictated sentences stay hidden until the reader asks to see them.
     await expect(page.locator('.reading__text')).toContainText('原文已隐藏');
-    await page.getByLabel('显示未听写的原文').check();
+    await openStudyMenu(page, '显示未听写的原文');
     await expect(page.locator('.reading__text')).toContainText('Nice to meet you.');
-    await page.getByRole('tab', { name: '听写' }).click();
+    await page.getByRole('button', { name: '听写', exact: true }).click();
     await expect(page.getByLabel('第 1 句听写')).toHaveValue('Hello world');
   });
 
@@ -274,13 +274,13 @@ test.describe('player and views', () => {
     await seed(page, [material({ audio: wav() })]);
     await page.getByRole('button', { name: '素材库' }).first().click();
     await page.locator('.materials__row').first().click();
-    await page.getByRole('button', { name: '☆ 标记难句' }).click();
-    await expect(page.getByRole('button', { name: '★ 难句' })).toBeVisible();
+    await page.getByRole('button', { name: '标记难句' }).click();
+    await expect(page.getByRole('button', { name: '标记难句' })).toHaveAttribute('aria-pressed', 'true');
     await settled(page);
     await page.reload();
     await page.getByRole('button', { name: '素材库' }).first().click();
     await page.locator('.materials__row').first().click();
-    await expect(page.getByRole('button', { name: '★ 难句' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '标记难句' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('refuses to check a sentence with no reference text', async ({ page }) => {

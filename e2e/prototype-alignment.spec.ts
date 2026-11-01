@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { material, openStudy, seed, storedMaterial, wav } from './support';
+import { material, openStudy, openStudyMenu, seed, storedMaterial, wav } from './support';
 
 test('prepared material uses ready row, supports rename and opens subtitle proofing', async ({
   page,
 }) => {
   await seed(page, [material({ audio: wav(9) })]);
   await openStudy(page);
-  await page.getByRole('button', { name: '素材设置' }).click();
+  await openStudyMenu(page, '素材设置');
   await expect(page.locator('.dropzone')).toHaveCount(0);
   await expect(page.locator('.import__file')).toBeVisible();
   await expect(page.getByRole('button', { name: '开始听写 →' })).toHaveClass(/primary/);
