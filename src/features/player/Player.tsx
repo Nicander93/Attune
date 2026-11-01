@@ -15,6 +15,8 @@ type Props = {
   onStepSentence?: (delta: 1 | -1) => void;
   hasPrevious?: boolean;
   hasNext?: boolean;
+  /** Focus study chrome: loop as icon, no speed/mode cluster beside the transport. */
+  variant?: 'default' | 'focus';
 };
 
 /**
@@ -23,9 +25,18 @@ type Props = {
  * It renders no title and no labels beyond the controls themselves: the sentence it
  * acts on is already stated by the page above it.
  */
-export function Player({ material, player, status, onStepSentence, hasPrevious, hasNext }: Props) {
+export function Player({
+  material,
+  player,
+  status,
+  onStepSentence,
+  hasPrevious,
+  hasNext,
+  variant = 'default',
+}: Props) {
+  const focus = variant === 'focus';
   return (
-    <div className="player">
+    <div className={`player${focus ? ' player--focus' : ''}`}>
       <div
         className="player__controls"
         onMouseDown={(event) => {
@@ -36,10 +47,12 @@ export function Player({ material, player, status, onStepSentence, hasPrevious, 
             event.preventDefault();
         }}
       >
-        <div className="player__track">
-          <strong title={material.displayName}>{material.displayName}</strong>
-          <span className="caption">{status ?? `${material.segments.length} 句 · 英语听写`}</span>
-        </div>
+        {!focus && (
+          <div className="player__track">
+            <strong title={material.displayName}>{material.displayName}</strong>
+            <span className="caption">{status ?? `${material.segments.length} 句 · 英语听写`}</span>
+          </div>
+        )}
         <button
           className="quiet"
           aria-label="上一句"
@@ -63,52 +76,70 @@ export function Player({ material, player, status, onStepSentence, hasPrevious, 
         >
           ⏭
         </button>
-        <button className="quiet" disabled={!player.canStep} onClick={player.replay}>
-          ↻ 重听本句
-        </button>
-        <span className="player__spacer" />
-        <label className="muted">
-          <select
-            aria-label="播放速度"
-            value={player.speed}
-            onChange={(event) => player.setSpeed(Number(event.target.value))}
-          >
-            {PLAYBACK_RATES.map((rate) => (
-              <option key={rate} value={rate}>
-                {rate}×
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="muted">
-          <input
-            type="checkbox"
-            checked={player.loop}
-            onChange={(event) => player.setLoop(event.target.checked)}
-          />{' '}
-          单句循环
-        </label>
-        <label className="muted">
-          <input
-            type="radio"
-            name="playback-mode"
-            checked={player.mode === 'segment'}
-            onChange={() => player.setMode('segment')}
-          />{' '}
-          按句
-        </label>
-        <label className="muted">
-          <input
-            type="radio"
-            name="playback-mode"
-            checked={player.mode === 'continuous'}
-            onChange={() => player.setMode('continuous')}
-          />{' '}
-          连续
-        </label>
-        <span className="muted">
+        {!focus && (
+          <button className="quiet" disabled={!player.canStep} onClick={player.replay}>
+            ↻ 重听本句
+          </button>
+        )}
+        <span className="muted player__time">
           {formatTime(player.position)} / {formatTime(material.duration)}
         </span>
+        <button
+          type="button"
+          className={`quiet player__loop${player.loop ? ' is-active' : ''}`}
+          aria-label="单句循环"
+          aria-pressed={player.loop}
+          title="单句循环"
+          onClick={() => player.setLoop(!player.loop)}
+        >
+          ↻
+        </button>
+        {!focus && (
+          <>
+            <span className="player__spacer" />
+            <label className="muted">
+              <select
+                aria-label="播放速度"
+                value={player.speed}
+                onChange={(event) => player.setSpeed(Number(event.target.value))}
+              >
+                {PLAYBACK_RATES.map((rate) => (
+                  <option key={rate} value={rate}>
+                    {rate}×
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="muted">
+              <input
+                type="radio"
+                name="playback-mode"
+                checked={player.mode === 'segment'}
+                onChange={() => player.setMode('segment')}
+              />{' '}
+              按句
+            </label>
+            <label className="muted">
+              <input
+                type="radio"
+                name="playback-mode"
+                checked={player.mode === 'continuous'}
+                onChange={() => player.setMode('continuous')}
+              />{' '}
+              连续
+            </label>
+          </>
+        )}
+        {focus && (
+          <button
+            className="quiet"
+            disabled={!player.canStep}
+            onClick={player.replay}
+            aria-label="重听本句"
+          >
+            ↻ 重听本句
+          </button>
+        )}
       </div>
       <input
         className="player__timeline"

@@ -6,7 +6,7 @@ import { summarizeDiff } from '../../domain/word-flow';
 import { toggleBookmark } from '../../domain/progress';
 import { keySound } from '../../sound';
 import { Player } from '../player/Player';
-import type { AudioPlayer } from '../player/useAudioPlayer';
+import { PLAYBACK_RATES, type AudioPlayer } from '../player/useMediaPlayer';
 import { WordFlowEditor } from '../dictation/WordFlowEditor';
 import { ReadingView, useActiveWord } from '../reading/ReadingView';
 
@@ -28,6 +28,11 @@ function navigationScope(material: Material, bookmarkedOnly: boolean) {
   return material.segments.filter((s) => marks.has(s.id));
 }
 
+function nextPlaybackRate(current: number) {
+  const index = PLAYBACK_RATES.findIndex((rate) => rate === current);
+  return PLAYBACK_RATES[(index + 1) % PLAYBACK_RATES.length] ?? 1;
+}
+
 export function StudyPage({
   material,
   player,
@@ -45,10 +50,11 @@ export function StudyPage({
   const [checked, setChecked] = useState(
     Boolean(
       activeRound(material)?.checkedSegmentId &&
-      activeRound(material)?.checkedSegmentId === activeRound(material)?.activeSegmentId,
+        activeRound(material)?.checkedSegmentId === activeRound(material)?.activeSegmentId,
     ),
   );
   const [revealAll, setRevealAll] = useState(material.studySettings?.revealAll ?? false);
+  const [following, setFollowing] = useState(material.studySettings?.following ?? true);
   const [bookmarkedOnly, setBookmarkedOnly] = useState(
     material.studySettings?.bookmarkedOnly ?? false,
   );
@@ -59,6 +65,7 @@ export function StudyPage({
   const [sentenceOpen, setSentenceOpen] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   const menuWrap = useRef<HTMLDivElement>(null);
+
   function updateStudySettings(settings: NonNullable<Material['studySettings']>) {
     update((m) => ({ ...m, studySettings: { ...m.studySettings, ...settings } }));
   }
@@ -71,15 +78,12 @@ export function StudyPage({
     if (!material.playbackSettings) player.setMode(next === 'reading' ? 'continuous' : 'segment');
   }
 
-  // Video surface: listen-read always shows; dictation hides by default (player stays alive).
+  // Video stays hidden by default in both modes; after check the user may show it.
+  // Never remount MediaOutput — only toggle surface visibility.
   useEffect(() => {
     if (!player.hasVideoSurface) return;
-    if (view === 'reading') {
-      player.setVideoSurface('visible');
-      return;
-    }
-    player.setVideoSurface('hidden');
-  }, [view, editingId, player.hasVideoSurface]);
+    if (view === 'dictation' && !checked) player.setVideoSurface('hidden');
+  }, [view, editingId, checked, player.hasVideoSurface]);
 
   function selectSentence(id: string, checked = false) {
     setEditingId(id);
@@ -283,6 +287,10 @@ export function StudyPage({
     onNotice('已开启新一轮，上一轮的进度保留在历史里。');
   }
 
+  function closeMenu() {
+    setMenuOpen(false);
+  }
+
   if (!material.segments.length) {
     return (
       <section className="study">
@@ -360,22 +368,13 @@ export function StudyPage({
           {material.displayName}
         </span>
         <span className="study__head-spacer" />
-        <div className="mode study__mode" role="tablist" aria-label="学习模式">
-          <button
-            role="tab"
-            aria-selected={view === 'dictation'}
-            onClick={() => changeView('dictation')}
-          >
-            听写
-          </button>
-          <button
-            role="tab"
-            aria-selected={view === 'reading'}
-            onClick={() => changeView('reading')}
-          >
-            听读
-          </button>
-        </div>
+        <button
+          type="button"
+          className="quiet study__mode-switch"
+          onClick={() => changeView(view === 'dictation' ? 'reading' : 'dictation')}
+        >
+          {view === 'dictation' ? '听读' : '听写'}
+        </button>
         <div className="study__menu-wrap" ref={menuWrap}>
           <button
             type="button"
@@ -397,7 +396,61 @@ export function StudyPage({
                 type="button"
                 role="menuitem"
                 onClick={() => {
-                  setMenuOpen(false);
+                  player.setLoop(!player.loop);
+                  closeMenu();
+                }}
+              >
+                {player.loop ? '关闭单句循环' : '开启单句循环'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  player.setSpeed(nextPlaybackRate(player.speed));
+                  closeMenu();
+                }}
+              >
+                语速 · {player.speed}×
+              </button>
+              <label className="study__menu-volume" role="none">
+                语速
+                <select
+                  aria-label="播放速度"
+                  value={player.speed}
+                  onChange={(event) => player.setSpeed(Number(event.target.value))}
+                >
+                  {PLAYBACK_RATES.map((rate) => (
+                    <option key={rate} value={rate}>
+                      {rate}×
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  player.setMode('segment');
+                  closeMenu();
+                }}
+              >
+                {player.mode === 'segment' ? '✓ 按句' : '按句'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  player.setMode('continuous');
+                  closeMenu();
+                }}
+              >
+                {player.mode === 'continuous' ? '✓ 连续' : '连续'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  closeMenu();
                   setSentenceOpen(true);
                 }}
               >
@@ -410,10 +463,34 @@ export function StudyPage({
                   setBookmarkedOnly(!bookmarkedOnly);
                   updateStudySettings({ bookmarkedOnly: !bookmarkedOnly });
                   setChecked(false);
-                  setMenuOpen(false);
+                  closeMenu();
                 }}
               >
                 {bookmarkedOnly ? '查看全部句子' : '只看难句'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  const next = !following;
+                  setFollowing(next);
+                  updateStudySettings({ following: next });
+                  closeMenu();
+                }}
+              >
+                {following ? '关闭自动跟随' : '开启自动跟随'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  const next = !revealAll;
+                  setRevealAll(next);
+                  updateStudySettings({ revealAll: next });
+                  closeMenu();
+                }}
+              >
+                {revealAll ? '隐藏未听写原文' : '显示未听写的原文'}
               </button>
               <button
                 type="button"
@@ -446,7 +523,7 @@ export function StudyPage({
                 type="button"
                 role="menuitem"
                 onClick={() => {
-                  setMenuOpen(false);
+                  closeMenu();
                   setShowHistory(true);
                 }}
               >
@@ -456,7 +533,7 @@ export function StudyPage({
                 type="button"
                 role="menuitem"
                 onClick={() => {
-                  setMenuOpen(false);
+                  closeMenu();
                   onSubtitles();
                 }}
               >
@@ -466,7 +543,7 @@ export function StudyPage({
                 type="button"
                 role="menuitem"
                 onClick={() => {
-                  setMenuOpen(false);
+                  closeMenu();
                   onTranscript();
                 }}
               >
@@ -476,7 +553,7 @@ export function StudyPage({
                 type="button"
                 role="menuitem"
                 onClick={() => {
-                  setMenuOpen(false);
+                  closeMenu();
                   onPrepare();
                 }}
               >
@@ -486,7 +563,7 @@ export function StudyPage({
                 type="button"
                 role="menuitem"
                 onClick={() => {
-                  setMenuOpen(false);
+                  closeMenu();
                   onNotice(
                     'Enter：核对 / 下一句；Space：播放 / 暂停（输入框外）；左右方向键：切句（输入框外）；Esc：从核对返回修改。',
                   );
@@ -515,11 +592,14 @@ export function StudyPage({
         </button>
         {segment && (
           <button
+            type="button"
             className={`quiet study__star${bookmarked ? ' is-selected' : ''}`}
+            aria-label="标记难句"
             aria-pressed={bookmarked}
+            title="标记难句"
             onClick={() => update((m) => toggleBookmark(m, segment.id))}
           >
-            {bookmarked ? '★ 难句' : '☆ 标记难句'}
+            {bookmarked ? '★' : '☆'}
           </button>
         )}
         <span className="muted study__progress-label">
@@ -554,30 +634,12 @@ export function StudyPage({
       <Player
         material={material}
         player={player}
+        variant="focus"
         onStepSentence={stepSentence}
         hasPrevious={index > 0}
         hasNext={index >= 0 && index < scope.length - 1}
         status={`第 ${index + 1} / ${scope.length} 句`}
       />
-
-      <div className="tabs study__tools">
-        <label className="muted">
-          <input
-            type="checkbox"
-            checked={bookmarkedOnly}
-            onChange={(event) => {
-              setBookmarkedOnly(event.target.checked);
-              updateStudySettings({ bookmarkedOnly: event.target.checked });
-              setChecked(false);
-            }}
-          />{' '}
-          只看难句（{material.bookmarkedSegmentIds.length}）
-        </label>
-        <span className="player__spacer" />
-        <button className="quiet" onClick={() => setShowHistory(true)}>
-          轮次
-        </button>
-      </div>
 
       {view === 'dictation' ? (
         segment ? (
@@ -638,12 +700,20 @@ export function StudyPage({
                     </button>
                   </p>
                 )}
+                <div className="dictation__actions">
+                  <button className="quiet" onClick={() => selectSentence(editingId)}>
+                    修改
+                  </button>
+                  <button className="quiet" onClick={player.replay}>
+                    ↻ 重听
+                  </button>
+                  <button className="primary" onClick={() => goTo(index + 1)}>
+                    下一句 →
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="dictation__actions">
-                <button className="quiet" onClick={onTranscript}>
-                  完整原文 ↗
-                </button>
                 <button className="quiet" onClick={player.replay}>
                   ↻ 重听
                 </button>
@@ -667,10 +737,16 @@ export function StudyPage({
           currentId={player.playbackSegment?.id}
           activeWord={activeWord}
           revealAll={revealAll}
+          following={following}
+          chrome="light"
           completed={completed}
           onRevealAll={(value) => {
             setRevealAll(value);
             updateStudySettings({ revealAll: value });
+          }}
+          onFollowingChange={(value) => {
+            setFollowing(value);
+            updateStudySettings({ following: value });
           }}
           onSettingsChange={updateStudySettings}
           onSeekWord={(segmentId, wordIndex) => {
@@ -680,23 +756,6 @@ export function StudyPage({
           }}
         />
       )}
-
-      <footer className="study__foot">
-        <span className="study__hint muted">
-          Enter 核对 / 下一句 · Space 播放 · Esc 退出输入后 ← → 切句
-        </span>
-        {(view === 'reading' || checked) && (
-          <button className="quiet" onClick={onTranscript}>
-            完整原文 ↗
-          </button>
-        )}
-        <button className="quiet" onClick={onSubtitles}>
-          字幕校对
-        </button>
-        <button className="quiet" onClick={onPrepare}>
-          素材设置
-        </button>
-      </footer>
     </section>
   );
 }

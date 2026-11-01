@@ -2439,3 +2439,63 @@ h1 {
     flex-wrap: wrap;
   }
 }
+
+/* ---------- S5 focus declutter ---------- */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+.study__mode-switch {
+  font-size: 13px;
+  padding: 6px 10px;
+  color: var(--text);
+  font-weight: 550;
+}
+.study__mode-switch:hover {
+  background: var(--accent-faint, #edf3ee);
+}
+.study__playback-a11y {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+.player--focus .player__controls {
+  justify-content: center;
+  gap: 10px;
+}
+.player--focus .player__time {
+  min-width: 7.5em;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+.player__loop {
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+  border-radius: 8px;
+}
+.player__loop.is-active {
+  color: var(--accent);
+  background: var(--accent-faint, #edf3ee);
+}
+.study--focus .study__tools,
+.study--focus .study__foot {
+  display: none;
+}
+.reading--light .reading__bar {
+  justify-content: center;
+  gap: 8px;
+}
+.study--focus .dictation__head h1 {
+  font-size: 15px;
+  font-weight: 600;
+}

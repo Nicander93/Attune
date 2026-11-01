@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { material, openStudy, seed, settled, storedMaterial, wav } from './support';
+import { material, openStudy, openStudyMenu, seed, settled, storedMaterial, wav } from './support';
 
 test('reopening a material resumes audio rather than persisting the initial unloaded zero', async ({
   page,
@@ -34,18 +34,22 @@ test('preserves sentence, checked state, view and player preferences through sec
   await page.getByRole('button', { name: '下一句', exact: true }).click();
   await page.getByLabel('第 2 句听写').fill('Nice to meet you');
   await page.getByLabel('第 2 句听写').press('Enter');
+  await page.getByRole('button', { name: '更多', exact: true }).click();
   await page.getByLabel('播放速度').selectOption('1.25');
-  await page.getByLabel('单句循环').check();
-  await page.getByRole('button', { name: '完整原文 ↗' }).click();
+  await page.getByRole('button', { name: '更多', exact: true }).click();
+  await page.getByRole('button', { name: '单句循环' }).click();
+  await openStudyMenu(page, '完整原文');
   await page.getByRole('button', { name: '← 返回' }).click();
   await expect(page.getByLabel('第 2 句听写')).toHaveValue('Nice to meet you');
   await expect(page.locator('.diff')).toBeVisible();
+  await page.getByRole('button', { name: '更多', exact: true }).click();
   await expect(page.getByLabel('播放速度')).toHaveValue('1.25');
-  await expect(page.getByLabel('单句循环')).toBeChecked();
-  await page.getByRole('tab', { name: '听读' }).click();
-  await page.getByRole('button', { name: '素材设置' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: '单句循环' })).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: '听读', exact: true }).click();
+  await openStudyMenu(page, '素材设置');
   await page.getByRole('button', { name: '← 返回' }).click();
-  await expect(page.getByRole('tab', { name: '听读' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('button', { name: '听写', exact: true })).toBeVisible();
 });
 
 test('real playback updates transport state, stops at sentence end and loops', async ({ page }) => {
@@ -64,7 +68,7 @@ test('real playback updates transport state, stops at sentence end and loops', a
   const end = await page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime);
   expect(end).toBeGreaterThan(2.9);
   expect(end).toBeLessThanOrEqual(3);
-  await page.getByLabel('单句循环').check();
+  await page.getByRole('button', { name: '单句循环' }).click();
   await page.getByRole('button', { name: '重听本句' }).click();
   await expect
     .poll(() => page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime))
@@ -81,7 +85,7 @@ test('continuous playback leaves the draft in its sentence and transcript clicks
   await seed(page, [material({ audio: wav(9) })]);
   await openStudy(page);
   await page.getByLabel('第 1 句听写').fill('unfinished first sentence');
-  await page.getByLabel('连续', { exact: true }).check();
+  await openStudyMenu(page, '连续');
   await page.getByRole('button', { name: '播放', exact: true }).click();
   await expect
     .poll(() => page.locator('audio').evaluate((audio: HTMLAudioElement) => audio.currentTime), {
@@ -89,7 +93,7 @@ test('continuous playback leaves the draft in its sentence and transcript clicks
     })
     .toBeGreaterThan(3);
   await expect(page.getByLabel('第 1 句听写')).toHaveValue('unfinished first sentence');
-  await page.getByRole('button', { name: '完整原文 ↗' }).click();
+  await openStudyMenu(page, '完整原文');
   await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeVisible();
   await page.locator('.transcript__jump').nth(2).click();
   await expect(page.getByRole('button', { name: '暂停', exact: true })).toBeVisible();
@@ -173,7 +177,7 @@ test('splits at the text caret and an explicit time after confirming existing re
     }),
   ]);
   await openStudy(page);
-  await page.getByRole('button', { name: '字幕校对' }).click();
+  await openStudyMenu(page, '校对字幕');
   await page.getByRole('button', { name: '编辑', exact: true }).first().click();
   const field = page.getByLabel('编辑第 1 句字幕');
   await page.getByLabel('拆分时间').fill('1.5');
@@ -197,7 +201,7 @@ test('replacement audio persists after reload and reading starts in reading mode
 }) => {
   await seed(page, [material({ audio: wav(9) })]);
   await openStudy(page);
-  await page.getByRole('button', { name: '素材设置' }).click();
+  await openStudyMenu(page, '素材设置');
   await page
     .locator('input[type=file]')
     .first()
@@ -206,7 +210,7 @@ test('replacement audio persists after reload and reading starts in reading mode
   await settled(page);
   await page.getByRole('button', { name: '更多 ···' }).click();
   await page.getByRole('menuitem', { name: '开始听读' }).click();
-  await expect(page.getByRole('tab', { name: '听读' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('button', { name: '听写', exact: true })).toBeVisible();
   await page.reload();
   await page.getByRole('button', { name: '素材库' }).first().click();
   await page.locator('.materials__row').first().click();
@@ -229,7 +233,7 @@ for (const viewport of [
       const layout = await page.evaluate(() => {
         const main = document.querySelector('.page');
         const controls = [
-          ...document.querySelectorAll('.player, .study__foot, .flow, .import__actions'),
+          ...document.querySelectorAll('.player, .study__head, .flow, .import__actions'),
         ];
         return {
           scroll: main.scrollHeight > main.clientHeight + 1,
@@ -245,9 +249,9 @@ for (const viewport of [
     await page.screenshot({
       path: `screenshots/dictation-checked-${viewport.width}x${viewport.height}.png`,
     });
-    await page.getByRole('tab', { name: '听读' }).click();
+    await page.getByRole('button', { name: '听读', exact: true }).click();
     await assertFits();
-    await page.getByRole('button', { name: '素材设置' }).click();
+    await openStudyMenu(page, '素材设置');
     await assertFits();
   });
 }
