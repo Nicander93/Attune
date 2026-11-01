@@ -61,7 +61,7 @@ export function HomePage(props: {
         <p className="muted home__loading">正在打开本地数据…</p>
       ) : resume ? (
         <>
-          <div className="home__current resume">
+          <div className="home__current">
             <div className="minilabel">上次学习</div>
             <div className="home__row">
               <div>

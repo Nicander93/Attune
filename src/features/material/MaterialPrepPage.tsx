@@ -46,8 +46,8 @@ function isVideoFile(file: File): boolean {
 }
 
 /**
- * S2 import converge (V2): drag/choose → ready → 校对字幕 / 开始听写.
- * Advanced items (字幕文件、识别、缓存、视频/ffmpeg) live under「更多」, not parallel prep panes.
+ * S4 import empty: upload icon + unified「音频或视频」copy. Drag/choose still accepts video
+ * (desktop routes into VideoImportPanel). Advanced items stay under「更多」.
  */
 export function MaterialPrepPage({
   material,
@@ -316,6 +316,20 @@ export function MaterialPrepPage({
               void importAudio(event.dataTransfer.files[0]);
             }}
           >
+            <svg
+              className="import__upload-icon"
+              width="36"
+              height="36"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M12 16V3m0 0L7.7 7.3M12 3l4.3 4.3M4 15.5v4A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5v-4" />
+            </svg>
             <div className="import__upload-title">音频或视频</div>
             <button
               type="button"
@@ -325,7 +339,7 @@ export function MaterialPrepPage({
             >
               {audioBusy ? '正在读取…' : '选择文件'}
             </button>
-            <p className="muted import__hint">或拖入文件 · MP3 / WAV / M4A；视频请用「更多 → 导入视频」</p>
+            <p className="muted import__hint">或拖入文件</p>
             <div className="import__empty-more">{moreMenu}</div>
           </div>
         )}
