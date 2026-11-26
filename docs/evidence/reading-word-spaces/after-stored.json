@@ -1,0 +1,33 @@
+{
+  "id": "059a10b8-243c-41d0-8cce-affd8d38ead6",
+  "displayName": "speech",
+  "lastView": "reading",
+  "segments": [
+    {
+      "id": "7287c065-f58e-4f41-892a-70236d183222",
+      "reference": "Hello from a tune.",
+      "translation": "",
+      "words": [
+        "Hello",
+        "from",
+        "a",
+        "tune."
+      ]
+    },
+    {
+      "id": "228203c3-c097-4cc6-9f0d-a33afa8f4da2",
+      "reference": "This is a short English sentence for recognition.",
+      "translation": "",
+      "words": [
+        "This",
+        "is",
+        "a",
+        "short",
+        "English",
+        "sentence",
+        "for",
+        "recognition."
+      ]
+    }
+  ]
+}

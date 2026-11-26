@@ -1,0 +1,121 @@
+{
+  "phase": "after",
+  "when": "2026-11-26T10:58:08.906Z",
+  "all": "PASS",
+  "checks": {
+    "after_reading_en_audit": "PASS",
+    "after_reading_en_spaces": "PASS",
+    "after_reading_both_audit": "PASS",
+    "after_reading_both_spaces": "PASS"
+  },
+  "detail": {
+    "after_reading_en_audit": {
+      "inner": {
+        "w": 1180,
+        "h": 801
+      },
+      "head": {
+        "left": 0,
+        "top": 0,
+        "right": 1180.5755615234375,
+        "bottom": 55.991458892822266,
+        "text": "← 返回\nspeech\n听写\n···"
+      },
+      "count": {
+        "left": 529.4963989257812,
+        "top": 68.5926284790039,
+        "right": 609.0827331542969,
+        "bottom": 99.35926628112793,
+        "text": "02 / 02 ⌄"
+      },
+      "player": {
+        "left": 0,
+        "top": 105.96897888183594,
+        "right": 1180.5755615234375,
+        "bottom": 192.6483917236328,
+        "text": "⏮\n▶\n⏭\n00:02 / 00:07"
+      },
+      "problems": []
+    },
+    "after_reading_en_spaces": [
+      {
+        "text": "Hello from a tune.",
+        "raw": "Hello from a tune.",
+        "words": [
+          "Hello",
+          "from",
+          "a",
+          "tune."
+        ]
+      },
+      {
+        "text": "This is a short English sentence for recognition.",
+        "raw": "This is a short English sentence for recognition.",
+        "words": [
+          "This",
+          "is",
+          "a",
+          "short",
+          "English",
+          "sentence",
+          "for",
+          "recognition."
+        ]
+      }
+    ],
+    "after_reading_both_audit": {
+      "inner": {
+        "w": 1180,
+        "h": 801
+      },
+      "head": {
+        "left": 0,
+        "top": 0,
+        "right": 1180.5755615234375,
+        "bottom": 55.991458892822266,
+        "text": "← 返回\nspeech\n听写\n···"
+      },
+      "count": {
+        "left": 529.4963989257812,
+        "top": 68.5926284790039,
+        "right": 609.0827331542969,
+        "bottom": 99.35926628112793,
+        "text": "02 / 02 ⌄"
+      },
+      "player": {
+        "left": 0,
+        "top": 105.96897888183594,
+        "right": 1180.5755615234375,
+        "bottom": 192.6483917236328,
+        "text": "⏮\n▶\n⏭\n00:02 / 00:07"
+      },
+      "problems": []
+    },
+    "after_reading_both_spaces": [
+      {
+        "text": "Hello from a tune.",
+        "raw": "Hello from a tune.",
+        "words": [
+          "Hello",
+          "from",
+          "a",
+          "tune."
+        ]
+      },
+      {
+        "text": "This is a short English sentence for recognition.",
+        "raw": "This is a short English sentence for recognition.",
+        "words": [
+          "This",
+          "is",
+          "a",
+          "short",
+          "English",
+          "sentence",
+          "for",
+          "recognition."
+        ]
+      }
+    ]
+  }
+}
