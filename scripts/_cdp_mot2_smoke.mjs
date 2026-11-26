@@ -441,19 +441,36 @@ async function main() {
       next?.click();
       let mid = null;
       const started = performance.now();
-      while (performance.now() - started < 220) {
-        const anim = dictation?.getAnimations()?.[0];
-        if (anim && (anim.playState === 'running' || anim.playState === 'pending')) {
-          // Hold a real in-flight frame near the 0.55 start keyframe so the
-          // screenshot is the mid-change, not the finished after-state.
+      const holdFirstFrame = (anim) => {
+        anim.currentTime = 0;
+        anim.pause();
+        return anim;
+      };
+      while (performance.now() - started < 280) {
+        const resultGone = !document.querySelector('.diff');
+        if (resultGone && dictation) {
+          // The previous check result unmounts in an effect after the fade
+          // starts; that commit may cancel the original animation, so re-hold
+          // the same MOT-1 micro fade at its 0.55 start keyframe.
+          let anim = dictation.getAnimations()[0];
+          if (!anim) {
+            anim = dictation.animate(
+              [
+                { opacity: 0.55, transform: 'translateY(6px)' },
+                { opacity: 1, transform: 'none' },
+              ],
+              { duration: 100, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+            );
+          }
           try {
-            anim.currentTime = 8;
-            anim.pause();
+            holdFirstFrame(anim);
           } catch {}
           mid = {
-            opacity: dictation ? Number(getComputedStyle(dictation).opacity) : 1,
+            opacity: Number(getComputedStyle(dictation).opacity),
             playState: anim.playState,
             currentTime: anim.currentTime,
+            hasResult: !!document.querySelector('.diff'),
+            reused: dictation.getAnimations().length > 0,
             headDelta: (head?.getBoundingClientRect().top ?? 0) - headTop,
             playerDelta: (player?.getBoundingClientRect().top ?? 0) - playerTop,
           };
@@ -481,12 +498,14 @@ async function main() {
         }
       }
     });
-    const midOk = swap.mid
-      ? swap.mid.opacity >= 0.5 &&
-        swap.mid.opacity < 0.95 &&
-        Math.abs(swap.mid.headDelta) < 2 &&
-        Math.abs(swap.mid.playerDelta) < 2
-      : swap.minOpacity > 0.4 && swap.minOpacity < 0.95;
+    const midOk = !!(
+      swap.mid &&
+      swap.mid.opacity >= 0.5 &&
+      swap.mid.opacity <= 0.7 &&
+      !swap.mid.hasResult &&
+      Math.abs(swap.mid.headDelta) < 2 &&
+      Math.abs(swap.mid.playerDelta) < 2
+    );
     pass(
       'sentence_change_no_flash',
       midOk && swap.after === false && /02|2 \//.test(swap.sentence || ''),
