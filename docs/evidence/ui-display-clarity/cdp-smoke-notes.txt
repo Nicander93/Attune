@@ -1,0 +1,496 @@
+tip 7056a26cda472334afa164f30da71786aaadd3fc
+waiting CDP 9222...
+page http://localhost:1420/
+page http://localhost:1420/
+size target=1180x800 inner=1181x801
+shot 01-home.png
+1 home {"overflowX":false,"clipped":0,"size":"1181x801"}
+shot 02-home-to-library-mid.png
+shot 03-library.png
+1 library {"overflowX":false,"clipped":0,"heading":"素材库"}
+shot 04-library-to-import-mid.png
+shot 05-import.png
+1 import {"overflowX":false,"clipped":0,"heading":"导入素材"}
+shot 06-back-library.png
+shot 07-back-home.png
+1 page switch => PASS
+size target=1024x640 inner=1025x642
+shot 10-ref-home.png
+shot 11-ref-library.png
+shot 12-ref-import.png
+3 1024x640 overflow=false inner=1025x642
+size target=720x560 inner=721x561
+shot 10-narrow-home.png
+shot 11-narrow-library.png
+shot 12-narrow-import.png
+3 720x560 overflow=false inner=721x561
+size target=1440x900 inner=1441x901
+shot 10-wide-home.png
+shot 11-wide-library.png
+shot 12-wide-import.png
+3 1440x900 overflow=false inner=1441x901
+3 viewports => PASS
+size target=1024x640 inner=1025x641
+no ready study material; importing C:\Users\PC\AttuneSmoke\p3\speech.wav
+import dialog {"code":0,"out":"DIALOG title=[��] hwnd=1051332\r\nCLICKED_OK"}
+import ready=true
+shot 39-imported-ready.png
+shot 40-study-entered.png
+shot 41-menu-opening.png
+shot 42-menu-open.png
+2 menu open overlapCheck=null opaque=true checkVisible=true => PASS
+shot 50-notice-appearing.png
+1 mid-frame {"menuPresent":false,"motion":null,"opacity":null,"mixedText":false} => PASS
+shot 51-notice-study.png
+3 study banner overlaps {"head":null,"status":null,"count":null,"banner":{"left":0,"top":56,"right":1025,"bottom":92,"width":1025,"height":36},"headBox":{"left":0,"top":0,"right":1025,"bottom":56,"width":1025,"height":56},"statusBox":{"left":0,"top":102,"right":1025,"bottom":138,"width":1025,"height":36},"clickable":{"← 返回":true,"听读":true,"更多":true,"01/02":true}} => PASS
+shot 52-notice-after-leave.png
+3 after leave overlaps {"topbar":null,"heading":null,"back":null,"banner":{"left":0,"top":66,"right":1025,"bottom":102,"width":1025,"height":36},"topbarBox":{"left":0,"top":0,"right":1025,"bottom":66,"width":1025,"height":66},"headingBox":{"left":113,"top":171,"right":913,"bottom":214,"width":800,"height":43},"backBox":{"left":113,"top":130,"right":164,"bottom":163,"width":51,"height":33}} => PASS
+ALL PASS
+
+SUMMARY {
+  "tip": "7056a26cda472334afa164f30da71786aaadd3fc",
+  "branch": "feat/ui-display-clarity",
+  "when": "2026-11-26T04:05:31.152Z",
+  "viewports": {
+    "default": {
+      "target": {
+        "width": 1180,
+        "height": 800
+      },
+      "innerWidth": 1181,
+      "innerHeight": 801,
+      "dpr": 1.3899999856948853,
+      "outer": {
+        "left": 1087,
+        "top": 1204,
+        "width": 1182,
+        "height": 803,
+        "windowState": "normal"
+      }
+    },
+    "ref": {
+      "target": {
+        "width": 1024,
+        "height": 640
+      },
+      "innerWidth": 1025,
+      "innerHeight": 642,
+      "dpr": 1.3899999856948853,
+      "outer": {
+        "left": 1242,
+        "top": 1376,
+        "width": 1026,
+        "height": 643,
+        "windowState": "normal"
+      }
+    },
+    "narrow": {
+      "target": {
+        "width": 720,
+        "height": 560
+      },
+      "innerWidth": 721,
+      "innerHeight": 561,
+      "dpr": 1.3899999856948853,
+      "outer": {
+        "left": 1397,
+        "top": 1548,
+        "width": 722,
+        "height": 562,
+        "windowState": "normal"
+      }
+    },
+    "wide": {
+      "target": {
+        "width": 1440,
+        "height": 900
+      },
+      "innerWidth": 1441,
+      "innerHeight": 901,
+      "dpr": 1.3899999856948853,
+      "outer": {
+        "left": 1553,
+        "top": 1720,
+        "width": 1442,
+        "height": 902,
+        "windowState": "normal"
+      }
+    },
+    "study": {
+      "target": {
+        "width": 1024,
+        "height": 640
+      },
+      "innerWidth": 1025,
+      "innerHeight": 641,
+      "dpr": 1.3899999856948853,
+      "outer": {
+        "left": 1709,
+        "top": 1892,
+        "width": 1026,
+        "height": 642,
+        "windowState": "normal"
+      }
+    }
+  },
+  "item1_page_switch": "PASS",
+  "item2_study_chrome": "FAIL",
+  "item3_viewports": "PASS",
+  "item4_notice_overlay": "FAIL",
+  "notice_blocks_title_or_toolbar": null,
+  "all": "PASS",
+  "evidence_dir": "docs/evidence/ui-display-clarity/",
+  "detail": {
+    "menuOpen": {
+      "menu": {
+        "text": "开启单句循环\n语速 · 1×\n语速\n0.5×\n0.75×\n1×\n1.25×\n1.5×\n✓ 按句\n连续\n句子列表\n只看难句\n关闭自动跟随\n显示未听写的原文\n开启按键音\n练习轮次\n校对字幕\n完整原文\n素材设置\n快捷键",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgb(255, 255, 255)",
+        "motion": "entered",
+        "rect": {
+          "left": 819,
+          "top": 53,
+          "right": 995,
+          "bottom": 366,
+          "width": 176,
+          "height": 313
+        }
+      },
+      "check": {
+        "text": "核对答案 Enter",
+        "hidden": false,
+        "opacity": "0.45",
+        "background": "rgb(49, 88, 67)",
+        "motion": null,
+        "rect": {
+          "left": 791,
+          "top": 386,
+          "right": 923,
+          "bottom": 424,
+          "width": 132,
+          "height": 38
+        }
+      },
+      "banner": null,
+      "head": {
+        "text": "← 返回\nspeech\n听读\n···\n开启单句循环\n语速 · 1×\n语速\n0.5×\n0.75×\n1×\n1.25×\n1.5×\n✓ 按句\n连续\n句子列表\n只看难句\n关闭自动跟随\n显示未听写的原文\n开启按键音\n练习轮次\n校对字幕\n完整原文\n素材设置\n快捷键",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgb(255, 255, 255)",
+        "motion": null,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "right": 1025,
+          "bottom": 56,
+          "width": 1025,
+          "height": 56
+        }
+      },
+      "status": {
+        "text": "01 / 02 ⌄\n☆\n已听写 0 / 2 句",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "motion": null,
+        "rect": {
+          "left": 0,
+          "top": 66,
+          "right": 1025,
+          "bottom": 102,
+          "width": 1025,
+          "height": 36
+        }
+      },
+      "count": {
+        "text": "01 / 02 ⌄",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "motion": null,
+        "rect": {
+          "left": 452,
+          "top": 69,
+          "right": 531,
+          "bottom": 99,
+          "width": 80,
+          "height": 31
+        }
+      },
+      "topbar": {
+        "text": "",
+        "hidden": true,
+        "opacity": "0",
+        "background": "rgb(255, 255, 255)",
+        "motion": null,
+        "rect": {
+          "left": 0,
+          "top": -8,
+          "right": 1025,
+          "bottom": 58,
+          "width": 1025,
+          "height": 66
+        }
+      },
+      "heading": {
+        "text": "第 1 / 2 句",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "motion": null,
+        "rect": {
+          "left": 103,
+          "top": 201,
+          "right": 175,
+          "bottom": 225,
+          "width": 72,
+          "height": 24
+        }
+      },
+      "back": {
+        "text": "← 返回",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "motion": null,
+        "rect": {
+          "left": 30,
+          "top": 11,
+          "right": 81,
+          "bottom": 44,
+          "width": 51,
+          "height": 33
+        }
+      },
+      "menuOverlapsCheck": null,
+      "bannerOverlapsHead": null,
+      "bannerOverlapsStatus": null,
+      "bannerOverlapsCount": null,
+      "bannerOverlapsTopbar": null,
+      "bannerOverlapsHeading": null,
+      "bannerOverlapsBack": null
+    },
+    "midClick": {
+      "menuPresent": false,
+      "motion": null,
+      "opacity": null,
+      "mixedText": false
+    },
+    "noticeStudy": {
+      "menu": null,
+      "check": {
+        "text": "核对答案 Enter",
+        "hidden": false,
+        "opacity": "0.45",
+        "background": "rgb(49, 88, 67)",
+        "motion": null,
+        "rect": {
+          "left": 791,
+          "top": 422,
+          "right": 923,
+          "bottom": 460,
+          "width": 132,
+          "height": 38
+        }
+      },
+      "banner": {
+        "text": "Enter：核对 / 下一句；Space：播放 / 暂停（输入框外）；左右方向键：切句（输入框外）；Esc：从核对返回修改。",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgb(237, 243, 238)",
+        "motion": "entered",
+        "rect": {
+          "left": 0,
+          "top": 56,
+          "right": 1025,
+          "bottom": 92,
+          "width": 1025,
+          "height": 36
+        }
+      },
+      "head": {
+        "text": "← 返回\nspeech\n听读\n···",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgb(255, 255, 255)",
+        "motion": null,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "right": 1025,
+          "bottom": 56,
+          "width": 1025,
+          "height": 56
+        }
+      },
+      "status": {
+        "text": "01 / 02 ⌄\n☆\n已听写 0 / 2 句",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "motion": null,
+        "rect": {
+          "left": 0,
+          "top": 102,
+          "right": 1025,
+          "bottom": 138,
+          "width": 1025,
+          "height": 36
+        }
+      },
+      "count": {
+        "text": "01 / 02 ⌄",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "motion": null,
+        "rect": {
+          "left": 452,
+          "top": 105,
+          "right": 531,
+          "bottom": 135,
+          "width": 80,
+          "height": 31
+        }
+      },
+      "topbar": {
+        "text": "",
+        "hidden": true,
+        "opacity": "0",
+        "background": "rgb(255, 255, 255)",
+        "motion": null,
+        "rect": {
+          "left": 0,
+          "top": -8,
+          "right": 1025,
+          "bottom": 58,
+          "width": 1025,
+          "height": 66
+        }
+      },
+      "heading": {
+        "text": "第 1 / 2 句",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "motion": null,
+        "rect": {
+          "left": 103,
+          "top": 237,
+          "right": 175,
+          "bottom": 261,
+          "width": 72,
+          "height": 24
+        }
+      },
+      "back": {
+        "text": "← 返回",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "motion": null,
+        "rect": {
+          "left": 30,
+          "top": 11,
+          "right": 81,
+          "bottom": 44,
+          "width": 51,
+          "height": 33
+        }
+      },
+      "menuOverlapsCheck": null,
+      "bannerOverlapsHead": null,
+      "bannerOverlapsStatus": null,
+      "bannerOverlapsCount": null,
+      "bannerOverlapsTopbar": null,
+      "bannerOverlapsHeading": null,
+      "bannerOverlapsBack": null
+    },
+    "chromeClickable": {
+      "← 返回": true,
+      "听读": true,
+      "更多": true,
+      "01/02": true
+    },
+    "noticeAfterLeave": {
+      "menu": null,
+      "check": null,
+      "banner": {
+        "text": "Enter：核对 / 下一句；Space：播放 / 暂停（输入框外）；左右方向键：切句（输入框外）；Esc：从核对返回修改。",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgb(237, 243, 238)",
+        "motion": "entered",
+        "rect": {
+          "left": 0,
+          "top": 66,
+          "right": 1025,
+          "bottom": 102,
+          "width": 1025,
+          "height": 36
+        }
+      },
+      "head": null,
+      "status": null,
+      "count": null,
+      "topbar": {
+        "text": "Attune\n首页\n素材库",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgb(255, 255, 255)",
+        "motion": null,
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "right": 1025,
+          "bottom": 66,
+          "width": 1025,
+          "height": 66
+        }
+      },
+      "heading": {
+        "text": "导入素材",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "motion": null,
+        "rect": {
+          "left": 113,
+          "top": 171,
+          "right": 913,
+          "bottom": 214,
+          "width": 800,
+          "height": 43
+        }
+      },
+      "back": {
+        "text": "← 返回",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "motion": null,
+        "rect": {
+          "left": 113,
+          "top": 130,
+          "right": 164,
+          "bottom": 163,
+          "width": 51,
+          "height": 33
+        }
+      },
+      "menuOverlapsCheck": null,
+      "bannerOverlapsHead": null,
+      "bannerOverlapsStatus": null,
+      "bannerOverlapsCount": null,
+      "bannerOverlapsTopbar": null,
+      "bannerOverlapsHeading": null,
+      "bannerOverlapsBack": null
+    }
+  },
+  "item2_menu_open": "PASS",
+  "item1_no_mixed_text": "PASS",
+  "item3_banner_study": "PASS",
+  "item3_banner_after_leave": "PASS",
+  "regression_shell": "PASS"
+}
