@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { Material } from '../../domain/types';
 import { activeWordIndex } from '../../domain/timing';
 import { motionScrollBehavior } from '../../app/motion';
@@ -167,15 +167,17 @@ export function ReadingView(props: Props) {
                     wordTimings.length ? (
                       <p className="reading__en">
                         {wordTimings.map((word, i) => (
-                          <button
-                            key={i}
-                            className={`reading__word${
-                              isCurrent && i === props.activeWord ? ' is-active' : ''
-                            }`}
-                            onClick={() => props.onSeekWord(segment.id, i)}
-                          >
-                            {word.text}
-                          </button>
+                          <Fragment key={i}>
+                            {i > 0 ? ' ' : null}
+                            <button
+                              className={`reading__word${
+                                isCurrent && i === props.activeWord ? ' is-active' : ''
+                              }`}
+                              onClick={() => props.onSeekWord(segment.id, i)}
+                            >
+                              {word.text}
+                            </button>
+                          </Fragment>
                         ))}
                       </p>
                     ) : (
