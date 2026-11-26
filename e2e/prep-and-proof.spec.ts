@@ -1,5 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
-import { material, openStudy, openStudyMenu, seed, settled, srt, storedMaterial, vtt, wav } from './support';
+import {
+  material,
+  openStudy,
+  openStudyMenu,
+  seed,
+  settled,
+  srt,
+  storedMaterial,
+  vtt,
+  wav,
+} from './support';
 
 const goToPrep = async (page: Page) => {
   await page.getByRole('button', { name: '素材库' }).first().click();
@@ -54,6 +64,11 @@ test.describe('material preparation', () => {
         buffer: Buffer.from(srt),
       });
     await expect(page.getByRole('status').filter({ hasText: /字幕已导入 2 句/ })).toBeVisible();
+    await expect(page.getByText('已准备好 2 句，可以开始听写')).toBeVisible();
+    await expect(page.getByRole('button', { name: '开始听写 →' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: '校对字幕' })).toHaveCount(0);
+    await page.getByRole('button', { name: '更多 ···' }).click();
+    await expect(page.getByRole('menuitem', { name: '校对字幕' })).toBeVisible();
     await settled(page);
     expect((await storedMaterial(page, 'm1')).segments).toHaveLength(2);
   });
@@ -124,13 +139,14 @@ test.describe('material preparation', () => {
     expect((await storedMaterial(page, 'm1')).segments).toHaveLength(3);
   });
 
-  test('allows a material with no subtitles but says checking is unavailable', async ({ page }) => {
+  test('allows a material with no subtitles and keeps dictation disabled', async ({ page }) => {
     await seed(page, [material({ audio: wav(), segments: [] })]);
     await page.getByRole('button', { name: '素材库' }).first().click();
     await page.locator('.materials__row').first().click();
     await expect(page.getByText('这段素材还没有字幕')).toBeVisible();
     await page.getByRole('button', { name: '去准备字幕' }).click();
-    await expect(page.getByText('字幕待校对')).toBeVisible();
+    await expect(page.getByText('还没有字幕')).toBeVisible();
+    await expect(page.getByText('字幕待校对')).toHaveCount(0);
     await expect(page.getByRole('button', { name: '开始听写 →' })).toBeDisabled();
   });
 });

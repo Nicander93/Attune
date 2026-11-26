@@ -40,9 +40,15 @@ test('prepared material uses ready row, supports rename and opens subtitle proof
 
 test('new material shows one dropzone then ready CTAs after audio import', async ({ page }) => {
   await seed(page, []);
-  await page.getByRole('button', { name: /导入素材/ }).first().click();
+  await page
+    .getByRole('button', { name: /导入素材/ })
+    .first()
+    .click();
   await expect(page.locator('.dropzone')).toHaveCount(1);
   await expect(page.getByRole('heading', { name: '导入素材' })).toBeVisible();
+  await expect(page.getByText('选择或拖入文件')).toBeVisible();
+  await expect(page.getByText('未命名素材')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '更多 ···' })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '开始听写 →' })).toHaveCount(0);
   await page
     .locator('input[type=file]')
@@ -53,4 +59,17 @@ test('new material shows one dropzone then ready CTAs after audio import', async
   await expect(page.getByRole('button', { name: '开始听写 →' })).toBeDisabled();
   await page.getByRole('button', { name: '更多 ···' }).click();
   await expect(page.getByRole('menuitem', { name: '开始听读' })).toBeEnabled();
+});
+
+test('ready subtitles use plain success copy and keep proofing under more', async ({ page }) => {
+  await seed(page, [material({ audio: wav(9) })]);
+  await openStudy(page);
+  await openStudyMenu(page, '素材设置');
+  await expect(page.getByText('已准备好 3 句，可以开始听写')).toBeVisible();
+  await expect(page.getByText('请校对后再开始听写')).toHaveCount(0);
+  await expect(page.getByText('不应作为最终答案')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '开始听写 →' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '校对字幕' })).toHaveCount(0);
+  await page.getByRole('button', { name: '更多 ···' }).click();
+  await expect(page.getByRole('menuitem', { name: '校对字幕' })).toBeVisible();
 });

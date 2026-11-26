@@ -212,6 +212,7 @@ fn main() {
             media::media_ffmpeg_bundle,
             download_ffmpeg,
             media::media_authorize_path,
+            media::media_stage_import,
             media::media_probe,
             media::media_extract_audio,
             media::media_extract_subtitles,
