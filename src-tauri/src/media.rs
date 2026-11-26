@@ -416,7 +416,8 @@ pub fn media_authorize_path(state: State<'_, MediaState>, path: String) -> Resul
     Ok(full.display().to_string())
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StageImportRequest {
     pub path: String,
     pub material_id: String,
@@ -1064,6 +1065,14 @@ mod tests {
     fn rejects_shell_metacharacters() {
         assert!(looks_dangerous("a;rm"));
         assert!(!looks_dangerous(r"D:\videos\lesson.mp4"));
+    }
+
+    #[test]
+    fn stage_import_request_accepts_camel_case() {
+        let req: StageImportRequest =
+            serde_json::from_str(r#"{"path":"C:\\a.wav","materialId":"abc-123"}"#).unwrap();
+        assert_eq!(req.path, r"C:\a.wav");
+        assert_eq!(req.material_id, "abc-123");
     }
 
     #[test]
