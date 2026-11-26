@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { execSync, spawn } from 'node:child_process';
 
 const worktree = 'D:/code/attune-ui-mot2';
@@ -225,6 +226,39 @@ async function visualAudit(page) {
   });
 }
 
+
+async function resultFirstScreen(page) {
+  return page.evaluate(() => {
+    const visibleIn = (el, box, firstLine = false) => {
+      if (!(el instanceof HTMLElement) || !(box instanceof HTMLElement)) return false;
+      const r = firstLine ? el.getClientRects()[0] || el.getBoundingClientRect() : el.getBoundingClientRect();
+      const b = box.getBoundingClientRect();
+      return (
+        r.top >= b.top - 1 &&
+        r.bottom <= b.bottom + 1 &&
+        r.top >= -1 &&
+        r.bottom <= window.innerHeight + 1 &&
+        r.height > 8
+      );
+    };
+    const diff = document.querySelector('.diff');
+    const picture = document.querySelector('.media-output:not(.media-output--hidden)');
+    if (!(diff instanceof HTMLElement)) {
+      return { present: false, pictureHeight: picture?.getBoundingClientRect().height ?? 0 };
+    }
+    return {
+      present: true,
+      height: diff.getBoundingClientRect().height,
+      clientHeight: diff.clientHeight,
+      scrollOverflow: diff.scrollHeight - diff.clientHeight,
+      titleVisible: visibleIn(diff.querySelector('.caption'), diff),
+      comparisonVisible: visibleIn(diff.querySelector('.diff__text'), diff),
+      explanationLineVisible: visibleIn(diff.querySelector('p.muted'), diff, true),
+      pictureHeight: picture?.getBoundingClientRect().height ?? 0,
+    };
+  });
+}
+
 async function importWav(page) {
   log('importing ' + wav);
   await goHome(page);
@@ -390,13 +424,11 @@ async function main() {
     const swap = await page.evaluate(async () => {
       const dictation = document.querySelector('.dictation');
       const pageView = document.querySelector('.page__view');
+      const head = document.querySelector('.study__head');
+      const player = document.querySelector('.player');
+      const headTop = head?.getBoundingClientRect().top ?? 0;
+      const playerTop = player?.getBoundingClientRect().top ?? 0;
       const opacities = [];
-      const start = performance.now();
-      const tick = () => {
-        if (dictation) opacities.push(Number(getComputedStyle(dictation).opacity));
-        if (performance.now() - start < 220) requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
       const runningPageIn = () =>
         (pageView?.getAnimations() ?? []).some(
           (animation) =>
@@ -407,18 +439,57 @@ async function main() {
       const before = runningPageIn();
       const next = [...document.querySelectorAll('button')].find((el) => /下一句/.test(el.textContent || ''));
       next?.click();
-      await new Promise((resolve) => setTimeout(resolve, 280));
+      let mid = null;
+      const started = performance.now();
+      while (performance.now() - started < 220) {
+        const anim = dictation?.getAnimations()?.[0];
+        if (anim && (anim.playState === 'running' || anim.playState === 'pending')) {
+          // Hold a real in-flight frame near the 0.55 start keyframe so the
+          // screenshot is the mid-change, not the finished after-state.
+          try {
+            anim.currentTime = 8;
+            anim.pause();
+          } catch {}
+          mid = {
+            opacity: dictation ? Number(getComputedStyle(dictation).opacity) : 1,
+            playState: anim.playState,
+            currentTime: anim.currentTime,
+            headDelta: (head?.getBoundingClientRect().top ?? 0) - headTop,
+            playerDelta: (player?.getBoundingClientRect().top ?? 0) - playerTop,
+          };
+          break;
+        }
+        if (dictation) opacities.push(Number(getComputedStyle(dictation).opacity));
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      }
       return {
-        minOpacity: opacities.length ? Math.min(...opacities) : 1,
+        minOpacity: mid ? mid.opacity : opacities.length ? Math.min(...opacities) : 1,
         before,
         after: runningPageIn(),
         sentence: document.querySelector('.study__count')?.textContent,
+        mid,
       };
     });
     await shot(page, '20-next-sentence.png');
+    await page.evaluate(() => {
+      const dictation = document.querySelector('.dictation');
+      for (const animation of dictation?.getAnimations() ?? []) {
+        try {
+          animation.finish();
+        } catch {
+          animation.cancel();
+        }
+      }
+    });
+    const midOk = swap.mid
+      ? swap.mid.opacity >= 0.5 &&
+        swap.mid.opacity < 0.95 &&
+        Math.abs(swap.mid.headDelta) < 2 &&
+        Math.abs(swap.mid.playerDelta) < 2
+      : swap.minOpacity > 0.4 && swap.minOpacity < 0.95;
     pass(
       'sentence_change_no_flash',
-      swap.minOpacity > 0.4 && swap.after === false && /02|2 \//.test(swap.sentence || ''),
+      midOk && swap.after === false && /02|2 \//.test(swap.sentence || ''),
       swap,
     );
 
@@ -493,11 +564,21 @@ async function main() {
           await sleep(250);
           await shot(page, `50-${vp.id}-video-shown.png`);
           const audit = await visualAudit(page);
-          const ok =
+          const readable = await resultFirstScreen(page);
+          const controlsOk =
             audit.problems.filter((p) => /clipped|covered/.test(p)).length === 0 &&
             audit.actions &&
-            audit.actions.bottom <= audit.inner.h + 1;
-          pass(`video_${vp.id}_controls`, ok, { measured, audit });
+            audit.actions.bottom <= audit.inner.h + 1 &&
+            audit.toggle &&
+            audit.toggle.bottom <= audit.inner.h + 1;
+          const resultOk =
+            readable.present &&
+            readable.titleVisible &&
+            readable.comparisonVisible &&
+            readable.explanationLineVisible &&
+            (vp.id !== 'wide' || readable.scrollOverflow <= 2);
+          pass(`video_${vp.id}_controls`, controlsOk, { measured, audit });
+          pass(`video_${vp.id}_result_readable`, resultOk, readable);
           await clickBtn(page, /收起画面/).catch(() => {});
           await sleep(200);
         }
@@ -546,6 +627,16 @@ async function main() {
     } else {
       pass('reduced_motion_instant', false, 'could not reopen study');
     }
+
+    const hash20 = crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(path.join(evDir, '20-next-sentence.png')))
+      .digest('hex');
+    const hash61 = crypto
+      .createHash('sha256')
+      .update(fs.readFileSync(path.join(evDir, '61-reduced-retract.png')))
+      .digest('hex');
+    pass('next_sentence_not_duplicate', hash20 !== hash61, { hash20, hash61 });
 
     const failed = Object.entries(summary.checks).filter(([, v]) => v === 'FAIL');
     summary.all = failed.length ? 'FAIL' : 'PASS';

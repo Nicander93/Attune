@@ -2875,6 +2875,15 @@ input[type='range'],
 .app[data-focus='study'] .media-output:not(.media-output--hidden) .media-output__video {
   max-height: min(32vh, 240px, calc(100% - 22rem));
 }
+/* 1024x640: 32vh left the check result as a ~26px slit once the picture was open.
+   Keep 收起画面 and 修改/下一句 in the window, but leave room for the 核对结果
+   title, the comparison sentence, and one line of explanation. */
+@media (max-height: 660px) {
+  .app[data-focus='study'] .media-output:not(.media-output--hidden),
+  .app[data-focus='study'] .media-output:not(.media-output--hidden) .media-output__video {
+    max-height: min(16vh, 104px, calc(100% - 30rem));
+  }
+}
 
 .study--focus .dictation {
   display: flex;
