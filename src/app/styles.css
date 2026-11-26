@@ -17,6 +17,11 @@
   --errbg: #fdf0ee;
   --shadow: 0 12px 32px rgba(32, 42, 35, 0.055);
   --radius: 14px;
+  --motion-micro: 100ms;
+  --motion-short: 180ms;
+  --motion-page: 240ms;
+  --motion-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-leave: cubic-bezier(0.4, 0, 1, 1);
 }
 
 * {
@@ -895,7 +900,7 @@ button.back {
 }
 .proof__actions {
   opacity: 0;
-  transition: opacity 120ms ease-out;
+  transition: opacity var(--motion-short) var(--motion-ease-enter);
 }
 .proof__list > li:hover .proof__actions,
 .proof__list > li:focus-within .proof__actions {
@@ -1084,9 +1089,14 @@ button.back {
 /* V3 page composition and shared controls. Business state stays in the page components. */
 button {
   transition:
-    background-color 140ms ease,
-    border-color 140ms ease,
-    color 140ms ease;
+    background-color var(--motion-micro) var(--motion-ease-enter),
+    border-color var(--motion-micro) var(--motion-ease-enter),
+    color var(--motion-micro) var(--motion-ease-enter),
+    opacity var(--motion-micro) var(--motion-ease-enter),
+    transform var(--motion-micro) var(--motion-ease-enter);
+}
+button:active:not(:disabled):not(.reading__word) {
+  transform: scale(0.98);
 }
 button:not([class]):not([role='tab']):not(.reading__word),
 button.secondary {
@@ -1656,6 +1666,7 @@ h1 {
   *::before,
   *::after {
     transition: none !important;
+    animation: none !important;
     scroll-behavior: auto !important;
   }
 }
@@ -2020,7 +2031,6 @@ h1 {
   }
 }
 
-
 /* S2 import converge 鈥?single drop 鈫?ready 鈫?CTAs; advanced under銆屾洿澶氥€? */
 .import.prep {
   gap: 0;
@@ -2169,7 +2179,6 @@ h1 {
   }
 }
 
-
 /* ---------- S3 focus study shell (V2) ---------- */
 .app[data-focus='study'] .page {
   padding: 0;
@@ -2182,6 +2191,8 @@ h1 {
   background: #fff;
 }
 .study__head--focus {
+  position: relative;
+  z-index: 60;
   height: 56px;
   min-height: 56px;
   padding: 0 28px;
@@ -2189,6 +2200,7 @@ h1 {
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
+  background: #fff;
 }
 .study__file {
   font-size: 13px;
@@ -2294,7 +2306,7 @@ h1 {
 .study__sentence-pop {
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
+  translate: -50% 0;
   top: 108px;
   z-index: 35;
   width: min(400px, calc(100% - 48px));
@@ -2500,7 +2512,6 @@ h1 {
   font-weight: 600;
 }
 
-
 /* UX-1 import failure / choice */
 .import__failure {
   display: flex;
@@ -2549,4 +2560,115 @@ h1 {
 }
 .import__probe-detail {
   margin-bottom: 10px;
+}
+
+/* ---------- MOT-1 motion language ---------- */
+.topbar {
+  position: relative;
+  z-index: 60;
+  background: var(--paper);
+  visibility: visible;
+  transition:
+    opacity var(--motion-page) var(--motion-ease-enter),
+    transform var(--motion-page) var(--motion-ease-enter),
+    visibility 0s linear;
+}
+.app[data-focus='study'] .topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+  visibility: hidden;
+  transition:
+    opacity var(--motion-short) var(--motion-ease-leave),
+    transform var(--motion-short) var(--motion-ease-leave),
+    visibility 0s linear var(--motion-short);
+}
+
+.banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 50;
+  transition:
+    opacity var(--motion-short) var(--motion-ease-enter),
+    transform var(--motion-short) var(--motion-ease-enter);
+}
+.app:not([data-focus='study']) .banner {
+  top: 54px;
+}
+.app[data-focus='study'] .banner {
+  /* Sit below the 56px study head, same idea as the global topbar offset. */
+  top: 56px;
+}
+.banner[data-motion='entering'],
+.banner[data-motion='leaving'] {
+  opacity: 0;
+  transform: translateY(-6px);
+  pointer-events: none;
+  transition-timing-function: var(--motion-ease-leave);
+}
+.banner[data-motion='entered'] {
+  opacity: 1;
+  transform: none;
+}
+
+@keyframes motion-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.page.is-entering > section,
+.page.is-entering > .page__view {
+  animation: motion-page-in var(--motion-page) var(--motion-ease-enter) both;
+}
+
+[data-motion='entering'],
+[data-motion='leaving'] {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+  pointer-events: none;
+  transition:
+    opacity var(--motion-short) var(--motion-ease-leave),
+    transform var(--motion-short) var(--motion-ease-leave);
+}
+[data-motion='entered'] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--motion-short) var(--motion-ease-enter),
+    transform var(--motion-short) var(--motion-ease-enter);
+}
+[data-motion][data-origin='top-right'] {
+  transform-origin: top right;
+}
+[data-motion][data-origin='top-left'] {
+  transform-origin: top left;
+}
+[data-motion][data-origin='top-center'] {
+  transform-origin: top center;
+}
+
+.dropzone {
+  transform-origin: center;
+  transition: transform var(--motion-micro) var(--motion-ease-enter);
+}
+.dropzone.is-dragging {
+  transform: scale(1.01);
+}
+
+input[type='range'],
+.progress-track span,
+.player__timeline {
+  transition: none;
 }

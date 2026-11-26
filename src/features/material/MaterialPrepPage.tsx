@@ -28,6 +28,7 @@ import {
 } from './local-media';
 import { shouldAutoPrepareSubtitles } from './prepare-video';
 import { useAutoVideoImport } from './useAutoVideoImport';
+import { MotionPop } from '../../app/MotionPop';
 
 type Props = {
   material: Material;
@@ -381,11 +382,14 @@ export function MaterialPrepPage({
         >
           更多 ···
         </button>
-        {advanced === 'more' && (
-          <div className="menu menu--right" role="menu">
-            {moreItems}
-          </div>
-        )}
+        <MotionPop
+          open={advanced === 'more'}
+          className="menu menu--right"
+          role="menu"
+          origin="top-right"
+        >
+          {moreItems}
+        </MotionPop>
       </div>
     );
 

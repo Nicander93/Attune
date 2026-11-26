@@ -9,6 +9,7 @@ import { Player } from '../player/Player';
 import { PLAYBACK_RATES, type AudioPlayer } from '../player/useMediaPlayer';
 import { WordFlowEditor } from '../dictation/WordFlowEditor';
 import { ReadingView, useActiveWord } from '../reading/ReadingView';
+import { MotionPop } from '../../app/MotionPop';
 
 type Props = {
   material: Material;
@@ -50,7 +51,7 @@ export function StudyPage({
   const [checked, setChecked] = useState(
     Boolean(
       activeRound(material)?.checkedSegmentId &&
-        activeRound(material)?.checkedSegmentId === activeRound(material)?.activeSegmentId,
+      activeRound(material)?.checkedSegmentId === activeRound(material)?.activeSegmentId,
     ),
   );
   const [revealAll, setRevealAll] = useState(material.studySettings?.revealAll ?? false);
@@ -390,189 +391,187 @@ export function StudyPage({
           >
             ···
           </button>
-          {menuOpen && (
-            <div className="study__menu" role="menu">
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  player.setLoop(!player.loop);
-                  closeMenu();
-                }}
+          <MotionPop open={menuOpen} className="study__menu" role="menu" origin="top-right">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                player.setLoop(!player.loop);
+                closeMenu();
+              }}
+            >
+              {player.loop ? '关闭单句循环' : '开启单句循环'}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                player.setSpeed(nextPlaybackRate(player.speed));
+                closeMenu();
+              }}
+            >
+              语速 · {player.speed}×
+            </button>
+            <label className="study__menu-volume" role="none">
+              语速
+              <select
+                aria-label="播放速度"
+                value={player.speed}
+                onChange={(event) => player.setSpeed(Number(event.target.value))}
               >
-                {player.loop ? '关闭单句循环' : '开启单句循环'}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  player.setSpeed(nextPlaybackRate(player.speed));
-                  closeMenu();
-                }}
-              >
-                语速 · {player.speed}×
-              </button>
+                {PLAYBACK_RATES.map((rate) => (
+                  <option key={rate} value={rate}>
+                    {rate}×
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                player.setMode('segment');
+                closeMenu();
+              }}
+            >
+              {player.mode === 'segment' ? '✓ 按句' : '按句'}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                player.setMode('continuous');
+                closeMenu();
+              }}
+            >
+              {player.mode === 'continuous' ? '✓ 连续' : '连续'}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                closeMenu();
+                setSentenceOpen(true);
+              }}
+            >
+              句子列表
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setBookmarkedOnly(!bookmarkedOnly);
+                updateStudySettings({ bookmarkedOnly: !bookmarkedOnly });
+                setChecked(false);
+                closeMenu();
+              }}
+            >
+              {bookmarkedOnly ? '查看全部句子' : '只看难句'}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const next = !following;
+                setFollowing(next);
+                updateStudySettings({ following: next });
+                closeMenu();
+              }}
+            >
+              {following ? '关闭自动跟随' : '开启自动跟随'}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                const next = !revealAll;
+                setRevealAll(next);
+                updateStudySettings({ revealAll: next });
+                closeMenu();
+              }}
+            >
+              {revealAll ? '隐藏未听写原文' : '显示未听写的原文'}
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setKeySounds(!keySounds);
+                updateStudySettings({ keySounds: !keySounds });
+              }}
+            >
+              {keySounds ? '关闭按键音' : '开启按键音'}
+            </button>
+            {keySounds && (
               <label className="study__menu-volume" role="none">
-                语速
-                <select
-                  aria-label="播放速度"
-                  value={player.speed}
-                  onChange={(event) => player.setSpeed(Number(event.target.value))}
-                >
-                  {PLAYBACK_RATES.map((rate) => (
-                    <option key={rate} value={rate}>
-                      {rate}×
-                    </option>
-                  ))}
-                </select>
+                音量
+                <input
+                  type="range"
+                  aria-label="按键音量"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={volume}
+                  onChange={(event) => {
+                    setVolume(Number(event.target.value));
+                    updateStudySettings({ volume: Number(event.target.value) });
+                  }}
+                />
               </label>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  player.setMode('segment');
-                  closeMenu();
-                }}
-              >
-                {player.mode === 'segment' ? '✓ 按句' : '按句'}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  player.setMode('continuous');
-                  closeMenu();
-                }}
-              >
-                {player.mode === 'continuous' ? '✓ 连续' : '连续'}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeMenu();
-                  setSentenceOpen(true);
-                }}
-              >
-                句子列表
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setBookmarkedOnly(!bookmarkedOnly);
-                  updateStudySettings({ bookmarkedOnly: !bookmarkedOnly });
-                  setChecked(false);
-                  closeMenu();
-                }}
-              >
-                {bookmarkedOnly ? '查看全部句子' : '只看难句'}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  const next = !following;
-                  setFollowing(next);
-                  updateStudySettings({ following: next });
-                  closeMenu();
-                }}
-              >
-                {following ? '关闭自动跟随' : '开启自动跟随'}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  const next = !revealAll;
-                  setRevealAll(next);
-                  updateStudySettings({ revealAll: next });
-                  closeMenu();
-                }}
-              >
-                {revealAll ? '隐藏未听写原文' : '显示未听写的原文'}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  setKeySounds(!keySounds);
-                  updateStudySettings({ keySounds: !keySounds });
-                }}
-              >
-                {keySounds ? '关闭按键音' : '开启按键音'}
-              </button>
-              {keySounds && (
-                <label className="study__menu-volume" role="none">
-                  音量
-                  <input
-                    type="range"
-                    aria-label="按键音量"
-                    min="0"
-                    max="1"
-                    step="0.05"
-                    value={volume}
-                    onChange={(event) => {
-                      setVolume(Number(event.target.value));
-                      updateStudySettings({ volume: Number(event.target.value) });
-                    }}
-                  />
-                </label>
-              )}
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeMenu();
-                  setShowHistory(true);
-                }}
-              >
-                练习轮次
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeMenu();
-                  onSubtitles();
-                }}
-              >
-                校对字幕
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeMenu();
-                  onTranscript();
-                }}
-              >
-                完整原文
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeMenu();
-                  onPrepare();
-                }}
-              >
-                素材设置
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  closeMenu();
-                  onNotice(
-                    'Enter：核对 / 下一句；Space：播放 / 暂停（输入框外）；左右方向键：切句（输入框外）；Esc：从核对返回修改。',
-                  );
-                }}
-              >
-                快捷键
-              </button>
-            </div>
-          )}
+            )}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                closeMenu();
+                setShowHistory(true);
+              }}
+            >
+              练习轮次
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                closeMenu();
+                onSubtitles();
+              }}
+            >
+              校对字幕
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                closeMenu();
+                onTranscript();
+              }}
+            >
+              完整原文
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                closeMenu();
+                onPrepare();
+              }}
+            >
+              素材设置
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                closeMenu();
+                onNotice(
+                  'Enter：核对 / 下一句；Space：播放 / 暂停（输入框外）；左右方向键：切句（输入框外）；Esc：从核对返回修改。',
+                );
+              }}
+            >
+              快捷键
+            </button>
+          </MotionPop>
         </div>
       </header>
 
@@ -607,29 +606,33 @@ export function StudyPage({
         </span>
       </div>
 
-      {sentenceOpen && (
-        <div className="study__sentence-pop" role="listbox" aria-label="句子列表">
-          {scope.map((s, i) => (
-            <button
-              key={s.id}
-              type="button"
-              role="option"
-              aria-selected={s.id === editingId}
-              className={s.id === editingId ? 'is-current' : undefined}
-              onClick={() => {
-                selectSentence(s.id);
-                player.goToSegment(s.id);
-              }}
-            >
-              <strong>{String(i + 1).padStart(2, '0')}</strong>
-              <span>
-                {completed.has(s.id) ? '已听写' : '未听写'}
-                {material.bookmarkedSegmentIds.includes(s.id) ? ' · ★' : ''}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
+      <MotionPop
+        open={sentenceOpen}
+        className="study__sentence-pop"
+        role="listbox"
+        origin="top-center"
+        aria-label="句子列表"
+      >
+        {scope.map((s, i) => (
+          <button
+            key={s.id}
+            type="button"
+            role="option"
+            aria-selected={s.id === editingId}
+            className={s.id === editingId ? 'is-current' : undefined}
+            onClick={() => {
+              selectSentence(s.id);
+              player.goToSegment(s.id);
+            }}
+          >
+            <strong>{String(i + 1).padStart(2, '0')}</strong>
+            <span>
+              {completed.has(s.id) ? '已听写' : '未听写'}
+              {material.bookmarkedSegmentIds.includes(s.id) ? ' · ★' : ''}
+            </span>
+          </button>
+        ))}
+      </MotionPop>
 
       <Player
         material={material}
