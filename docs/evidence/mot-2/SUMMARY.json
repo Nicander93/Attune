@@ -1,0 +1,350 @@
+{
+  "tip": "57d50b89a0aa97180b9d33530cd690666c4afaa7",
+  "branch": "feat/mot-2-study-motion",
+  "when": "2026-11-26T09:40:15.428Z",
+  "all": "PASS",
+  "checks": {
+    "enter_study": "PASS",
+    "check_appears_near_field": "PASS",
+    "esc_retracts": "PASS",
+    "sentence_change_no_flash": "PASS",
+    "reading_mode": "PASS",
+    "open_video_material": "PASS",
+    "video_toggle_present": "PASS",
+    "video_show_controls_in_window": "PASS",
+    "video_interruptible": "PASS",
+    "video_narrow_controls": "PASS",
+    "video_wide_controls": "PASS",
+    "reduced_motion_instant": "PASS"
+  },
+  "detail": {
+    "size": {
+      "innerWidth": 1181,
+      "innerHeight": 801,
+      "dpr": 1.3899999856948853
+    },
+    "enter_study": {
+      "opened": true
+    },
+    "check_appears_near_field": {
+      "nearField": {
+        "gap": 13.995063781738281,
+        "below": true
+      },
+      "problems": [],
+      "audit": {
+        "inner": {
+          "w": 1181,
+          "h": 801
+        },
+        "head": {
+          "left": 0,
+          "top": 0,
+          "right": 1181.2950439453125,
+          "bottom": 55.991458892822266,
+          "text": "← 返回\nspeech\n听读\n···"
+        },
+        "count": {
+          "left": 529.8561401367188,
+          "top": 68.5926284790039,
+          "right": 609.4424743652344,
+          "bottom": 99.35926628112793,
+          "text": "01 / 02 ⌄"
+        },
+        "player": {
+          "left": 0,
+          "top": 105.96897888183594,
+          "right": 1181.2950439453125,
+          "bottom": 192.6483917236328,
+          "text": "⏮\n▶\n⏭\n00:00 / 00:07"
+        },
+        "field": {
+          "left": 180.6429901123047,
+          "top": 247.84173583984375,
+          "right": 1000.6407928466797,
+          "bottom": 311.27474212646484,
+          "text": "Hello from a tune."
+        },
+        "diff": {
+          "left": 180.6429901123047,
+          "top": 325.2698059082031,
+          "right": 1000.6407928466797,
+          "bottom": 474.65155029296875,
+          "text": "核对结果\n\nHello from a tune.\n\n和原文一致。 · Enter 下一句 · Esc 回到修改"
+        },
+        "actions": {
+          "left": 180.6429901123047,
+          "top": 488.6466064453125,
+          "right": 1000.6407928466797,
+          "bottom": 536.8480453491211,
+          "text": "修改\n↻ 重听\n下一句 →"
+        },
+        "next": {
+          "left": 775.6182861328125,
+          "top": 501.4276123046875,
+          "right": 821.0544395446777,
+          "bottom": 534.049015045166,
+          "text": "修改"
+        },
+        "toggle": null,
+        "picture": null,
+        "pictureMotion": null,
+        "diffMotion": "entered",
+        "problems": []
+      }
+    },
+    "sentence_change_no_flash": {
+      "minOpacity": 0.55,
+      "before": false,
+      "after": false,
+      "sentence": "02 / 02 ⌄"
+    },
+    "reading_mode": {
+      "reading": 1
+    },
+    "video_show_controls_in_window": {
+      "inner": {
+        "w": 1181,
+        "h": 801
+      },
+      "head": {
+        "left": 0,
+        "top": 239.99551391601562,
+        "right": 1181.2950439453125,
+        "bottom": 295.9869728088379,
+        "text": "← 返回\nh264_aac_subs\n听读\n···"
+      },
+      "count": {
+        "left": 529.8561401367188,
+        "top": 308.588134765625,
+        "right": 609.4424743652344,
+        "bottom": 339.354772567749,
+        "text": "01 / 02 ⌄"
+      },
+      "player": {
+        "left": 0,
+        "top": 345.9644775390625,
+        "right": 1181.2950439453125,
+        "bottom": 432.6438903808594,
+        "text": "⏮\n▶\n⏭\n00:03 / 00:03"
+      },
+      "field": {
+        "left": 180.6429901123047,
+        "top": 487.8372497558594,
+        "right": 1000.6407928466797,
+        "bottom": 551.2702560424805,
+        "text": "Hello from embedded subtitle Second line for listening"
+      },
+      "diff": {
+        "left": 180.6429901123047,
+        "top": 565.2653198242188,
+        "right": 1000.6407928466797,
+        "bottom": 682.6439208984375,
+        "text": "核对结果\n\nHello from embedded subtitle Second line for listening\n\n多写或写错：Second、line、"
+      },
+      "actions": {
+        "left": 180.6429901123047,
+        "top": 753.2374267578125,
+        "right": 1000.6407928466797,
+        "bottom": 801.4388656616211,
+        "text": "修改\n↻ 重听\n下一句 →"
+      },
+      "next": {
+        "left": 775.6182861328125,
+        "top": 766.0184326171875,
+        "right": 821.0544395446777,
+        "bottom": 798.639835357666,
+        "text": "修改"
+      },
+      "toggle": {
+        "left": 180.6429901123047,
+        "top": 704.63134765625,
+        "right": 250.07869720458984,
+        "bottom": 737.2527503967285,
+        "text": "收起画面"
+      },
+      "picture": {
+        "left": 0,
+        "top": 0,
+        "right": 1181.2950439453125,
+        "bottom": 239.99551391601562,
+        "text": ""
+      },
+      "pictureMotion": "entered",
+      "diffMotion": "entered",
+      "problems": []
+    },
+    "video_interruptible": {
+      "motion": "entered",
+      "hidden": false,
+      "label": "收起画面"
+    },
+    "video_narrow_controls": {
+      "measured": {
+        "innerWidth": 1026,
+        "innerHeight": 641,
+        "dpr": 1.3899999856948853
+      },
+      "audit": {
+        "inner": {
+          "w": 1026,
+          "h": 641
+        },
+        "head": {
+          "left": 0,
+          "top": 205.1146697998047,
+          "right": 1026.6187744140625,
+          "bottom": 261.10612869262695,
+          "text": "← 返回\nh264_aac_subs\n听读\n···"
+        },
+        "count": {
+          "left": 452.51800537109375,
+          "top": 273.7073059082031,
+          "right": 532.1043395996094,
+          "bottom": 304.47394371032715,
+          "text": "01 / 02 ⌄"
+        },
+        "player": {
+          "left": 0,
+          "top": 311.0836486816406,
+          "right": 1026.6187744140625,
+          "bottom": 391.76036071777344,
+          "text": "⏮\n▶\n⏭\n00:03 / 00:03"
+        },
+        "field": {
+          "left": 103.30486297607422,
+          "top": 434.94830322265625,
+          "right": 923.3026657104492,
+          "bottom": 494.37950897216797,
+          "text": "Hello from embedded subtitle Second line for listening"
+        },
+        "diff": {
+          "left": 103.30486297607422,
+          "top": 504.3727722167969,
+          "right": 923.3026657104492,
+          "bottom": 530.2158489227295,
+          "text": "核对结果\n\nHello from embedded subtitle Second line for listening\n\n多写或写错：Second、line、"
+        },
+        "actions": {
+          "left": 103.30486297607422,
+          "top": 592.8057861328125,
+          "right": 923.3026657104492,
+          "bottom": 641.0072250366211,
+          "text": "修改\n↻ 重听\n下一句 →"
+        },
+        "next": {
+          "left": 698.2801513671875,
+          "top": 605.5867919921875,
+          "right": 743.7163047790527,
+          "bottom": 638.208194732666,
+          "text": "修改"
+        },
+        "toggle": {
+          "left": 103.30486297607422,
+          "top": 548.2014770507812,
+          "right": 172.74057006835938,
+          "bottom": 580.8228797912598,
+          "text": "收起画面"
+        },
+        "picture": {
+          "left": 0,
+          "top": 0,
+          "right": 1026.6187744140625,
+          "bottom": 205.1146697998047,
+          "text": ""
+        },
+        "pictureMotion": "entered",
+        "diffMotion": "entered",
+        "problems": []
+      }
+    },
+    "video_wide_controls": {
+      "measured": {
+        "innerWidth": 1441,
+        "innerHeight": 901,
+        "dpr": 1.3899999856948853
+      },
+      "audit": {
+        "inner": {
+          "w": 1441,
+          "h": 901
+        },
+        "head": {
+          "left": 0,
+          "top": 239.99551391601562,
+          "right": 1441.0072021484375,
+          "bottom": 295.9869728088379,
+          "text": "← 返回\nh264_aac_subs\n听读\n···"
+        },
+        "count": {
+          "left": 659.7122802734375,
+          "top": 308.588134765625,
+          "right": 739.2986145019531,
+          "bottom": 339.354772567749,
+          "text": "01 / 02 ⌄"
+        },
+        "player": {
+          "left": 0,
+          "top": 345.9644775390625,
+          "right": 1441.0072021484375,
+          "bottom": 432.6438903808594,
+          "text": "⏮\n▶\n⏭\n00:03 / 00:03"
+        },
+        "field": {
+          "left": 310.4991149902344,
+          "top": 487.8372497558594,
+          "right": 1130.4969177246094,
+          "bottom": 551.2702560424805,
+          "text": "Hello from embedded subtitle Second line for listening"
+        },
+        "diff": {
+          "left": 310.4991149902344,
+          "top": 565.2653198242188,
+          "right": 1130.4969177246094,
+          "bottom": 714.6470642089844,
+          "text": "核对结果\n\nHello from embedded subtitle Second line for listening\n\n多写或写错：Second、line、"
+        },
+        "actions": {
+          "left": 310.4991149902344,
+          "top": 785.2406005859375,
+          "right": 1130.4969177246094,
+          "bottom": 833.4420394897461,
+          "text": "修改\n↻ 重听\n下一句 →"
+        },
+        "next": {
+          "left": 905.4744262695312,
+          "top": 798.0216064453125,
+          "right": 950.9105796813965,
+          "bottom": 830.643009185791,
+          "text": "修改"
+        },
+        "toggle": {
+          "left": 310.4991149902344,
+          "top": 736.6344604492188,
+          "right": 379.93482208251953,
+          "bottom": 769.2558631896973,
+          "text": "收起画面"
+        },
+        "picture": {
+          "left": 0,
+          "top": 0,
+          "right": 1441.0072021484375,
+          "bottom": 239.99551391601562,
+          "text": ""
+        },
+        "pictureMotion": "entered",
+        "diffMotion": "entered",
+        "problems": []
+      }
+    },
+    "reduced_motion_instant": {
+      "timings": {
+        "motion": "entered",
+        "transition": "0s",
+        "animation": "none"
+      },
+      "retractMs": 11
+    }
+  },
+  "evidence_dir": "docs/evidence/mot-2/"
+}
