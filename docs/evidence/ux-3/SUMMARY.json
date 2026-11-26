@@ -1,7 +1,7 @@
 {
-  "tip": "581df5dfed331d0258db1074396b059dccde19fc",
+  "tip": "75b942b2c1a790c95e90df7f529fa707f6c5243c",
   "branch": "feat/ux-3-notice-undo",
-  "when": "2026-11-26T08:12:02.526Z",
+  "when": "2026-11-26T08:55:45.099Z",
   "all": "PASS",
   "checks": {
     "home_no_empty_recent": "PASS",
@@ -11,7 +11,8 @@
     "speed_label_only": "PASS",
     "shortcuts_in_menu": "PASS",
     "delete_undo_no_confirm": "PASS",
-    "cache_in_page_confirm": "PASS"
+    "cache_in_page_confirm": "PASS",
+    "install_in_page_consent": "PASS"
   },
   "detail": {
     "size": {
@@ -29,9 +30,9 @@
     "toast": {
       "toast": {
         "left": 644,
-        "top": 78,
+        "top": 144,
         "right": 1004,
-        "bottom": 127,
+        "bottom": 193,
         "text": "音频已导入：speech.wav\n\n×"
       },
       "toastText": "音频已导入：speech.wav\n\n×",
@@ -45,12 +46,15 @@
       "head": null,
       "menu": null,
       "shortcuts": null,
+      "importCta": null,
+      "importHit": null,
       "overlaps": {
         "toastField": null,
         "toastPlayer": null,
         "toastCheck": null,
         "toastCount": null,
         "toastHead": null,
+        "toastImportCta": null,
         "shortcutsField": null,
         "shortcutsPlayer": null,
         "shortcutsCheck": null,
@@ -69,6 +73,7 @@
         "toastCheck": null,
         "toastCount": null,
         "toastHead": null,
+        "toastImportCta": null,
         "shortcutsField": null,
         "shortcutsPlayer": null,
         "shortcutsCheck": null,
@@ -146,12 +151,15 @@
         "bottom": 360,
         "text": "Enter 核对或进入下一句\n\nSpace 播放或暂停（在输入框外）\n\n← → 切到上一句或下一句（在输入框外）\n\nEsc 从核对返回修改"
       },
+      "importCta": null,
+      "importHit": null,
       "overlaps": {
         "toastField": null,
         "toastPlayer": null,
         "toastCheck": null,
         "toastCount": null,
         "toastHead": null,
+        "toastImportCta": null,
         "shortcutsField": {
           "width": 150,
           "height": 129
@@ -172,10 +180,57 @@
         "toastCheck": null,
         "toastCount": null,
         "toastHead": null,
+        "toastImportCta": null,
         "shortcutsField": {
           "width": 150,
           "height": 129
         },
+        "shortcutsPlayer": null,
+        "shortcutsCheck": null,
+        "shortcutsCount": null,
+        "shortcutsHead": null,
+        "shortcutsTopbar": null
+      }
+    },
+    "delete_toast_layout": {
+      "toast": {
+        "left": 644,
+        "top": 144,
+        "right": 1004,
+        "bottom": 197,
+        "text": "已删除「h264_aac_subs」。\n\n撤销\n×"
+      },
+      "toastText": "已删除「h264_aac_subs」。\n\n撤销\n×",
+      "hostPosition": "fixed",
+      "pagePadding": "0px",
+      "bannerCount": 0,
+      "field": null,
+      "player": null,
+      "check": null,
+      "count": null,
+      "head": null,
+      "menu": null,
+      "shortcuts": null,
+      "importCta": {
+        "left": 860,
+        "top": 80,
+        "right": 962,
+        "bottom": 118,
+        "text": "＋ 导入素材"
+      },
+      "importHit": {
+        "centerIsButton": true,
+        "centerIsToast": false,
+        "blockedCount": 0
+      },
+      "overlaps": {
+        "toastField": null,
+        "toastPlayer": null,
+        "toastCheck": null,
+        "toastCount": null,
+        "toastHead": null,
+        "toastImportCta": null,
+        "shortcutsField": null,
         "shortcutsPlayer": null,
         "shortcutsCheck": null,
         "shortcutsCount": null,
@@ -191,12 +246,69 @@
         "hasUndo": true,
         "rowGone": false,
         "countAfter": 67,
-        "confirmCalls": 0
+        "confirmCalls": 0,
+        "importVisible": true,
+        "toastImportCta": null,
+        "importHit": {
+          "centerIsButton": true,
+          "centerIsToast": false,
+          "blockedCount": 0
+        }
       },
       "undone": {
         "rowBack": true,
         "confirmCalls": 0
+      },
+      "importClear": true,
+      "deleteLayout": {
+        "toast": {
+          "left": 644,
+          "top": 144,
+          "right": 1004,
+          "bottom": 197,
+          "text": "已删除「h264_aac_subs」。\n\n撤销\n×"
+        },
+        "toastText": "已删除「h264_aac_subs」。\n\n撤销\n×",
+        "hostPosition": "fixed",
+        "pagePadding": "0px",
+        "bannerCount": 0,
+        "field": null,
+        "player": null,
+        "check": null,
+        "count": null,
+        "head": null,
+        "menu": null,
+        "shortcuts": null,
+        "importCta": {
+          "left": 860,
+          "top": 80,
+          "right": 962,
+          "bottom": 118,
+          "text": "＋ 导入素材"
+        },
+        "importHit": {
+          "centerIsButton": true,
+          "centerIsToast": false,
+          "blockedCount": 0
+        },
+        "overlaps": {
+          "toastField": null,
+          "toastPlayer": null,
+          "toastCheck": null,
+          "toastCount": null,
+          "toastHead": null,
+          "toastImportCta": null,
+          "shortcutsField": null,
+          "shortcutsPlayer": null,
+          "shortcutsCheck": null,
+          "shortcutsCount": null,
+          "shortcutsHead": null,
+          "shortcutsTopbar": null
+        }
       }
+    },
+    "install_in_page_consent": {
+      "copy": "要处理这段视频，需要在这台电脑上安装一套本地工具（约 79 MB），只用于本机。是否同意安装？\n\n同意安装\n取消"
     }
   },
   "evidence_dir": "docs/evidence/ux-3/"
