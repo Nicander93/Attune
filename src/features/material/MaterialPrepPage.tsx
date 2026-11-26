@@ -684,7 +684,7 @@ export function MaterialPrepPage({
               material={material}
               update={update}
               onNotice={onNotice}
-              onError={(message, detail) => setError({ message, detail })}
+              onError={(message, detail) => setError(message ? { message, detail } : null)}
               onNeedAsr={() => {
                 pendingPrepare.current = true;
               }}

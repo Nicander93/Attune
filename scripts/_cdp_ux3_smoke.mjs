@@ -335,32 +335,11 @@ async function importWav(page) {
   return ready;
 }
 
-async function stubFfmpegMissing(page) {
-  await page.evaluate(() => {
-    const internals = window.__TAURI_INTERNALS__;
-    if (!internals?.invoke) throw new Error('no tauri invoke');
-    window.__ATTUNE_ORIG_INVOKE ??= internals.invoke.bind(internals);
-    internals.invoke = (cmd, args, extra) => {
-      if (cmd === 'media_ffmpeg_status') {
-        return Promise.resolve({
-          available: false,
-          source: 'missing',
-          hint: '这台电脑还没有安装处理视频所需的本地工具。',
-        });
-      }
-      return window.__ATTUNE_ORIG_INVOKE(cmd, args, extra);
-    };
-  });
-}
-
-async function restoreFfmpegInvoke(page) {
-  await page.evaluate(() => {
-    const internals = window.__TAURI_INTERNALS__;
-    if (internals && window.__ATTUNE_ORIG_INVOKE) {
-      internals.invoke = window.__ATTUNE_ORIG_INVOKE;
-      delete window.__ATTUNE_ORIG_INVOKE;
-    }
-  });
+async function forceToolsMissing(page, on) {
+  await page.evaluate((enabled) => {
+    if (enabled) window.__ATTUNE_FORCE_TOOLS_MISSING = true;
+    else delete window.__ATTUNE_FORCE_TOOLS_MISSING;
+  }, on);
 }
 
 async function main() {
@@ -662,7 +641,7 @@ async function main() {
         await sleep(200);
         const settings = page.getByRole('menuitem', { name: '素材设置' });
         if (await settings.count()) {
-          await stubFfmpegMissing(page);
+          await forceToolsMissing(page, true);
           await domClick(settings);
           await sleep(500);
           const morePrep = page.getByRole('button', { name: '更多 ···' });
@@ -692,12 +671,12 @@ async function main() {
               }
             }
           }
-          await restoreFfmpegInvoke(page);
+          await forceToolsMissing(page, false);
         }
       }
     } catch (err) {
       log('install consent path skipped ' + err);
-      await restoreFfmpegInvoke(page).catch(() => {});
+      await forceToolsMissing(page, false).catch(() => {});
     }
     if (!installShot) {
       summary.checks.install_in_page_consent = 'FAIL';

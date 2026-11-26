@@ -50,7 +50,21 @@ export interface ExtractSubtitlesResult {
   codecName: string;
 }
 
+declare global {
+  interface Window {
+    /** CDP smoke may force the in-page install-consent path. */
+    __ATTUNE_FORCE_TOOLS_MISSING?: boolean;
+  }
+}
+
 export async function ffmpegStatus(): Promise<FfmpegStatus> {
+  if (typeof window !== 'undefined' && window.__ATTUNE_FORCE_TOOLS_MISSING) {
+    return {
+      available: false,
+      source: 'missing',
+      hint: '这台电脑还没有安装处理视频所需的本地工具。',
+    };
+  }
   if (!isDesktop()) {
     return {
       available: false,

@@ -91,9 +91,11 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
 
   async function installTools() {
     onError('');
-    setBusy(true);
     const result = await ensureLocalMediaTools({
-      onProgress: setDownloadLabel,
+      onProgress: (label) => {
+        setBusy(true);
+        setDownloadLabel(label);
+      },
       confirm: (message) => consent.confirm(message, '同意安装'),
     });
     if (result.status === 'cancelled') {

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 
 export function ConfirmPanel({
   message,
@@ -13,8 +13,18 @@ export function ConfirmPanel({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    panelRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, []);
   return (
-    <div className="confirm-panel" role="dialog" aria-modal="false" aria-label={message}>
+    <div
+      ref={panelRef}
+      className="confirm-panel"
+      role="dialog"
+      aria-modal="false"
+      aria-label={message}
+    >
       <p className="confirm-panel__message">{message}</p>
       <div className="confirm-panel__actions">
         <button type="button" className="primary" onClick={onConfirm}>
