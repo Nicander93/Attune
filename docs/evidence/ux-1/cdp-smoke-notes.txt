@@ -1,4 +1,4 @@
-tip fc0dc117efe379c67786482b6eb812483aa5e471
+tip 67b6fe16091f8aed3532e71c15e2ba096742f87b
 fixtures wav=C:\Users\PC\AttuneSmoke\p3\speech.wav
 fixtures video=C:\Users\PC\AttuneSmoke\p3\speech_nosubs.mp4 (no text track; auto-recognize path)
 missing embedded-subs fixture: attune-video-p0 worktree / h264_aac_subs.mkv
@@ -7,7 +7,7 @@ page http://localhost:1420/
 shot 01-home.png
 shot 02-import-empty.png
 1 empty {"heading":true,"hasDrop":true,"title":"选择或拖入文件","hint":"音频或视频都可以","showsUntitled":false,"hasMore":false,"settingsInMenu":false,"bodySlice":"Attune\n首页\n素材库\n← 返回\n导入素材\n选择或拖入文件\n选择文件\n\n音频或视频都可以"}
-dialog fill {"code":0,"out":"DIALOG title=[打开] hwnd=2164884\r\nCLICKED_OK"}
+dialog fill {"code":0,"out":"DIALOG title=[打开] hwnd=4327952\r\nCLICKED_OK"}
 shot 03-audio-imported.png
 shot 04-audio-preparing.png
 progress 正在准备字幕…
@@ -17,27 +17,29 @@ shot 06-audio-dictation.png
 1 dictation {"hasStudy":true,"hasPlay":false,"hasBack":true,"bodySlice":"← 返回\nspeech\n听读\n···\n01 / 02 ⌄\n☆\n已听写 0 / 2 句\n⏮\n▶\n⏭\n00:00 / 00:07\n↻\n↻ 重听本句\n第 1 / 2 句\n00:00 — 00:02\n听完这句，写下来…\n↻ 重听\n核对答案 Enter"}
 1 audio auto prepare => PASS
 shot 10-video-import-empty.png
-dialog fill {"code":0,"out":"DIALOG title=[打开] hwnd=133820\r\nCLICKED_OK"}
+dialog fill {"code":0,"out":"DIALOG title=[打开] hwnd=3541542\r\nCLICKED_OK"}
 shot 11-video-after-pick.png
-2 after pick {"secondPickPrompt":false,"pathMissing":true,"advancedVideo":false,"toolsConsent":false,"bodySlice":"Attune\n首页\n素材库\n← 返回\n导入素材\n\n无法确定这个视频文件的位置，请使用「选择文件」。\n\n关闭\n选择或拖入文件\n选择文件\n\n音频或视频都可以"}
+2 after pick {"secondPickPrompt":false,"pathMissing":false,"advancedVideo":false,"toolsConsent":false,"bodySlice":"Attune\n首页\n素材库\n← 返回\n导入素材\n选择或拖入文件\n选择文件\n\n音频或视频都可以"}
+shot 12-video-preparing.png
+progress 正在准备素材…
 shot 13-video-ready.png
-2 ready {"status":"","readyCopy":false,"startDisabled":true,"startVisible":false,"advancedVideo":false,"secondPickPrompt":false,"jargon":[],"kind":false,"bodySlice":"Attune\n首页\n素材库\n← 返回\n导入素材\n\n无法确定这个视频文件的位置，请使用「选择文件」。\n\n关闭\n选择或拖入文件\n选择文件\n\n音频或视频都可以"}
-2 video same path => FAIL
+2 ready {"status":"已准备好 2 句，可以开始听写","readyCopy":true,"startDisabled":false,"startVisible":true,"advancedVideo":false,"secondPickPrompt":false,"jargon":[],"kind":true,"bodySlice":"Attune\n首页\n素材库\n← 返回\n导入素材\n▣\nspeech_nosubs\n00:05 · 视频 · speech_nosubs.mp4\n更换\n\n已准备好 2 句，可以开始听写\n\n更多 ···\n开始听写 →"}
+2 video same path => PASS
 2 note: local tools were already installed; consent UI was not expected this run
 2 note: used speech_nosubs.mp4 (no text track) so the automatic path is recognition, not embedded extract
 
 SUMMARY {
-  "tip": "fc0dc117efe379c67786482b6eb812483aa5e471",
+  "tip": "67b6fe16091f8aed3532e71c15e2ba096742f87b",
   "branch": "feat/ux-1-import-delegate",
-  "when": "2026-11-26T02:13:10.216Z",
+  "when": "2026-11-26T02:31:22.825Z",
   "fixtures": {
     "wav": "C:\\Users\\PC\\AttuneSmoke\\p3\\speech.wav",
     "video": "C:\\Users\\PC\\AttuneSmoke\\p3\\speech_nosubs.mp4",
     "missing": "D:\\code\\attune-video-p0\\fixtures\\video-p0\\h264_aac_subs.mkv (worktree gone)"
   },
   "item1_audio_auto_prepare": "PASS",
-  "item2_video_same_path": "FAIL",
-  "all": "FAIL",
+  "item2_video_same_path": "PASS",
+  "all": "PASS",
   "evidence_dir": "docs/evidence/ux-1/",
   "detail": {
     "empty": {
@@ -52,7 +54,7 @@ SUMMARY {
     },
     "audioPick": {
       "code": 0,
-      "out": "DIALOG title=[打开] hwnd=2164884\r\nCLICKED_OK"
+      "out": "DIALOG title=[打开] hwnd=4327952\r\nCLICKED_OK"
     },
     "audioWait": {
       "ready": true,
@@ -80,33 +82,33 @@ SUMMARY {
     },
     "videoPick": {
       "code": 0,
-      "out": "DIALOG title=[打开] hwnd=133820\r\nCLICKED_OK"
+      "out": "DIALOG title=[打开] hwnd=3541542\r\nCLICKED_OK"
     },
     "videoAfterPick": {
       "secondPickPrompt": false,
-      "pathMissing": true,
+      "pathMissing": false,
       "advancedVideo": false,
       "toolsConsent": false,
-      "bodySlice": "Attune\n首页\n素材库\n← 返回\n导入素材\n\n无法确定这个视频文件的位置，请使用「选择文件」。\n\n关闭\n选择或拖入文件\n选择文件\n\n音频或视频都可以"
+      "bodySlice": "Attune\n首页\n素材库\n← 返回\n导入素材\n选择或拖入文件\n选择文件\n\n音频或视频都可以"
     },
     "videoWait": {
-      "ready": false,
-      "sawProgress": false,
-      "progressText": "",
-      "failed": true,
+      "ready": true,
+      "sawProgress": true,
+      "progressText": "正在准备字幕… 0%",
+      "failed": false,
       "timeout": false,
-      "bodySlice": "Attune\n首页\n素材库\n← 返回\n导入素材\n\n无法确定这个视频文件的位置，请使用「选择文件」。\n\n关闭\n选择或拖入文件\n选择文件\n\n音频或视频都可以"
+      "bodySlice": "Attune\n首页\n素材库\n← 返回\n导入素材\n▣\nspeech_nosubs\n00:05 · 视频 · speech_nosubs.mp4\n更换\n\n已准备好 2 句，可以开始听写\n\n更多 ···\n开始听写 →"
     },
     "videoReady": {
-      "status": "",
-      "readyCopy": false,
-      "startDisabled": true,
-      "startVisible": false,
+      "status": "已准备好 2 句，可以开始听写",
+      "readyCopy": true,
+      "startDisabled": false,
+      "startVisible": true,
       "advancedVideo": false,
       "secondPickPrompt": false,
       "jargon": [],
-      "kind": false,
-      "bodySlice": "Attune\n首页\n素材库\n← 返回\n导入素材\n\n无法确定这个视频文件的位置，请使用「选择文件」。\n\n关闭\n选择或拖入文件\n选择文件\n\n音频或视频都可以"
+      "kind": true,
+      "bodySlice": "Attune\n首页\n素材库\n← 返回\n导入素材\n▣\nspeech_nosubs\n00:05 · 视频 · speech_nosubs.mp4\n更换\n\n已准备好 2 句，可以开始听写\n\n更多 ···\n开始听写 →"
     }
   }
 }

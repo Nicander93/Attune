@@ -1,11 +1,12 @@
 # UX-1 人眼冒烟证据
 
 - 分支：`feat/ux-1-import-delegate`
-- 实施 tip：`fc0dc117efe379c67786482b6eb812483aa5e471`（冒烟开始时 HEAD）
+- 冒烟 tip：`67b6fe16091f8aed3532e71c15e2ba096742f87b`（桌面「选择文件」改走系统对话框，并修好 `media_stage_import` 的 camelCase）
 - 机器：Windows LM，WebView2 CDP `:9222`
 - 启动：`npm run desktop` + `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`
-- 脚本：`scripts/_cdp_ux1_smoke.mjs`
-- 总评：**FAIL**（第 1 条 PASS，第 2 条 FAIL）
+- 脚本：`scripts/_cdp_ux1_smoke.mjs`（点击真实「选择文件」，用 `Fill-OpenDialog.ps1` 填入系统「打开」对话框，不是 Playwright `setInputFiles`）
+- 总评：**PASS**（音频选择文件、视频选择文件都过）
+- 时间：2026-11-26 10:31（Asia/Shanghai）
 
 ## 素材
 
@@ -21,20 +22,17 @@
 
 | # | 路径 | 结果 | 关键截图 |
 | --- | --- | --- | --- |
-| 1 | 首页 → 导入无字幕音频 → 自动准备字幕（可见「正在准备字幕…」）→「已准备好 2 句，可以开始听写」且开始听写可点 → 进入听写 | **PASS** | `02-import-empty.png`、`04-audio-preparing.png`、`05-audio-ready.png`、`06-audio-dictation.png` |
-| 2 | 选中无文本轨视频后沿同一条路做完，不二次选择；有字幕则抽出，无则自动识别；主路径不出现 ffmpeg/ASR/OCR 等术语 | **FAIL** | `11-video-after-pick.png`、`13-video-ready.png` |
+| 1 | 首页 → 「选择文件」导入无字幕音频 → 自动准备字幕（可见「正在准备字幕…」）→「已准备好 2 句，可以开始听写」且开始听写可点 → 进入听写 | **PASS** | `02-import-empty.png`、`04-audio-preparing.png`、`05-audio-ready.png`、`06-audio-dictation.png` |
+| 2 | 「选择文件」选中无文本轨视频后沿同一条路做完，不二次选择，不出现「无法确定…位置」；无文本轨则自动识别；主路径不出现 ffmpeg/ASR/OCR 等术语 | **PASS** | `12-video-preparing.png`、`13-video-ready.png` |
 
-### 第 2 条失败点
+第 2 条这次走的是系统「打开」对话框（与真实桌面「选择文件」同一条路）。选中后出现「正在准备素材…」/「正在准备字幕…」，随后「已准备好 2 句，可以开始听写」，「开始听写」可点，没有打开「导入视频」技术面板，也没有主路径术语。
 
-选中 `speech_nosubs.mp4` 后，主路径出现：
+## 原生拖入
 
-> 无法确定这个视频文件的位置，请使用「选择文件」。
+本轮未单独自动化操作系统级拖入（WebView2 走的是 Tauri 投放事件，现有脚本只能稳定驱动「选择文件」对话框）。原生拖入监听仍走原来的 `listenDesktopMediaDrop` → `importFromPath`，与这次修好并验收过的视频路径会合，代码未改这条监听。
 
-没有打开「导入视频」技术面板，也没有主路径术语，但自动处理没有开始，因此不能验收「选中后沿同一条路做完 / 无文本轨则自动识别」。
+## 未开始
 
-复现：系统「打开」对话框选中该文件，以及 Playwright `setInputFiles` 指向同一路径，结果相同。页面拿到的是 `video/mp4` File，但没有 `path`。WebView2 的 HTML file input 未提供本地路径，而当前主路径处理视频依赖这条路径。
-
-未改产品代码。未开始 MOT-1 / UX-2 / UX-3 / MOT-2。未动 main 与 v0.1.3 Release。
+未开始 MOT-1 / UX-2 / UX-3 / MOT-2。未动 main 与 v0.1.3 Release。软口未改。
 
 详见 `SUMMARY.json` 与 `cdp-smoke-notes.txt`。
-
