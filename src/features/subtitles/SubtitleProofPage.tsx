@@ -13,6 +13,7 @@ import {
 import { saveTextFile } from '../../desktop';
 import { Player } from '../player/Player';
 import type { AudioPlayer } from '../player/useAudioPlayer';
+import { useConsent } from '../../app/ConfirmPanel';
 
 type Props = {
   material: Material;
@@ -32,6 +33,7 @@ const toDraft = (segment: SubtitleSegment): Draft => ({
 });
 
 export function SubtitleProofPage({ material, player, update, onBack, onNotice }: Props) {
+  const consent = useConsent();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState('');
@@ -98,21 +100,20 @@ export function SubtitleProofPage({ material, player, update, onBack, onNotice }
     applyEdit(segmentId, { reference: draft.reference.trim(), start, end });
   }
 
-  function confirmChange(ids: string[]) {
+  async function confirmChange(ids: string[]) {
     const affected = ids.some(
       (id) =>
         material.bookmarkedSegmentIds.includes(id) ||
         material.rounds.some((r) => r.drafts[id]?.trim() || r.completedSegmentIds.includes(id)),
     );
-    return (
-      !affected ||
-      window.confirm(
-        '这些字幕已有草稿、核对记录或难句标记。拆分会保留原句草稿，合并会连接两句草稿；受影响的核对记录将标记为待重新核对。继续？',
-      )
+    if (!affected) return true;
+    return consent.confirm(
+      '这些字幕已有草稿、核对记录或难句标记。拆分会保留原句草稿，合并会连接两句草稿；受影响的核对记录将标记为待重新核对。',
+      '继续',
     );
   }
 
-  function handleSplit(segmentId: string) {
+  async function handleSplit(segmentId: string) {
     const at = Number(splitTime);
     try {
       if (!draft || !fieldRef.current) return;
@@ -127,7 +128,7 @@ export function SubtitleProofPage({ material, player, update, onBack, onNotice }
         at,
         fieldRef.current.selectionStart,
       );
-      if (!confirmChange([segmentId])) return;
+      if (!(await confirmChange([segmentId]))) return;
       update(() => markSubtitlesReviewed(next));
       const created = next.segments.find((s) => s.start === at);
       if (created) {
@@ -140,11 +141,11 @@ export function SubtitleProofPage({ material, player, update, onBack, onNotice }
     }
   }
 
-  function handleMerge(segmentId: string) {
+  async function handleMerge(segmentId: string) {
     try {
       const { material: next, report } = mergeWithNext(material, segmentId);
       const index = material.segments.findIndex((s) => s.id === segmentId);
-      if (!confirmChange([segmentId, material.segments[index + 1]?.id])) return;
+      if (!(await confirmChange([segmentId, material.segments[index + 1]?.id]))) return;
       update(() => markSubtitlesReviewed(next));
       setEditingId(null);
       reportStale(report.stale);
@@ -154,7 +155,6 @@ export function SubtitleProofPage({ material, player, update, onBack, onNotice }
       setError(String(err));
     }
   }
-
 
   function markReviewed() {
     update((m) => markSubtitlesReviewed(m));
@@ -174,6 +174,7 @@ export function SubtitleProofPage({ material, player, update, onBack, onNotice }
 
   return (
     <section className="proof">
+      {consent.panel}
       <header className="prep__head">
         <button className="quiet back" onClick={onBack}>
           ← 返回
@@ -189,8 +190,8 @@ export function SubtitleProofPage({ material, player, update, onBack, onNotice }
             </button>
           )}
           <button className="quiet" onClick={() => void exportSrt()}>
-          导出 SRT
-        </button>
+            导出 SRT
+          </button>
         </div>
       </header>
 

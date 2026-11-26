@@ -20,7 +20,10 @@ test('new material opens preparation directly and returns to its actual source',
   page,
 }) => {
   await seed(page, []);
-  await page.getByRole('button', { name: /导入素材/ }).first().click();
+  await page
+    .getByRole('button', { name: /导入素材/ })
+    .first()
+    .click();
   await expect(page.getByRole('heading', { name: '导入素材' })).toBeVisible();
   await page.getByRole('button', { name: '← 返回' }).click();
   await expect(page.getByRole('heading', { name: '继续学习' })).toBeVisible();
@@ -45,7 +48,10 @@ test('preserves sentence, checked state, view and player preferences through sec
   await page.getByRole('button', { name: '更多', exact: true }).click();
   await expect(page.getByLabel('播放速度')).toHaveValue('1.25');
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: '单句循环' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('button', { name: '单句循环' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await page.getByRole('button', { name: '听读', exact: true }).click();
   await openStudyMenu(page, '素材设置');
   await page.getByRole('button', { name: '← 返回' }).click();
@@ -185,8 +191,8 @@ test('splits at the text caret and an explicit time after confirming existing re
     node.focus();
     node.setSelectionRange(6, 6);
   });
-  page.once('dialog', (dialog) => void dialog.accept());
   await page.getByRole('button', { name: '在文字光标处拆分' }).click();
+  await page.getByRole('button', { name: '继续' }).click();
   await settled(page);
   const stored = await storedMaterial(page, 'm1');
   expect(stored.segments).toHaveLength(4);

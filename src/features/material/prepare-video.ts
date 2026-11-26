@@ -74,15 +74,14 @@ export type ToolsEnsureResult =
 
 export async function ensureLocalMediaTools(options: {
   onProgress: (label: string) => void;
-  confirm?: (message: string) => boolean;
+  confirm: (message: string) => boolean | Promise<boolean>;
 }): Promise<ToolsEnsureResult> {
-  const confirm = options.confirm ?? ((message) => window.confirm(message));
   const status = await ffmpegStatus();
   if (status.available) return { status: 'ready', toolsStatus: status };
 
   const info = await ffmpegBundle().catch(() => null);
   const sizeMb = info?.sizeBytes ? Math.max(1, Math.round(info.sizeBytes / 1_048_576)) : 79;
-  if (!confirm(toolsConsentMessage(sizeMb))) return { status: 'cancelled' };
+  if (!(await options.confirm(toolsConsentMessage(sizeMb)))) return { status: 'cancelled' };
 
   options.onProgress(toolsProgressLabel());
   try {

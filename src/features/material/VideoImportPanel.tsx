@@ -26,6 +26,7 @@ import {
   ensureLocalMediaTools,
   fullClipEnd,
 } from './prepare-video';
+import { useConsent } from '../../app/ConfirmPanel';
 
 type Props = {
   material: Material;
@@ -51,6 +52,7 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
   const [busy, setBusy] = useState(false);
   const [wantPictureText, setWantPictureText] = useState(false);
   const [downloadLabel, setDownloadLabel] = useState('');
+  const consent = useConsent();
 
   useEffect(() => {
     void ffmpegStatus()
@@ -89,9 +91,12 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
 
   async function installTools() {
     onError('');
-    setBusy(true);
     const result = await ensureLocalMediaTools({
-      onProgress: setDownloadLabel,
+      onProgress: (label) => {
+        setBusy(true);
+        setDownloadLabel(label);
+      },
+      confirm: (message) => consent.confirm(message, '同意安装'),
     });
     if (result.status === 'cancelled') {
       onNotice(COPY.toolsCancelled);
@@ -133,8 +138,9 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
   }
 
   async function clearThisCache() {
-    const ok = window.confirm(
+    const ok = await consent.confirm(
       '清理本条素材的临时文件？音频和字幕会保留。需要画面时可以再准备一次。',
+      '清理',
     );
     if (!ok) return;
     onError('');
@@ -333,6 +339,7 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
           </p>
         )}
       </div>
+      {consent.panel}
       <div className="prep__actions">
         {toolsMissing && (
           <button className="primary" disabled={busy} onClick={() => void installTools()}>

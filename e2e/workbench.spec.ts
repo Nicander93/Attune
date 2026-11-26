@@ -42,9 +42,9 @@ test.describe('home', () => {
     await expect(resume).toContainText('已听的.mp3');
     await expect(resume).toContainText('听写 · 2 / 3 句');
     await expect(page.locator('.home__title')).toContainText('已听的.mp3');
-    // Resume is outside .home-recent; with only one studied item .recent is empty.
-    await expect(page.locator('.home-recent')).not.toContainText('已听的.mp3');
-    await expect(page.locator('.home-recent')).not.toContainText('只导入的.mp3');
+    // With only one studied item, the recent-study block stays hidden.
+    await expect(page.locator('.home-recent')).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: '最近学习' })).toHaveCount(0);
     await expect(page.getByText('暂无更多最近学习')).toHaveCount(0);
   });
 });
@@ -82,7 +82,6 @@ test.describe('library', () => {
     await page.locator('select[aria-label="文件夹"]').selectOption({ label: '播客' });
     await expect(page.locator('.materials__row')).toContainText('podcast.mp3');
 
-    page.once('dialog', (dialog) => void dialog.accept());
     await page.getByLabel('删除文件夹 播客').click();
 
     // The last folder is gone, so the folder filter leaves the main toolbar.

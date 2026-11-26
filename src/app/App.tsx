@@ -1,12 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLibrary } from './useLibrary';
 import type { Route } from './routes';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -14,42 +6,9 @@ import { HomePage } from '../features/home/HomePage';
 import { blank, LibraryPage } from '../features/library/LibraryPage';
 import { MaterialWorkspace } from './MaterialWorkspace';
 import type { SortOrder } from '../features/library/listing';
-import { prefersReducedMotion, usePresence } from './motion';
-
-function translatedY(el: Element) {
-  const transform = getComputedStyle(el).transform;
-  if (!transform || transform === 'none') return 0;
-  const matrix3d = transform.match(/matrix3d\((.+)\)/);
-  if (matrix3d) {
-    const parts = matrix3d[1].split(',').map(Number);
-    return parts[13] ?? 0;
-  }
-  const matrix = transform.match(/matrix\((.+)\)/);
-  if (!matrix) return 0;
-  const parts = matrix[1].split(',').map(Number);
-  return parts[5] ?? 0;
-}
-
-function syncBannerAnchor(focusStudy: boolean) {
-  const root = document.querySelector('.app');
-  if (!(root instanceof HTMLElement)) return;
-  const chrome = focusStudy
-    ? document.querySelector('.study__head')
-    : document.querySelector('.topbar');
-  const banner = document.querySelector('.banner');
-  const rootTop = root.getBoundingClientRect().top;
-  // Use the layout box, not a mid-transition translated box, so the banner
-  // cannot be pinned 8px into a topbar that is still sliding in.
-  const chromeBottom =
-    chrome instanceof HTMLElement
-      ? chrome.getBoundingClientRect().bottom - translatedY(chrome) - rootTop
-      : 0;
-  const bannerHeight = banner instanceof HTMLElement ? banner.getBoundingClientRect().height : 0;
-  if (chromeBottom > 0) root.style.setProperty('--banner-top', `${Math.round(chromeBottom)}px`);
-  if (bannerHeight > 0) {
-    root.style.setProperty('--shell-banner-height', `${Math.round(bannerHeight)}px`);
-  }
-}
+import { prefersReducedMotion } from './motion';
+import { INFO_TOAST_MS, type NoticeOptions, type ShowNotice } from './notice';
+import { ToastHost, type ToastItem } from './ToastHost';
 
 /**
  * One window, a page stack, and no router dependency.
@@ -57,37 +16,6 @@ function syncBannerAnchor(focusStudy: boolean) {
  * `← 返回` returns to the page a second-level view was opened from, which is what the
  * spec means by "返回实际来源页面" - not a hard-coded jump to the library.
  */
-
-function ShellBanner({
-  message,
-  error,
-  children,
-}: {
-  message: string;
-  error?: boolean;
-  children?: ReactNode;
-}) {
-  const open = Boolean(message);
-  const presence = usePresence(open);
-  const [text, setText] = useState(message);
-  useEffect(() => {
-    if (message) setText(message);
-  }, [message]);
-  // Stay mounted in the same render as `message`, so the reserved slot can be
-  // measured before paint. `usePresence` would otherwise still be exited.
-  if (!open && presence === 'exited') return null;
-  const motion = open && presence === 'exited' ? 'entering' : presence;
-  return (
-    <div
-      className={error ? 'banner banner--error' : 'banner'}
-      data-motion={motion}
-      role={error ? 'alert' : 'status'}
-    >
-      {text}
-      {children}
-    </div>
-  );
-}
 
 export function App() {
   const library = useLibrary();
@@ -98,11 +26,52 @@ export function App() {
   // Kept above the pages so a row stays selected when the user returns from a study
   // session, which is what makes F2 rename work on the material they just practised.
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [notice, setNotice] = useState('');
+  const [notice, setNoticeState] = useState<{
+    id: string;
+    message: string;
+    options?: NoticeOptions;
+  } | null>(null);
+  const [errorHidden, setErrorHidden] = useState(false);
+  const noticeTimer = useRef<number>(0);
+
+  const setNotice: ShowNotice = useCallback((message, options) => {
+    window.clearTimeout(noticeTimer.current);
+    if (!message) {
+      setNoticeState(null);
+      return;
+    }
+    const id = crypto.randomUUID();
+    setNoticeState({ id, message, options });
+    const kind = options?.kind ?? 'info';
+    if (kind === 'error' || options?.action) return;
+    const duration = options?.durationMs ?? INFO_TOAST_MS;
+    noticeTimer.current = window.setTimeout(() => {
+      setNoticeState((current) => (current?.id === id ? null : current));
+    }, duration);
+  }, []);
+
+  useEffect(() => () => window.clearTimeout(noticeTimer.current), []);
+
+  useEffect(() => {
+    setErrorHidden(false);
+  }, [library.error]);
+
+  useEffect(() => {
+    if (!library.pendingUndo) {
+      setNoticeState((current) => (current?.options?.action?.label === '撤销' ? null : current));
+      return;
+    }
+    const pending = library.pendingUndo;
+    setNotice(pending.message, {
+      action: { label: '撤销', onClick: () => void library.undo() },
+    });
+    // Only re-arm when the pending entry itself changes; undo is read from the render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- see above
+  }, [library.pendingUndo]);
 
   const go = useCallback(
     (next: Route) => {
-      setNotice('');
+      setNoticeState((current) => (current?.options?.action ? current : null));
       history.current.push(route);
       setRoute(next);
     },
@@ -141,38 +110,41 @@ export function App() {
     el.classList.add('is-entering');
   }, [route.name]);
 
-  const bannerPresent = Boolean(notice || library.error);
-  useLayoutEffect(() => {
-    syncBannerAnchor(focusStudy);
-    const root = document.querySelector('.app');
-    if (!root) return;
-    const observer = new ResizeObserver(() => syncBannerAnchor(focusStudy));
-    observer.observe(root);
-    const banner = document.querySelector('.banner');
-    if (banner) observer.observe(banner);
-    const chrome = focusStudy
-      ? document.querySelector('.study__head')
-      : document.querySelector('.topbar');
-    if (chrome) observer.observe(chrome);
-    const mutations = new MutationObserver(() => {
-      syncBannerAnchor(focusStudy);
-      const nextBanner = document.querySelector('.banner');
-      if (nextBanner) observer.observe(nextBanner);
-    });
-    mutations.observe(root, { childList: true, subtree: true });
-    const onResize = () => syncBannerAnchor(focusStudy);
-    const onTransition = () => syncBannerAnchor(focusStudy);
-    window.addEventListener('resize', onResize);
-    root.addEventListener('transitionend', onTransition);
-    const later = window.setTimeout(() => syncBannerAnchor(focusStudy), 280);
-    return () => {
-      observer.disconnect();
-      mutations.disconnect();
-      window.removeEventListener('resize', onResize);
-      root.removeEventListener('transitionend', onTransition);
-      window.clearTimeout(later);
-    };
-  }, [focusStudy, bannerPresent, notice, library.error, route.name]);
+  const toasts = useMemo(() => {
+    const items: ToastItem[] = [];
+    if (library.error) {
+      items.push({
+        id: 'library-error',
+        message: library.error,
+        kind: 'error',
+        action: { label: '重试保存', onClick: library.flush },
+        open: !errorHidden,
+      });
+    }
+    if (notice) {
+      items.push({
+        id: notice.id,
+        message: notice.message,
+        kind: notice.options?.kind ?? 'info',
+        action: notice.options?.action,
+        open: true,
+      });
+    }
+    return items;
+  }, [library.error, library.flush, notice, errorHidden]);
+
+  function dismissToast(id: string) {
+    if (id === 'library-error') {
+      setErrorHidden(true);
+      return;
+    }
+    if (notice?.id === id && notice.options?.action?.label === '撤销') {
+      // Closing the undo toast accepts the deletion; the timer in useLibrary still commits.
+      setNoticeState(null);
+      return;
+    }
+    setNoticeState((current) => (current?.id === id ? null : current));
+  }
 
   return (
     <div
@@ -212,12 +184,7 @@ export function App() {
         </nav>
       </header>
 
-      <ShellBanner message={library.error} error>
-        <button className="quiet" onClick={library.flush}>
-          重试保存
-        </button>
-      </ShellBanner>
-      <ShellBanner message={notice} />
+      <ToastHost toasts={toasts} onDismiss={dismissToast} />
 
       <main className="page" ref={pageRef}>
         <ErrorBoundary key={material?.id ?? route.name}>

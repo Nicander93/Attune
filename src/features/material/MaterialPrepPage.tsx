@@ -29,6 +29,7 @@ import {
 import { shouldAutoPrepareSubtitles } from './prepare-video';
 import { useAutoVideoImport } from './useAutoVideoImport';
 import { MotionPop } from '../../app/MotionPop';
+import { useConsent } from '../../app/ConfirmPanel';
 
 type Props = {
   material: Material;
@@ -83,6 +84,7 @@ export function MaterialPrepPage({
   const [dragging, setDragging] = useState(false);
   const [audioChoice, setAudioChoice] = useState<number | undefined>();
   const [subtitleChoice, setSubtitleChoice] = useState<number | undefined>();
+  const consent = useConsent();
 
   const recognition = useRecognition({
     onRecognized: (_id, segments) => {
@@ -98,12 +100,14 @@ export function MaterialPrepPage({
       setAdvanced('settings');
     },
     onNotice,
+    confirm: (message) => consent.confirm(message, '同意'),
   });
 
   const videoImport = useAutoVideoImport({
     material,
     update,
     onNotice,
+    confirm: (message) => consent.confirm(message, '同意安装'),
     onNeedRecognition: () => {
       pendingPrepare.current = true;
     },
@@ -298,8 +302,12 @@ export function MaterialPrepPage({
     }
   }
 
-  function clearAllCache() {
-    if (!window.confirm('清理全部媒体缓存？需要画面时，可以在「更多」里重新准备这段视频。')) return;
+  async function clearAllCache() {
+    const ok = await consent.confirm(
+      '清理全部媒体缓存？需要画面时，可以在「更多」里重新准备这段视频。听写记录和字幕会保留。',
+      '清理',
+    );
+    if (!ok) return;
     void clearAllMediaCache()
       .then(() => {
         update((current) => clearPlaybackPath(current));
@@ -592,6 +600,8 @@ export function MaterialPrepPage({
           </>
         )}
 
+        {consent.panel}
+
         {(recognition.task || (videoImport.busy && videoImport.progress)) && (
           <p className="banner" role="status">
             {progressLabel}
@@ -674,7 +684,7 @@ export function MaterialPrepPage({
               material={material}
               update={update}
               onNotice={onNotice}
-              onError={(message, detail) => setError({ message, detail })}
+              onError={(message, detail) => setError(message ? { message, detail } : null)}
               onNeedAsr={() => {
                 pendingPrepare.current = true;
               }}

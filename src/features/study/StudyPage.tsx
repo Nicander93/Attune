@@ -58,6 +58,7 @@ export function StudyPage({
   const [keySounds, setKeySounds] = useState(material.studySettings?.keySounds ?? false);
   const [volume, setVolume] = useState(material.studySettings?.volume ?? 0.25);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [sentenceOpen, setSentenceOpen] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   const menuWrap = useRef<HTMLDivElement>(null);
@@ -221,6 +222,7 @@ export function StudyPage({
       if (target?.closest('.study__sentence-pop')) return;
       if (target?.closest('.study__count')) return;
       setMenuOpen(false);
+      setShortcutsOpen(false);
       setSentenceOpen(false);
     };
     document.addEventListener('mousedown', onPointer);
@@ -244,6 +246,7 @@ export function StudyPage({
         if (menuOpen || sentenceOpen) {
           event.preventDefault();
           setMenuOpen(false);
+          setShortcutsOpen(false);
           setSentenceOpen(false);
           return;
         }
@@ -285,6 +288,7 @@ export function StudyPage({
 
   function closeMenu() {
     setMenuOpen(false);
+    setShortcutsOpen(false);
   }
 
   useLayoutEffect(() => {
@@ -409,7 +413,10 @@ export function StudyPage({
             title="更多"
             onClick={() => {
               setSentenceOpen(false);
-              setMenuOpen((open) => !open);
+              setMenuOpen((open) => {
+                if (open) setShortcutsOpen(false);
+                return !open;
+              });
             }}
           >
             ···
@@ -426,7 +433,7 @@ export function StudyPage({
               {player.loop ? '关闭单句循环' : '开启单句循环'}
             </button>
             <label className="study__menu-volume" role="none">
-              语速 · {player.speed}×
+              语速
               <select
                 aria-label="播放速度"
                 value={player.speed}
@@ -575,15 +582,27 @@ export function StudyPage({
             <button
               type="button"
               role="menuitem"
-              onClick={() => {
-                closeMenu();
-                onNotice(
-                  'Enter：核对 / 下一句；Space：播放 / 暂停（输入框外）；左右方向键：切句（输入框外）；Esc：从核对返回修改。',
-                );
-              }}
+              aria-expanded={shortcutsOpen}
+              onClick={() => setShortcutsOpen((open) => !open)}
             >
               快捷键
             </button>
+            {shortcutsOpen && (
+              <div className="study__shortcuts" role="note">
+                <p>
+                  <kbd>Enter</kbd> 核对或进入下一句
+                </p>
+                <p>
+                  <kbd>Space</kbd> 播放或暂停（在输入框外）
+                </p>
+                <p>
+                  <kbd>←</kbd> <kbd>→</kbd> 切到上一句或下一句（在输入框外）
+                </p>
+                <p>
+                  <kbd>Esc</kbd> 从核对返回修改
+                </p>
+              </div>
+            )}
           </MotionPop>
         </div>
       </header>

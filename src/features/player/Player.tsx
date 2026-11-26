@@ -2,6 +2,7 @@ import type { RefObject, SyntheticEvent } from 'react';
 import type { Material } from '../../domain/types';
 import { formatTime } from '../../domain/types';
 import { PLAYBACK_RATES, useMediaPlayer } from './useMediaPlayer';
+import { LoopIcon, ReplayIcon } from './TransportIcons';
 
 type Props = {
   material: Material;
@@ -35,6 +36,18 @@ export function Player({
   variant = 'default',
 }: Props) {
   const focus = variant === 'focus';
+  const replayButton = (
+    <button
+      type="button"
+      className="quiet player__replay"
+      disabled={!player.canStep}
+      onClick={player.replay}
+      aria-label="重听本句"
+      title="重听本句"
+    >
+      <ReplayIcon />
+    </button>
+  );
   return (
     <div className={`player${focus ? ' player--focus' : ''}`}>
       <div
@@ -76,11 +89,7 @@ export function Player({
         >
           ⏭
         </button>
-        {!focus && (
-          <button className="quiet" disabled={!player.canStep} onClick={player.replay}>
-            ↻ 重听本句
-          </button>
-        )}
+        {!focus && replayButton}
         <span className="muted player__time">
           {formatTime(player.position)} / {formatTime(material.duration)}
         </span>
@@ -92,7 +101,7 @@ export function Player({
           title="单句循环"
           onClick={() => player.setLoop(!player.loop)}
         >
-          ↻
+          <LoopIcon />
         </button>
         {!focus && (
           <>
@@ -130,18 +139,7 @@ export function Player({
             </label>
           </>
         )}
-        {focus && (
-          <button
-            type="button"
-            className="quiet player__replay"
-            disabled={!player.canStep}
-            onClick={player.replay}
-            aria-label="重听本句"
-            title="重听本句"
-          >
-            ↺
-          </button>
-        )}
+        {focus && replayButton}
       </div>
       <input
         className="player__timeline"

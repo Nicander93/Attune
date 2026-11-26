@@ -86,14 +86,14 @@ export function HomePage(props: {
             </div>
           </div>
 
-          <div className="home-recent">
-            <div className="section-heading">
-              <h2>最近学习</h2>
-              <button className="quiet textbtn" onClick={props.onOpenLibrary}>
-                全部素材 →
-              </button>
-            </div>
-            {others.length > 0 && (
+          {others.length > 0 && (
+            <div className="home-recent">
+              <div className="section-heading">
+                <h2>最近学习</h2>
+                <button className="quiet textbtn" onClick={props.onOpenLibrary}>
+                  全部素材 →
+                </button>
+              </div>
               <ul className="recent">
                 {others.map(({ material, progress, studiedAt }) => {
                   const when = studiedLabel(studiedAt);
@@ -118,8 +118,8 @@ export function HomePage(props: {
                   );
                 })}
               </ul>
-            )}
-          </div>
+            </div>
+          )}
         </>
       ) : (
         <div className="empty">

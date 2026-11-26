@@ -5,10 +5,14 @@ test('the study menu keeps a single speed control and does not clip 核对答案
   await seed(page, [material({ audio: wav(9) })]);
   await openStudy(page);
   await page.getByRole('button', { name: '更多', exact: true }).click();
-  await expect(page.getByRole('menuitem', { name: /语速 · 1×/ })).toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: /语速 · / })).toHaveCount(0);
   const speed = page.getByLabel('播放速度');
   await expect(speed).toBeVisible();
-  await expect(page.locator('.study__menu')).toContainText('语速 · 1×');
+  const speedLabel = await page
+    .locator('.study__menu-volume')
+    .evaluate((el) => el.childNodes[0]?.textContent ?? '');
+  expect(speedLabel.trim()).toBe('语速');
+  await expect(page.locator('.study__menu')).not.toHaveText('语速 · 1×');
   await expect(speed).toHaveCount(1);
   const check = page.getByRole('button', { name: '核对答案' });
   await expect(check).toBeVisible();
@@ -31,9 +35,15 @@ test('the focus player uses an icon replay control and a single sentence index',
   await seed(page, [material({ audio: wav(9) })]);
   await openStudy(page);
   const replay = page.getByRole('button', { name: '重听本句' });
+  const loop = page.getByRole('button', { name: '单句循环' });
   await expect(replay).toBeVisible();
-  await expect(replay).toHaveText('↺');
-  await expect(page.getByRole('button', { name: '单句循环' })).toBeVisible();
+  await expect(loop).toBeVisible();
+  await expect(replay.locator('.player__icon')).toBeVisible();
+  await expect(loop.locator('.player__icon')).toBeVisible();
+  const replayPath = await replay.locator('svg').innerHTML();
+  const loopPath = await loop.locator('svg').innerHTML();
+  expect(replayPath).not.toEqual(loopPath);
+  await expect(replay).not.toHaveText(/重听本句|↺|↻/);
   await expect(page.locator('.player--focus')).not.toContainText('重听本句');
   await expectSentenceIndex(page, 1, 3);
   await expect(page.getByText('第 1 / 3 句')).toHaveCount(0);
@@ -76,6 +86,9 @@ test('home does not show an empty recent-study row when there is only a last ses
     }),
   ]);
   await expect(page.locator('.home__current')).toContainText('上次学习');
+  await expect(page.locator('.home-recent')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '最近学习' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '全部素材 →' })).toHaveCount(0);
   await expect(page.getByText('暂无更多最近学习')).toHaveCount(0);
 });
 
