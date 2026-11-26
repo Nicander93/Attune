@@ -16,6 +16,20 @@ import { MaterialWorkspace } from './MaterialWorkspace';
 import type { SortOrder } from '../features/library/listing';
 import { prefersReducedMotion, usePresence } from './motion';
 
+function translatedY(el: Element) {
+  const transform = getComputedStyle(el).transform;
+  if (!transform || transform === 'none') return 0;
+  const matrix3d = transform.match(/matrix3d\((.+)\)/);
+  if (matrix3d) {
+    const parts = matrix3d[1].split(',').map(Number);
+    return parts[13] ?? 0;
+  }
+  const matrix = transform.match(/matrix\((.+)\)/);
+  if (!matrix) return 0;
+  const parts = matrix[1].split(',').map(Number);
+  return parts[5] ?? 0;
+}
+
 function syncBannerAnchor(focusStudy: boolean) {
   const root = document.querySelector('.app');
   if (!(root instanceof HTMLElement)) return;
@@ -24,8 +38,12 @@ function syncBannerAnchor(focusStudy: boolean) {
     : document.querySelector('.topbar');
   const banner = document.querySelector('.banner');
   const rootTop = root.getBoundingClientRect().top;
+  // Use the layout box, not a mid-transition translated box, so the banner
+  // cannot be pinned 8px into a topbar that is still sliding in.
   const chromeBottom =
-    chrome instanceof HTMLElement ? chrome.getBoundingClientRect().bottom - rootTop : 0;
+    chrome instanceof HTMLElement
+      ? chrome.getBoundingClientRect().bottom - translatedY(chrome) - rootTop
+      : 0;
   const bannerHeight = banner instanceof HTMLElement ? banner.getBoundingClientRect().height : 0;
   if (chromeBottom > 0) root.style.setProperty('--banner-top', `${Math.round(chromeBottom)}px`);
   if (bannerHeight > 0) {
@@ -143,11 +161,16 @@ export function App() {
     });
     mutations.observe(root, { childList: true, subtree: true });
     const onResize = () => syncBannerAnchor(focusStudy);
+    const onTransition = () => syncBannerAnchor(focusStudy);
     window.addEventListener('resize', onResize);
+    root.addEventListener('transitionend', onTransition);
+    const later = window.setTimeout(() => syncBannerAnchor(focusStudy), 280);
     return () => {
       observer.disconnect();
       mutations.disconnect();
       window.removeEventListener('resize', onResize);
+      root.removeEventListener('transitionend', onTransition);
+      window.clearTimeout(later);
     };
   }, [focusStudy, bannerPresent, notice, library.error, route.name]);
 
