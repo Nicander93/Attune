@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Folder, Material } from '../../domain/types';
 import { formatTime } from '../../domain/types';
+import { MotionPop } from '../../app/MotionPop';
 import {
   UNCATEGORIZED,
   LIBRARY_SORT_OPTIONS,
@@ -360,66 +361,72 @@ export function LibraryPage(props: Props) {
                     >
                       ···
                     </button>
-                    {menuFor === row.id && (
-                      <div className="menu menu--right" role="menu">
+                    <MotionPop
+                      open={menuFor === row.id}
+                      className="menu menu--right"
+                      role="menu"
+                      origin="top-right"
+                    >
+                      <button
+                        role="menuitem"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          beginRename(row.id);
+                        }}
+                      >
+                        重命名
+                      </button>
+                      <button
+                        role="menuitem"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setFolderFor(row.id);
+                          setMenuFor(null);
+                        }}
+                      >
+                        移动到文件夹
+                      </button>
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          setMenuFor(null);
+                          props.onPrepare(row.id);
+                        }}
+                      >
+                        素材准备
+                      </button>
+                      <button role="menuitem" onClick={() => void confirmDelete(row.id)}>
+                        删除
+                      </button>
+                    </MotionPop>
+                    <MotionPop
+                      open={folderFor === row.id}
+                      className="menu menu--right"
+                      role="menu"
+                      origin="top-right"
+                    >
+                      <button
+                        role="menuitem"
+                        onClick={() => {
+                          props.onMove(row.id, null);
+                          setFolderFor(null);
+                        }}
+                      >
+                        未分类
+                      </button>
+                      {props.folders.map((folder) => (
                         <button
-                          role="menuitem"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            beginRename(row.id);
-                          }}
-                        >
-                          重命名
-                        </button>
-                        <button
-                          role="menuitem"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            setFolderFor(row.id);
-                            setMenuFor(null);
-                          }}
-                        >
-                          移动到文件夹
-                        </button>
-                        <button
+                          key={folder.id}
                           role="menuitem"
                           onClick={() => {
-                            setMenuFor(null);
-                            props.onPrepare(row.id);
-                          }}
-                        >
-                          素材准备
-                        </button>
-                        <button role="menuitem" onClick={() => void confirmDelete(row.id)}>
-                          删除
-                        </button>
-                      </div>
-                    )}
-                    {folderFor === row.id && (
-                      <div className="menu menu--right" role="menu">
-                        <button
-                          role="menuitem"
-                          onClick={() => {
-                            props.onMove(row.id, null);
+                            props.onMove(row.id, folder.id);
                             setFolderFor(null);
                           }}
                         >
-                          未分类
+                          {folder.name}
                         </button>
-                        {props.folders.map((folder) => (
-                          <button
-                            key={folder.id}
-                            role="menuitem"
-                            onClick={() => {
-                              props.onMove(row.id, folder.id);
-                              setFolderFor(null);
-                            }}
-                          >
-                            {folder.name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                      ))}
+                    </MotionPop>
                   </>
                 )}
                 <span className="sr-only">{material.originalFileName}</span>

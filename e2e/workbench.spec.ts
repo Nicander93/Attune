@@ -145,7 +145,7 @@ test.describe('focus shell S3', () => {
     await page.getByRole('button', { name: '素材库' }).first().click();
     await page.locator('.materials__row').first().click();
     await expect(page.getByRole('heading', { name: '第 1 / 3 句' })).toBeVisible();
-    await expect(page.locator('.topbar')).toHaveCount(0);
+    await expect(page.locator('.topbar')).toBeHidden();
     await expect(page.getByRole('navigation', { name: '主导航' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '听读', exact: true })).toBeVisible();
     await page.getByRole('button', { name: '← 返回' }).click();

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Material } from '../../domain/types';
 import { activeWordIndex } from '../../domain/timing';
+import { motionScrollBehavior } from '../../app/motion';
 
 type Props = {
   material: Material;
@@ -59,7 +60,7 @@ export function ReadingView(props: Props) {
     const follow = () => {
       setSuppressed(false);
       const node = list.current?.querySelector(`[data-segment="${props.currentId}"]`);
-      node?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      node?.scrollIntoView({ block: 'center', behavior: motionScrollBehavior() });
     };
     const delay = suppressedUntil.current - Date.now();
     if (delay <= 0) {

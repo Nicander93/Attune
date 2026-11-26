@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLibrary } from './useLibrary';
 import type { Route } from './routes';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -6,6 +6,7 @@ import { HomePage } from '../features/home/HomePage';
 import { blank, LibraryPage } from '../features/library/LibraryPage';
 import { MaterialWorkspace } from './MaterialWorkspace';
 import type { SortOrder } from '../features/library/listing';
+import { prefersReducedMotion, usePresence } from './motion';
 
 /**
  * One window, a page stack, and no router dependency.
@@ -13,6 +14,34 @@ import type { SortOrder } from '../features/library/listing';
  * `← 返回` returns to the page a second-level view was opened from, which is what the
  * spec means by "返回实际来源页面" - not a hard-coded jump to the library.
  */
+
+function ShellBanner({
+  message,
+  error,
+  children,
+}: {
+  message: string;
+  error?: boolean;
+  children?: ReactNode;
+}) {
+  const presence = usePresence(Boolean(message));
+  const [text, setText] = useState(message);
+  useEffect(() => {
+    if (message) setText(message);
+  }, [message]);
+  if (presence === 'exited') return null;
+  return (
+    <div
+      className={error ? 'banner banner--error' : 'banner'}
+      data-motion={presence}
+      role={error ? 'alert' : 'status'}
+    >
+      {text}
+      {children}
+    </div>
+  );
+}
+
 export function App() {
   const library = useLibrary();
   const [route, setRoute] = useState<Route>({ name: 'home' });
@@ -54,6 +83,16 @@ export function App() {
   );
 
   const focusStudy = route.name === 'study';
+  const pageRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const el = pageRef.current;
+    if (!el) return;
+    el.classList.remove('is-entering');
+    if (prefersReducedMotion()) return;
+    void el.offsetWidth;
+    el.classList.add('is-entering');
+  }, [route.name]);
 
   return (
     <div
@@ -61,51 +100,46 @@ export function App() {
       data-saving={library.saving ? 'true' : 'false'}
       data-focus={focusStudy ? 'study' : undefined}
     >
-      {!focusStudy && (
-        <header className="topbar">
-          <button className="brand" onClick={() => go({ name: 'home' })} aria-label="Attune 首页">
-            <span className="brand__bars" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-            </span>
-            Attune
+      <header
+        className="topbar"
+        aria-hidden={focusStudy || undefined}
+        inert={focusStudy || undefined}
+      >
+        <button className="brand" onClick={() => go({ name: 'home' })} aria-label="Attune 首页">
+          <span className="brand__bars" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+            <i />
+          </span>
+          Attune
+        </button>
+        <nav className="topbar__nav" aria-label="主导航">
+          <button
+            className="quiet"
+            aria-current={route.name === 'home' ? 'page' : undefined}
+            onClick={() => go({ name: 'home' })}
+          >
+            首页
           </button>
-          <nav className="topbar__nav" aria-label="主导航">
-            <button
-              className="quiet"
-              aria-current={route.name === 'home' ? 'page' : undefined}
-              onClick={() => go({ name: 'home' })}
-            >
-              首页
-            </button>
-            <button
-              className="quiet"
-              aria-current={route.name === 'library' ? 'page' : undefined}
-              onClick={() => go({ name: 'library', folderId: null })}
-            >
-              素材库
-            </button>
-          </nav>
-        </header>
-      )}
-
-      {library.error && (
-        <div className="banner banner--error" role="alert">
-          {library.error}
-          <button className="quiet" onClick={library.flush}>
-            重试保存
+          <button
+            className="quiet"
+            aria-current={route.name === 'library' ? 'page' : undefined}
+            onClick={() => go({ name: 'library', folderId: null })}
+          >
+            素材库
           </button>
-        </div>
-      )}
-      {notice && (
-        <div className="banner" role="status">
-          {notice}
-        </div>
-      )}
+        </nav>
+      </header>
 
-      <main className="page">
+      <ShellBanner message={library.error} error>
+        <button className="quiet" onClick={library.flush}>
+          重试保存
+        </button>
+      </ShellBanner>
+      <ShellBanner message={notice} />
+
+      <main className="page" ref={pageRef}>
         <ErrorBoundary key={material?.id ?? route.name}>
           {route.name === 'home' && (
             <HomePage

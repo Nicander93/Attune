@@ -30,45 +30,47 @@ export function MaterialWorkspace({ material, route, update, go, onBack, onNotic
   return (
     <>
       <MediaOutput player={player} />
-      {route.name === 'study' && (
-        <StudyPage
-          material={material}
-          player={player}
-          update={update}
-          onBack={onBack}
-          onNotice={onNotice}
-          onPrepare={() => go({ name: 'material', materialId: material.id, from: 'study' })}
-          onSubtitles={() => go({ name: 'subtitles', materialId: material.id })}
-          onTranscript={() => go({ name: 'transcript', materialId: material.id })}
-        />
-      )}
-      {route.name === 'material' && (
-        <MaterialPrepPage
-          material={material}
-          update={update}
-          onBack={onBack}
-          onNotice={onNotice}
-          onSubtitles={() => go({ name: 'subtitles', materialId: material.id })}
-          onStudy={(view) => {
-            update((m) => ({ ...m, lastView: view }));
-            if (!material.playbackSettings)
-              player.setMode(view === 'reading' ? 'continuous' : 'segment');
-            go({ name: 'study', materialId: material.id, from: 'material' });
-          }}
-        />
-      )}
-      {route.name === 'subtitles' && (
-        <SubtitleProofPage
-          material={material}
-          player={player}
-          update={update}
-          onBack={onBack}
-          onNotice={onNotice}
-        />
-      )}
-      {route.name === 'transcript' && (
-        <TranscriptPage material={material} player={player} onBack={onBack} />
-      )}
+      <div className="page__view">
+        {route.name === 'study' && (
+          <StudyPage
+            material={material}
+            player={player}
+            update={update}
+            onBack={onBack}
+            onNotice={onNotice}
+            onPrepare={() => go({ name: 'material', materialId: material.id, from: 'study' })}
+            onSubtitles={() => go({ name: 'subtitles', materialId: material.id })}
+            onTranscript={() => go({ name: 'transcript', materialId: material.id })}
+          />
+        )}
+        {route.name === 'material' && (
+          <MaterialPrepPage
+            material={material}
+            update={update}
+            onBack={onBack}
+            onNotice={onNotice}
+            onSubtitles={() => go({ name: 'subtitles', materialId: material.id })}
+            onStudy={(view) => {
+              update((m) => ({ ...m, lastView: view }));
+              if (!material.playbackSettings)
+                player.setMode(view === 'reading' ? 'continuous' : 'segment');
+              go({ name: 'study', materialId: material.id, from: 'material' });
+            }}
+          />
+        )}
+        {route.name === 'subtitles' && (
+          <SubtitleProofPage
+            material={material}
+            player={player}
+            update={update}
+            onBack={onBack}
+            onNotice={onNotice}
+          />
+        )}
+        {route.name === 'transcript' && (
+          <TranscriptPage material={material} player={player} onBack={onBack} />
+        )}
+      </div>
     </>
   );
 }
