@@ -18,7 +18,12 @@ export function motionScrollBehavior(): ScrollBehavior {
 }
 
 /** Pure step used by `usePresence`. Leaving + open interrupts back to entered. */
-export function nextPresence(current: Presence, open: boolean, reduced: boolean): Presence {
+export function nextPresence(
+  current: Presence,
+  open: boolean,
+  reduced: boolean,
+  instantLeave = false,
+): Presence {
   if (reduced) return open ? 'entered' : 'exited';
   if (open) {
     if (current === 'entered' || current === 'entering') return current;
@@ -26,6 +31,7 @@ export function nextPresence(current: Presence, open: boolean, reduced: boolean)
     return 'entering';
   }
   if (current === 'exited') return 'exited';
+  if (instantLeave) return 'exited';
   return 'leaving';
 }
 
@@ -45,15 +51,19 @@ export function useReducedMotion(): boolean {
  * Keeps a layer mounted through its leave transition and can be interrupted
  * mid-way instead of queuing a second animation.
  */
-export function usePresence(open: boolean, durationMs: number = MOTION_MS.short): Presence {
+export function usePresence(
+  open: boolean,
+  durationMs: number = MOTION_MS.short,
+  instantLeave = false,
+): Presence {
   const reduced = useReducedMotion();
   const [presence, setPresence] = useState<Presence>(() => (open ? 'entered' : 'exited'));
   const presenceRef = useRef(presence);
   presenceRef.current = presence;
 
   useEffect(() => {
-    const next = nextPresence(presenceRef.current, open, reduced);
-    if (reduced) {
+    const next = nextPresence(presenceRef.current, open, reduced, instantLeave);
+    if (reduced || (instantLeave && !open)) {
       setPresence(next);
       return;
     }
@@ -78,7 +88,7 @@ export function usePresence(open: boolean, durationMs: number = MOTION_MS.short)
       cancelAnimationFrame(frame);
       window.clearTimeout(timeout);
     };
-  }, [open, durationMs, reduced]);
+  }, [open, durationMs, reduced, instantLeave]);
 
   return presence;
 }

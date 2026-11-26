@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useLibrary } from './useLibrary';
 import type { Route } from './routes';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -7,6 +15,41 @@ import { blank, LibraryPage } from '../features/library/LibraryPage';
 import { MaterialWorkspace } from './MaterialWorkspace';
 import type { SortOrder } from '../features/library/listing';
 import { prefersReducedMotion, usePresence } from './motion';
+
+function translatedY(el: Element) {
+  const transform = getComputedStyle(el).transform;
+  if (!transform || transform === 'none') return 0;
+  const matrix3d = transform.match(/matrix3d\((.+)\)/);
+  if (matrix3d) {
+    const parts = matrix3d[1].split(',').map(Number);
+    return parts[13] ?? 0;
+  }
+  const matrix = transform.match(/matrix\((.+)\)/);
+  if (!matrix) return 0;
+  const parts = matrix[1].split(',').map(Number);
+  return parts[5] ?? 0;
+}
+
+function syncBannerAnchor(focusStudy: boolean) {
+  const root = document.querySelector('.app');
+  if (!(root instanceof HTMLElement)) return;
+  const chrome = focusStudy
+    ? document.querySelector('.study__head')
+    : document.querySelector('.topbar');
+  const banner = document.querySelector('.banner');
+  const rootTop = root.getBoundingClientRect().top;
+  // Use the layout box, not a mid-transition translated box, so the banner
+  // cannot be pinned 8px into a topbar that is still sliding in.
+  const chromeBottom =
+    chrome instanceof HTMLElement
+      ? chrome.getBoundingClientRect().bottom - translatedY(chrome) - rootTop
+      : 0;
+  const bannerHeight = banner instanceof HTMLElement ? banner.getBoundingClientRect().height : 0;
+  if (chromeBottom > 0) root.style.setProperty('--banner-top', `${Math.round(chromeBottom)}px`);
+  if (bannerHeight > 0) {
+    root.style.setProperty('--shell-banner-height', `${Math.round(bannerHeight)}px`);
+  }
+}
 
 /**
  * One window, a page stack, and no router dependency.
@@ -24,16 +67,20 @@ function ShellBanner({
   error?: boolean;
   children?: ReactNode;
 }) {
-  const presence = usePresence(Boolean(message));
+  const open = Boolean(message);
+  const presence = usePresence(open);
   const [text, setText] = useState(message);
   useEffect(() => {
     if (message) setText(message);
   }, [message]);
-  if (presence === 'exited') return null;
+  // Stay mounted in the same render as `message`, so the reserved slot can be
+  // measured before paint. `usePresence` would otherwise still be exited.
+  if (!open && presence === 'exited') return null;
+  const motion = open && presence === 'exited' ? 'entering' : presence;
   return (
     <div
       className={error ? 'banner banner--error' : 'banner'}
-      data-motion={presence}
+      data-motion={motion}
       role={error ? 'alert' : 'status'}
     >
       {text}
@@ -93,6 +140,39 @@ export function App() {
     void el.offsetWidth;
     el.classList.add('is-entering');
   }, [route.name]);
+
+  const bannerPresent = Boolean(notice || library.error);
+  useLayoutEffect(() => {
+    syncBannerAnchor(focusStudy);
+    const root = document.querySelector('.app');
+    if (!root) return;
+    const observer = new ResizeObserver(() => syncBannerAnchor(focusStudy));
+    observer.observe(root);
+    const banner = document.querySelector('.banner');
+    if (banner) observer.observe(banner);
+    const chrome = focusStudy
+      ? document.querySelector('.study__head')
+      : document.querySelector('.topbar');
+    if (chrome) observer.observe(chrome);
+    const mutations = new MutationObserver(() => {
+      syncBannerAnchor(focusStudy);
+      const nextBanner = document.querySelector('.banner');
+      if (nextBanner) observer.observe(nextBanner);
+    });
+    mutations.observe(root, { childList: true, subtree: true });
+    const onResize = () => syncBannerAnchor(focusStudy);
+    const onTransition = () => syncBannerAnchor(focusStudy);
+    window.addEventListener('resize', onResize);
+    root.addEventListener('transitionend', onTransition);
+    const later = window.setTimeout(() => syncBannerAnchor(focusStudy), 280);
+    return () => {
+      observer.disconnect();
+      mutations.disconnect();
+      window.removeEventListener('resize', onResize);
+      root.removeEventListener('transitionend', onTransition);
+      window.clearTimeout(later);
+    };
+  }, [focusStudy, bannerPresent, notice, library.error, route.name]);
 
   return (
     <div

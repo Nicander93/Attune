@@ -33,3 +33,9 @@ describe('presence', () => {
     }
   });
 });
+
+it('unmounts immediately when instant leave is asked for', () => {
+  expect(nextPresence('entered', false, false, true)).toBe('exited');
+  expect(nextPresence('entering', false, false, true)).toBe('exited');
+  expect(nextPresence('leaving', false, false, true)).toBe('exited');
+});

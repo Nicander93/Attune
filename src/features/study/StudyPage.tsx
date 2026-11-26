@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Material } from '../../domain/types';
 import { activeRound, ensureRound, formatTime, newRound } from '../../domain/types';
 import { compareWords, countKinds, tokenize } from '../../domain/text';
@@ -291,6 +291,34 @@ export function StudyPage({
   function closeMenu() {
     setMenuOpen(false);
   }
+
+  useLayoutEffect(() => {
+    if (!menuOpen) return;
+    const studyEl = menuWrap.current?.closest('.study');
+    const wrapEl = menuWrap.current;
+    if (!(studyEl instanceof HTMLElement) || !wrapEl) return;
+    const studyRoot: HTMLElement = studyEl;
+    const wrap: HTMLElement = wrapEl;
+
+    function fitMenu() {
+      const menuTop = wrap.getBoundingClientRect().bottom + 8;
+      const actions = studyRoot.querySelector('.dictation__actions');
+      const limit = actions ? actions.getBoundingClientRect().top - 10 : window.innerHeight - 16;
+      studyRoot.style.setProperty(
+        '--study-menu-max-height',
+        `${Math.max(120, Math.floor(limit - menuTop))}px`,
+      );
+    }
+
+    fitMenu();
+    const observer = new ResizeObserver(fitMenu);
+    observer.observe(studyRoot);
+    window.addEventListener('resize', fitMenu);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', fitMenu);
+    };
+  }, [menuOpen, view, checked]);
 
   if (!material.segments.length) {
     return (
