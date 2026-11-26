@@ -1,9 +1,9 @@
-tip c7db3e3fd9c6b3fcf47e43d17a56d8c9ed9a1670
+tip e2fa77ff644200c016e279358d1dda839671bd5d
 waiting CDP 9222...
 page http://localhost:1420/
-size target=1180x800 inner=1181x801
+size target=1180x800 inner=1180x800
 shot 01-home.png
-1 home {"overflowX":false,"clipped":0,"size":"1181x801"}
+1 home {"overflowX":false,"clipped":0,"size":"1180x800"}
 shot 02-home-to-library-mid.png
 shot 03-library.png
 1 library {"overflowX":false,"clipped":0,"heading":"素材库"}
@@ -23,11 +23,11 @@ shot 10-narrow-home.png
 shot 11-narrow-library.png
 shot 12-narrow-import.png
 3 720x560 overflow=false inner=721x561
-size target=1440x900 inner=1441x902
+size target=1440x900 inner=1441x901
 shot 10-wide-home.png
 shot 11-wide-library.png
 shot 12-wide-import.png
-3 1440x900 overflow=false inner=1441x902
+3 1440x900 overflow=false inner=1441x901
 3 viewports => PASS
 size target=1024x640 inner=1025x641
 library rows text slice Attune
@@ -41,7 +41,7 @@ library rows text slice Attune
 名称
 时长
 
-当前文件夹 · 50 段
+当前文件夹 · 55 段
 
 ＋ 文件夹
 ▣
@@ -83,9 +83,9 @@ h264_aac_subs.mkv
 ♫
 h264_audio
 未分类
-library row count 50
+library row count 55
 no ready study material; importing C:\Users\PC\AttuneSmoke\p3\speech.wav
-import dialog {"code":0,"out":"DIALOG title=[打开] hwnd=5638636\r\nCLICKED_OK"}
+import dialog {"code":0,"out":"DIALOG title=[打开] hwnd=15665052\r\nCLICKED_OK"}
 import ready=true
 shot 39-imported-ready.png
 shot 40-study-entered.png
@@ -102,8 +102,8 @@ shot 46-sentence-open.png
 shot 47-sentence-interrupt.png
 shot 50-notice-appearing.png
 shot 51-notice-study.png
-4 notice overlap {"heading":null,"topbar":null,"studyHead":{"width":1025,"height":36},"banner":{"text":"Enter：核对 / 下一句；Space：播放 / 暂停（输入框外）；左右方向键：切句（输入框外）；Esc：从核对返回修改。","hidden":false,"rect":{"left":0,"top":0,"right":1025,"bottom":36,"width":1025,"height":36}},"studyHeadBox":{"text":"← 返回\nspeech\n听读\n···","hidden":false,"rect":{"left":0,"top":0,"right":1025,"bottom":56,"width":1025,"height":56}},"headingBox":{"text":"第 1 / 2 句","hidden":false,"rect":{"left":103,"top":201,"right":175,"bottom":225,"width":72,"height":24}}}
-4 notice visible=true pushed=false blocks=true => PASS
+4 notice overlap {"heading":null,"topbar":null,"studyHead":null,"banner":{"text":"Enter：核对 / 下一句；Space：播放 / 暂停（输入框外）；左右方向键：切句（输入框外）；Esc：从核对返回修改。","hidden":false,"rect":{"left":0,"top":56,"right":1025,"bottom":92,"width":1025,"height":36}},"studyHeadBox":{"text":"← 返回\nspeech\n听读\n···","hidden":false,"rect":{"left":0,"top":0,"right":1025,"bottom":56,"width":1025,"height":56}},"headingBox":{"text":"第 1 / 2 句","hidden":false,"rect":{"left":103,"top":201,"right":175,"bottom":225,"width":72,"height":24}}}
+4 notice visible=true pushed=false blocksStudyToolbar=false => PASS
 shot 48-leave-study.png
 2 left study topbarBack=true
 shot 52-notice-after-leave.png
@@ -111,23 +111,23 @@ shot 52-notice-after-leave.png
 2 study chrome => PASS
 
 SUMMARY {
-  "tip": "c7db3e3fd9c6b3fcf47e43d17a56d8c9ed9a1670",
+  "tip": "e2fa77ff644200c016e279358d1dda839671bd5d",
   "branch": "feat/mot-1-motion-language",
-  "when": "2026-11-26T03:07:42.734Z",
+  "when": "2026-11-26T03:22:00.599Z",
   "viewports": {
     "default": {
       "target": {
         "width": 1180,
         "height": 800
       },
-      "innerWidth": 1181,
-      "innerHeight": 801,
+      "innerWidth": 1180,
+      "innerHeight": 800,
       "dpr": 1.3899999856948853,
       "outer": {
-        "left": 955,
-        "top": 1071,
-        "width": 1182,
-        "height": 802,
+        "left": 48,
+        "top": 82,
+        "width": 1181,
+        "height": 801,
         "windowState": "normal"
       }
     },
@@ -140,8 +140,8 @@ SUMMARY {
       "innerHeight": 641,
       "dpr": 1.3899999856948853,
       "outer": {
-        "left": 1091,
-        "top": 1224,
+        "left": 73,
+        "top": 123,
         "width": 1026,
         "height": 642,
         "windowState": "normal"
@@ -156,10 +156,10 @@ SUMMARY {
       "innerHeight": 561,
       "dpr": 1.3899999856948853,
       "outer": {
-        "left": 1227,
-        "top": 1377,
+        "left": 97,
+        "top": 164,
         "width": 722,
-        "height": 563,
+        "height": 562,
         "windowState": "normal"
       }
     },
@@ -169,13 +169,13 @@ SUMMARY {
         "height": 900
       },
       "innerWidth": 1441,
-      "innerHeight": 902,
+      "innerHeight": 901,
       "dpr": 1.3899999856948853,
       "outer": {
-        "left": 1364,
-        "top": 1530,
+        "left": 122,
+        "top": 205,
         "width": 1442,
-        "height": 903,
+        "height": 902,
         "windowState": "normal"
       }
     },
@@ -188,8 +188,8 @@ SUMMARY {
       "innerHeight": 641,
       "dpr": 1.3899999856948853,
       "outer": {
-        "left": 1501,
-        "top": 1683,
+        "left": 147,
+        "top": 246,
         "width": 1026,
         "height": 642,
         "windowState": "normal"
@@ -200,23 +200,23 @@ SUMMARY {
   "item2_study_chrome": "PASS",
   "item3_viewports": "PASS",
   "item4_notice_overlay": "PASS",
-  "notice_blocks_title_or_toolbar": true,
+  "notice_blocks_title_or_toolbar": false,
   "all": "PASS",
   "evidence_dir": "docs/evidence/mot-1/",
   "detail": {
     "home": {
-      "innerWidth": 1181,
-      "innerHeight": 801,
-      "scrollWidth": 1181,
-      "scrollHeight": 801,
+      "innerWidth": 1180,
+      "innerHeight": 800,
+      "scrollWidth": 1180,
+      "scrollHeight": 800,
       "overflowX": false,
-      "appHeight": 801,
+      "appHeight": 800,
       "clipped": [],
       "heading": {
         "text": "继续学习",
         "hidden": false,
         "rect": {
-          "left": 141,
+          "left": 140,
           "top": 84,
           "right": 243,
           "bottom": 122,
@@ -244,20 +244,20 @@ SUMMARY {
       "bodySlice": "Attune\n首页\n素材库\n继续学习\n＋ 导入素材\n上次学习\nh264_aac_subs\n听读 · 1 / 2 句\n继续 →\n最近学习\n全部素材 →\nh264_aac_subs\n00:03 · 10/30\n1 / 2\n›\nburned_in_en\n00:03 · 10/30\n1 / 1\n›\nh264_aac_subs\n00:03 · 10/26\n1 / 2\n›"
     },
     "library": {
-      "innerWidth": 1181,
-      "innerHeight": 801,
-      "scrollWidth": 1181,
-      "scrollHeight": 801,
+      "innerWidth": 1180,
+      "innerHeight": 800,
+      "scrollWidth": 1180,
+      "scrollHeight": 800,
       "overflowX": false,
-      "appHeight": 801,
+      "appHeight": 800,
       "clipped": [],
       "heading": {
         "text": "素材库",
         "hidden": false,
         "rect": {
-          "left": 141,
+          "left": 140,
           "top": 80,
-          "right": 218,
+          "right": 217,
           "bottom": 118,
           "width": 77,
           "height": 38
@@ -280,23 +280,23 @@ SUMMARY {
       "bannerOverlapsHeading": null,
       "bannerOverlapsTopbar": null,
       "bannerOverlapsStudyHead": null,
-      "bodySlice": "Attune\n首页\n素材库\n素材库\n＋ 导入素材\n全部素材\n未分类\n最近学习\n名称\n时长\n\n当前文件夹 · 46 段\n\n＋ 文件夹\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nburned_in_en\n未分类 · 00:03\n1 / 1\n···\nburned_in_en.mp4\n♫\nh264_audio\n未分类 · 00:03\n待校对\n···\nh264_audio.wav\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n未开始\n···\nh264_aac_subs.mkv\n♫\nh264_audio\n未分类 · 00:03\n未开始\n···\nh264_audio.wav\n▣\nh264_aac\n未分类 · 00:03\n1 / 2\n···\nh264_aac.mp4\n♫\nspeech\n未分类 · 00:07\n待校对\n···\nspeech.wav\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\n未命名素材\n未分类 · "
+      "bodySlice": "Attune\n首页\n素材库\n素材库\n＋ 导入素材\n全部素材\n未分类\n最近学习\n名称\n时长\n\n当前文件夹 · 51 段\n\n＋ 文件夹\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nburned_in_en\n未分类 · 00:03\n1 / 1\n···\nburned_in_en.mp4\n♫\nh264_audio\n未分类 · 00:03\n待校对\n···\nh264_audio.wav\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n未开始\n···\nh264_aac_subs.mkv\n♫\nh264_audio\n未分类 · 00:03\n未开始\n···\nh264_audio.wav\n▣\nh264_aac\n未分类 · 00:03\n1 / 2\n···\nh264_aac.mp4\n♫\nspeech\n未分类 · 00:07\n待校对\n···\nspeech.wav\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\n未命名素材\n未分类 · "
     },
     "importEmpty": {
-      "innerWidth": 1181,
-      "innerHeight": 801,
-      "scrollWidth": 1181,
-      "scrollHeight": 801,
+      "innerWidth": 1180,
+      "innerHeight": 800,
+      "scrollWidth": 1180,
+      "scrollHeight": 800,
       "overflowX": false,
-      "appHeight": 801,
+      "appHeight": 800,
       "clipped": [],
       "heading": {
         "text": "导入素材",
         "hidden": false,
         "rect": {
-          "left": 191,
+          "left": 190,
           "top": 135,
-          "right": 991,
+          "right": 990,
           "bottom": 178,
           "width": 800,
           "height": 43
@@ -398,7 +398,7 @@ SUMMARY {
         "bannerOverlapsHeading": null,
         "bannerOverlapsTopbar": null,
         "bannerOverlapsStudyHead": null,
-        "bodySlice": "Attune\n首页\n素材库\n素材库\n＋ 导入素材\n全部素材\n未分类\n最近学习\n名称\n时长\n\n当前文件夹 · 47 段\n\n＋ 文件夹\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nburned_in_en\n未分类 · 00:03\n1 / 1\n···\nburned_in_en.mp4\n♫\nh264_audio\n未分类 · 00:03\n待校对\n···\nh264_audio.wav\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n未开始\n···\nh264_aac_subs.mkv\n♫\nh264_audio\n未分类 · 00:03\n未开始\n···\nh264_audio.wav\n▣\nh264_aac\n未分类 · 00:03\n1 / 2\n···\nh264_aac.mp4\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\nspeech\n未分类 · 00:07\n待校对\n···\nspeech.wav\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\n未命名素材\n未分类 · "
+        "bodySlice": "Attune\n首页\n素材库\n素材库\n＋ 导入素材\n全部素材\n未分类\n最近学习\n名称\n时长\n\n当前文件夹 · 52 段\n\n＋ 文件夹\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nburned_in_en\n未分类 · 00:03\n1 / 1\n···\nburned_in_en.mp4\n♫\nh264_audio\n未分类 · 00:03\n待校对\n···\nh264_audio.wav\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n未开始\n···\nh264_aac_subs.mkv\n♫\nh264_audio\n未分类 · 00:03\n未开始\n···\nh264_audio.wav\n▣\nh264_aac\n未分类 · 00:03\n1 / 2\n···\nh264_aac.mp4\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\nspeech\n未分类 · 00:07\n待校对\n···\nspeech.wav\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\n未命名素材\n未分类 · "
       },
       "import": {
         "innerWidth": 1025,
@@ -517,7 +517,7 @@ SUMMARY {
         "bannerOverlapsHeading": null,
         "bannerOverlapsTopbar": null,
         "bannerOverlapsStudyHead": null,
-        "bodySlice": "Attune\n首页\n素材库\n素材库\n＋ 导入素材\n全部素材\n未分类\n最近学习\n名称\n时长\n\n当前文件夹 · 48 段\n\n＋ 文件夹\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nburned_in_en\n未分类 · 00:03\n1 / 1\n···\nburned_in_en.mp4\n♫\nh264_audio\n未分类 · 00:03\n待校对\n···\nh264_audio.wav\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n未开始\n···\nh264_aac_subs.mkv\n♫\nh264_audio\n未分类 · 00:03\n未开始\n···\nh264_audio.wav\n▣\nh264_aac\n未分类 · 00:03\n1 / 2\n···\nh264_aac.mp4\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\nspeech\n未分类 · 00:07\n待校对\n···\nspeech.wav\n♫\n未命名素材\n未分类 · "
+        "bodySlice": "Attune\n首页\n素材库\n素材库\n＋ 导入素材\n全部素材\n未分类\n最近学习\n名称\n时长\n\n当前文件夹 · 53 段\n\n＋ 文件夹\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nburned_in_en\n未分类 · 00:03\n1 / 1\n···\nburned_in_en.mp4\n♫\nh264_audio\n未分类 · 00:03\n待校对\n···\nh264_audio.wav\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n未开始\n···\nh264_aac_subs.mkv\n♫\nh264_audio\n未分类 · 00:03\n未开始\n···\nh264_audio.wav\n▣\nh264_aac\n未分类 · 00:03\n1 / 2\n···\nh264_aac.mp4\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\nspeech\n未分类 · 00:07\n待校对\n···\nspeech.wav\n♫\n未命名素材\n未分类 · "
       },
       "import": {
         "innerWidth": 721,
@@ -562,11 +562,11 @@ SUMMARY {
     "vp_wide": {
       "home": {
         "innerWidth": 1441,
-        "innerHeight": 902,
+        "innerHeight": 901,
         "scrollWidth": 1441,
-        "scrollHeight": 902,
+        "scrollHeight": 901,
         "overflowX": false,
-        "appHeight": 902,
+        "appHeight": 901,
         "clipped": [],
         "heading": {
           "text": "继续学习",
@@ -601,11 +601,11 @@ SUMMARY {
       },
       "library": {
         "innerWidth": 1441,
-        "innerHeight": 902,
+        "innerHeight": 901,
         "scrollWidth": 1441,
-        "scrollHeight": 902,
+        "scrollHeight": 901,
         "overflowX": false,
-        "appHeight": 902,
+        "appHeight": 901,
         "clipped": [],
         "heading": {
           "text": "素材库",
@@ -636,15 +636,15 @@ SUMMARY {
         "bannerOverlapsHeading": null,
         "bannerOverlapsTopbar": null,
         "bannerOverlapsStudyHead": null,
-        "bodySlice": "Attune\n首页\n素材库\n素材库\n＋ 导入素材\n全部素材\n未分类\n最近学习\n名称\n时长\n\n当前文件夹 · 49 段\n\n＋ 文件夹\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nburned_in_en\n未分类 · 00:03\n1 / 1\n···\nburned_in_en.mp4\n♫\nh264_audio\n未分类 · 00:03\n待校对\n···\nh264_audio.wav\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n未开始\n···\nh264_aac_subs.mkv\n♫\nh264_audio\n未分类 · 00:03\n未开始\n···\nh264_audio.wav\n▣\nh264_aac\n未分类 · 00:03\n1 / 2\n···\nh264_aac.mp4\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\nspeech\n未分类 · 00:07"
+        "bodySlice": "Attune\n首页\n素材库\n素材库\n＋ 导入素材\n全部素材\n未分类\n最近学习\n名称\n时长\n\n当前文件夹 · 54 段\n\n＋ 文件夹\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nburned_in_en\n未分类 · 00:03\n1 / 1\n···\nburned_in_en.mp4\n♫\nh264_audio\n未分类 · 00:03\n待校对\n···\nh264_audio.wav\n▣\nh264_aac_subs\n未分类 · 00:03\n待校对\n···\nh264_aac_subs.mkv\n▣\nh264_aac_subs\n未分类 · 00:03\n未开始\n···\nh264_aac_subs.mkv\n♫\nh264_audio\n未分类 · 00:03\n未开始\n···\nh264_audio.wav\n▣\nh264_aac\n未分类 · 00:03\n1 / 2\n···\nh264_aac.mp4\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\n未命名素材\n未分类 · 00:00 · 无字幕\n未开始\n···\n♫\nspeech\n未分类 · 00:07"
       },
       "import": {
         "innerWidth": 1441,
-        "innerHeight": 902,
+        "innerHeight": 901,
         "scrollWidth": 1441,
-        "scrollHeight": 902,
+        "scrollHeight": 901,
         "overflowX": false,
-        "appHeight": 902,
+        "appHeight": 901,
         "clipped": [],
         "heading": {
           "text": "导入素材",
@@ -724,7 +724,7 @@ SUMMARY {
         },
         "inner": {
           "width": 1441,
-          "height": 902
+          "height": 901
         },
         "overflow": false,
         "clipped": {
@@ -736,7 +736,7 @@ SUMMARY {
     ],
     "importPick": {
       "code": 0,
-      "out": "DIALOG title=[打开] hwnd=5638636\r\nCLICKED_OK"
+      "out": "DIALOG title=[打开] hwnd=15665052\r\nCLICKED_OK"
     },
     "studyEntered": {
       "innerWidth": 1025,
@@ -870,36 +870,30 @@ SUMMARY {
         "hidden": false,
         "rect": {
           "left": 0,
-          "top": 0,
+          "top": 56,
           "right": 1025,
-          "bottom": 36,
+          "bottom": 92,
           "width": 1025,
           "height": 36
         }
       },
       "bannerOverlapsHeading": null,
       "bannerOverlapsTopbar": null,
-      "bannerOverlapsStudyHead": {
-        "width": 1025,
-        "height": 36
-      },
+      "bannerOverlapsStudyHead": null,
       "bodySlice": "Enter：核对 / 下一句；Space：播放 / 暂停（输入框外）；左右方向键：切句（输入框外）；Esc：从核对返回修改。\n← 返回\nspeech\n听读\n···\n01 / 02 ⌄\n☆\n已听写 0 / 2 句\n⏮\n▶\n⏭\n00:00 / 00:07\n↻\n↻ 重听本句\n第 1 / 2 句\n00:00 — 00:02\n听完这句，写下来…\n↻ 重听\n核对答案 Enter"
     },
     "noticeOverlap": {
       "heading": null,
       "topbar": null,
-      "studyHead": {
-        "width": 1025,
-        "height": 36
-      },
+      "studyHead": null,
       "banner": {
         "text": "Enter：核对 / 下一句；Space：播放 / 暂停（输入框外）；左右方向键：切句（输入框外）；Esc：从核对返回修改。",
         "hidden": false,
         "rect": {
           "left": 0,
-          "top": 0,
+          "top": 56,
           "right": 1025,
-          "bottom": 36,
+          "bottom": 92,
           "width": 1025,
           "height": 36
         }
