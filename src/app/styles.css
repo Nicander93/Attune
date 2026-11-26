@@ -201,10 +201,12 @@ kbd {
 .banner {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
-  padding: 10px 24px;
+  padding: 10px 12px;
   background: var(--tint);
-  border-bottom: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: 8px;
 }
 .banner--error {
   background: var(--errbg);
@@ -1184,7 +1186,7 @@ h1 {
   font-size: 20px;
 }
 .banner {
-  padding: 8px 28px;
+  padding: 8px 12px;
   font-size: 12px;
 }
 .home {
@@ -2185,9 +2187,6 @@ h1 {
 .app[data-focus='study'] .page {
   padding: 0;
 }
-.app[data-focus='study'] .banner {
-  padding-inline: 28px;
-}
 .study--focus {
   height: 100%;
   background: #fff;
@@ -2502,8 +2501,15 @@ h1 {
 .player__replay {
   width: 34px;
   height: 34px;
-  font-size: 16px;
+  padding: 0;
   border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.player__icon {
+  display: block;
+  flex: none;
 }
 .player__loop.is-active {
   color: var(--accent);
@@ -2595,34 +2601,111 @@ h1 {
     visibility 0s linear var(--motion-short);
 }
 
-.banner {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: var(--banner-top, var(--shell-topbar-height));
-  z-index: 50;
-  transition: opacity var(--motion-short) var(--motion-ease-enter);
+/* UX-3: overlay toasts do not reserve layout space or push the page down. */
+.toast-host {
+  position: fixed;
+  z-index: 80;
+  top: calc(var(--shell-topbar-height) + 12px);
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  width: min(360px, calc(100vw - 40px));
+  pointer-events: none;
 }
-.app[data-focus='study'] .banner {
-  top: var(--banner-top, var(--study-head-height));
+.app[data-focus='study'] .toast-host {
+  top: calc(var(--study-head-height) + 12px);
 }
-/* Keep the banner in its slot; a vertical shift would collide with the chrome. */
-.banner[data-motion='entering'],
-.banner[data-motion='leaving'] {
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  line-height: 1.5;
+  transition:
+    opacity var(--motion-short) var(--motion-ease-enter),
+    transform var(--motion-short) var(--motion-ease-enter);
+}
+.toast--error {
+  background: var(--errbg);
+  color: var(--err);
+}
+.toast__message {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+.toast__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.toast__close {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--sub);
+}
+.toast[data-motion='entering'],
+.toast[data-motion='leaving'] {
   opacity: 0;
-  transform: none;
+  transform: translateY(-6px);
   pointer-events: none;
   transition-timing-function: var(--motion-ease-leave);
 }
-.banner[data-motion='entered'] {
+.toast[data-motion='entered'] {
   opacity: 1;
   transform: none;
 }
-.app:not([data-focus='study']):has(.banner) .page {
-  padding-top: max(36px, var(--shell-banner-height, 36px));
+
+.confirm-panel {
+  margin: 12px 0;
+  padding: 12px 14px;
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
 }
-.app[data-focus='study']:has(.banner) .study__status {
-  margin-top: calc(10px + max(36px, var(--shell-banner-height, 36px)));
+.confirm-panel__message {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+.confirm-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.study__menu:has(.study__shortcuts) {
+  min-width: 228px;
+}
+.study__shortcuts {
+  padding: 6px 12px 10px;
+  font-size: 12px;
+  color: var(--sub);
+  line-height: 1.55;
+  border-top: 1px solid var(--line);
+}
+.study__shortcuts p {
+  margin: 0 0 4px;
+}
+.study__shortcuts p:last-child {
+  margin-bottom: 0;
+}
+.study__shortcuts kbd {
+  font-size: 11px;
+}
+.study__menu-volume {
+  white-space: nowrap;
 }
 
 @keyframes motion-page-in {

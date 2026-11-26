@@ -29,10 +29,11 @@ type Callbacks = {
   onRecognized: (materialId: string, segments: SubtitleSegment[]) => void;
   onError: (message: string) => void;
   onNotice: (message: string) => void;
+  confirm: (message: string) => boolean | Promise<boolean>;
 };
 const megabytes = (bytes: number) => (bytes / 1_048_576).toFixed(1);
 
-export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
+export function useRecognition({ onRecognized, onError, onNotice, confirm }: Callbacks) {
   const [settings, setSettings] = useState(loadSettings),
     [models, setModels] = useState<ModelStatus[]>([]),
     [task, setTask] = useState<Task | undefined>();
@@ -115,7 +116,7 @@ export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
       if (!model) throw new Error(COPY.recognitionNoModel);
       if (!model.installed) {
         const sizeMb = Number(megabytesLabel(model.sizeBytes - model.downloadedBytes));
-        if (!window.confirm(modelConsentMessage(sizeMb))) throw CANCELLED;
+        if (!(await confirm(modelConsentMessage(sizeMb)))) throw CANCELLED;
         await download(model);
       }
       setTask({ label: COPY.preparingSubtitles, cancel: stop });

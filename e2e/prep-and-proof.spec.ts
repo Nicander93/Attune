@@ -251,8 +251,8 @@ test.describe('subtitle proofing', () => {
     ]);
     await openStudy(page);
     await openStudyMenu(page, '校对字幕');
-    page.once('dialog', (dialog) => void dialog.accept());
     await page.getByRole('button', { name: '与下一句合并' }).first().click();
+    await page.getByRole('button', { name: '继续' }).click();
     await expect(page.getByText(/标记为待重新核对/)).toBeVisible();
     await settled(page);
 

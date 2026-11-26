@@ -7,6 +7,7 @@ import { StudyPage } from '../features/study/StudyPage';
 import { TranscriptPage } from '../features/reading/TranscriptPage';
 import { MediaOutput } from '../features/player/Player';
 import { useMediaPlayer } from '../features/player/useMediaPlayer';
+import type { ShowNotice } from './notice';
 
 interface Props {
   material: Material;
@@ -14,7 +15,7 @@ interface Props {
   update: (transform: (material: Material) => Material) => void;
   go: (route: Route) => void;
   onBack: () => void;
-  onNotice: (message: string) => void;
+  onNotice: ShowNotice;
 }
 
 export function MaterialWorkspace({ material, route, update, go, onBack, onNotice }: Props) {

@@ -30,32 +30,67 @@ test('opening the study menu still works with reduced motion', async ({ page }) 
   await expect(page.getByRole('menuitem', { name: '快捷键' })).toHaveCount(0);
 });
 
-test('shortcut banner sits below the study head and leaves the toolbar clickable', async ({
-  page,
-}) => {
+test('shortcut help stays in the menu and does not cover the study chrome', async ({ page }) => {
   await seed(page, [material({ audio: wav(9) })]);
   await openStudy(page);
   await page.getByRole('button', { name: '更多', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: '快捷键' })).toBeVisible();
+  const fieldTop = await page
+    .getByLabel('第 1 句听写')
+    .evaluate((el) => el.getBoundingClientRect().top);
+  const playerTop = await page
+    .locator('.player--focus')
+    .evaluate((el) => el.getBoundingClientRect().top);
   await page.getByRole('menuitem', { name: '快捷键' }).click();
-  const banner = page.locator('.banner').first();
-  await expect(banner).toBeVisible();
-  const back = page.getByRole('button', { name: '← 返回' });
-  const more = page.getByRole('button', { name: '更多', exact: true });
-  await expect(back).toBeVisible();
-  await expect(more).toBeVisible();
-  const overlap = await page.evaluate(() => {
-    const notice = document.querySelector('.banner');
-    const head = document.querySelector('.study__head');
-    if (!notice || !head) return true;
-    const a = notice.getBoundingClientRect();
-    const b = head.getBoundingClientRect();
-    const width = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
-    const height = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
-    return width > 2 && height > 2;
+  await expect(page.locator('.study__menu')).toBeVisible();
+  await expect(page.locator('.study__shortcuts')).toBeVisible();
+  await expect(page.locator('.study__shortcuts')).toContainText('Enter');
+  await expect(page.locator('.banner')).toHaveCount(0);
+  await expect(page.locator('.toast')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '← 返回' })).toBeVisible();
+  await expect(page.locator('.study__count')).toBeVisible();
+  const fieldTopAfter = await page
+    .getByLabel('第 1 句听写')
+    .evaluate((el) => el.getBoundingClientRect().top);
+  const playerTopAfter = await page
+    .locator('.player--focus')
+    .evaluate((el) => el.getBoundingClientRect().top);
+  expect(Math.abs(fieldTopAfter - fieldTop)).toBeLessThan(2);
+  expect(Math.abs(playerTopAfter - playerTop)).toBeLessThan(2);
+  const audit = await page.evaluate(() => {
+    const box = (el: Element | null) => {
+      if (!(el instanceof HTMLElement)) return null;
+      const r = el.getBoundingClientRect();
+      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+    };
+    const intersects = (
+      a: NonNullable<ReturnType<typeof box>>,
+      b: NonNullable<ReturnType<typeof box>>,
+    ) => {
+      const width = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
+      const height = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      return width > 1 && height > 1;
+    };
+    const help = box(document.querySelector('.study__shortcuts'));
+    const menu = box(document.querySelector('.study__menu'));
+    const head = box(document.querySelector('.study__head'));
+    const count = box(document.querySelector('.study__count'));
+    const check = box(document.querySelector('[aria-label="核对答案"]'));
+    return {
+      overlapsHead: !!(help && head && intersects(help, head)),
+      overlapsCount: !!(help && count && intersects(help, count)),
+      overlapsCheck: !!(menu && check && intersects(menu, check)),
+      checkVisible: !!(check && check.bottom <= window.innerHeight + 1 && check.top >= 0),
+    };
   });
-  expect(overlap).toBe(false);
-  await back.click();
+  expect(audit.overlapsHead).toBe(false);
+  expect(audit.overlapsCount).toBe(false);
+  expect(audit.overlapsCheck).toBe(false);
+  expect(audit.checkVisible).toBe(true);
+
+  await page.getByRole('button', { name: '← 返回' }).click();
   await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible();
+  await expect(page.locator('.banner')).toHaveCount(0);
 });
 
 test('the study menu stays opaque and does not clip the check button', async ({ page }) => {
@@ -95,88 +130,4 @@ test('the study menu stays opaque and does not clip the check button', async ({ 
   expect(audit.checkVisible).toBe(true);
   expect(audit.opacity).toBe('1');
   expect(audit.background).toMatch(/rgb\(255,\s*255,\s*255\)/);
-});
-
-test('choosing 快捷键 closes the menu at once and keeps the sentence row clear', async ({
-  page,
-}) => {
-  await seed(page, [material({ audio: wav(9) })]);
-  await openStudy(page);
-  await page.getByRole('button', { name: '更多', exact: true }).click();
-  await page.getByRole('menuitem', { name: '快捷键' }).click();
-  await expect(page.locator('.study__menu')).toHaveCount(0);
-  await expect(page.locator('.study__menu[data-motion="leaving"]')).toHaveCount(0);
-  const banner = page.locator('.banner').first();
-  await expect(banner).toBeVisible();
-  await expect(page.getByRole('button', { name: '← 返回' })).toBeVisible();
-  await expect(page.locator('.study__count')).toBeVisible();
-  const audit = await page.evaluate(() => {
-    const box = (el: Element | null) => {
-      if (!(el instanceof HTMLElement)) return null;
-      const r = el.getBoundingClientRect();
-      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, height: r.height };
-    };
-    const intersects = (
-      a: NonNullable<ReturnType<typeof box>>,
-      b: NonNullable<ReturnType<typeof box>>,
-    ) => {
-      const width = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
-      const height = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
-      return width > 1 && height > 1;
-    };
-    const banner = box(document.querySelector('.banner'));
-    const head = box(document.querySelector('.study__head'));
-    const status = box(document.querySelector('.study__status'));
-    const count = box(document.querySelector('.study__count'));
-    return {
-      banner,
-      head,
-      status,
-      count,
-      overlapsHead: !!(banner && head && intersects(banner, head)),
-      overlapsStatus: !!(banner && status && intersects(banner, status)),
-      overlapsCount: !!(banner && count && intersects(banner, count)),
-    };
-  });
-  expect(audit.overlapsHead).toBe(false);
-  expect(audit.overlapsStatus).toBe(false);
-  expect(audit.overlapsCount).toBe(false);
-
-  await page.getByRole('button', { name: '← 返回' }).click();
-  await expect(page.getByRole('navigation', { name: '主导航' })).toBeVisible();
-  await expect(banner).toBeVisible();
-  const after = await page.evaluate(() => {
-    const box = (el: Element | null) => {
-      if (!(el instanceof HTMLElement)) return null;
-      const r = el.getBoundingClientRect();
-      return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, height: r.height };
-    };
-    const intersects = (
-      a: NonNullable<ReturnType<typeof box>>,
-      b: NonNullable<ReturnType<typeof box>>,
-    ) => {
-      const width = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
-      const height = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
-      return width > 1 && height > 1;
-    };
-    const banner = box(document.querySelector('.banner'));
-    const topbar = box(document.querySelector('.topbar'));
-    const back = box(
-      [...document.querySelectorAll('button')].find((el) => el.textContent?.includes('返回')) ??
-        null,
-    );
-    const heading = box([...document.querySelectorAll('h1')].find((el) => el.textContent) ?? null);
-    return {
-      banner,
-      topbar,
-      back,
-      heading,
-      overlapsTopbar: !!(banner && topbar && intersects(banner, topbar)),
-      overlapsBack: !!(banner && back && intersects(banner, back)),
-      overlapsHeading: !!(banner && heading && intersects(banner, heading)),
-    };
-  });
-  expect(after.overlapsTopbar).toBe(false);
-  expect(after.overlapsBack).toBe(false);
-  expect(after.overlapsHeading).toBe(false);
 });

@@ -11,8 +11,18 @@ import {
 } from '../storage/db';
 import { clearMediaCache } from '../media';
 import { isDesktop } from '../desktop';
+import { undoWindowMs } from './notice';
 
 const AUTOSAVE_MS = 300;
+
+export type PendingUndo =
+  | { kind: 'material'; material: Material; message: string }
+  | {
+      kind: 'folder';
+      folder: Folder;
+      moved: { id: string; folderId: string | null }[];
+      message: string;
+    };
 
 export type LibraryState = {
   ready: boolean;
@@ -21,6 +31,7 @@ export type LibraryState = {
   error: string;
   materials: Material[];
   folders: Folder[];
+  pendingUndo: PendingUndo | null;
   update: (transform: (material: Material) => Material, id: string) => void;
   rename: (id: string, displayName: string) => void;
   moveToFolder: (id: string, folderId: string | null) => void;
@@ -29,6 +40,7 @@ export type LibraryState = {
   createFolder: (name: string) => Promise<Folder>;
   renameFolder: (id: string, name: string) => Promise<void>;
   removeFolder: (id: string) => Promise<void>;
+  undo: () => Promise<void>;
   markStudied: (id: string, patch?: Partial<Material>) => void;
   flush: () => void;
 };
@@ -40,6 +52,10 @@ export type LibraryState = {
  * timer, so typing never waits on storage. Failures are kept pending and reported
  * rather than dropped - losing a draft silently is the one failure mode that must
  * not happen.
+ *
+ * Deleting a material or folder first hides it and can be undone for a short
+ * window; IndexedDB and media cache are only cleared after that window, or when
+ * a later delete replaces it.
  */
 export function useLibrary(): LibraryState {
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -47,11 +63,15 @@ export function useLibrary(): LibraryState {
   const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [pendingUndo, setPendingUndo] = useState<PendingUndo | null>(null);
   const current = useRef<Material[]>([]);
   const foldersRef = useRef<Folder[]>([]);
   const pending = useRef(new Map<string, Material>());
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const queue = useRef(Promise.resolve());
+  const pendingUndoRef = useRef<PendingUndo | null>(null);
+  const undoTimer = useRef<number>(0);
+  const undoGeneration = useRef(0);
 
   const flush = useCallback(() => {
     clearTimeout(timer.current);
@@ -76,6 +96,59 @@ export function useLibrary(): LibraryState {
     });
   }, []);
 
+  const commitPendingDelete = useCallback(async () => {
+    const entry = pendingUndoRef.current;
+    if (!entry) return;
+    const generation = undoGeneration.current;
+    pendingUndoRef.current = null;
+    setPendingUndo(null);
+    window.clearTimeout(undoTimer.current);
+    if (entry.kind === 'material') {
+      queue.current = queue.current.then(async () => {
+        await deleteMaterial(entry.material.id);
+        if (isDesktop()) await clearMediaCache(entry.material.id).catch(() => undefined);
+      });
+      try {
+        await queue.current;
+      } catch (err) {
+        queue.current = Promise.resolve();
+        if (generation === undoGeneration.current) {
+          current.current = [entry.material, ...current.current];
+          setMaterials(current.current);
+        }
+        setError(`删除失败：${String(err)}`);
+      }
+      return;
+    }
+    try {
+      flush();
+      await queue.current;
+      await deleteFolder(
+        entry.folder.id,
+        current.current.map((material) => {
+          const previous = entry.moved.find((item) => item.id === material.id);
+          return previous ? { ...material, folderId: previous.folderId } : material;
+        }),
+      );
+    } catch (err) {
+      setError(`删除失败：${String(err)}`);
+    }
+  }, [flush]);
+
+  const armUndo = useCallback(
+    (entry: PendingUndo) => {
+      undoGeneration.current += 1;
+      const generation = undoGeneration.current;
+      pendingUndoRef.current = entry;
+      setPendingUndo(entry);
+      window.clearTimeout(undoTimer.current);
+      undoTimer.current = window.setTimeout(() => {
+        if (generation === undoGeneration.current) void commitPendingDelete();
+      }, undoWindowMs());
+    },
+    [commitPendingDelete],
+  );
+
   useEffect(() => {
     let cancelled = false;
     Promise.all([loadMaterials(), loadFolders()])
@@ -95,16 +168,23 @@ export function useLibrary(): LibraryState {
 
   useEffect(() => {
     const onHide = () => {
-      if (document.visibilityState === 'hidden') flush();
+      if (document.visibilityState === 'hidden') {
+        flush();
+        void commitPendingDelete();
+      }
+    };
+    const onPageHide = () => {
+      flush();
+      void commitPendingDelete();
     };
     document.addEventListener('visibilitychange', onHide);
-    window.addEventListener('pagehide', flush);
+    window.addEventListener('pagehide', onPageHide);
     return () => {
       document.removeEventListener('visibilitychange', onHide);
-      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('pagehide', onPageHide);
       flush();
     };
-  }, [flush]);
+  }, [flush, commitPendingDelete]);
 
   const commit = useCallback((next: Material[]) => {
     current.current = next;
@@ -159,23 +239,18 @@ export function useLibrary(): LibraryState {
 
   const remove = useCallback(
     async (id: string) => {
+      await commitPendingDelete();
       const removed = current.current.find((m) => m.id === id);
+      if (!removed) return;
       pending.current.delete(id);
-      const next = current.current.filter((m) => m.id !== id);
-      commit(next);
-      queue.current = queue.current.then(async () => {
-        await deleteMaterial(id);
-        if (isDesktop()) await clearMediaCache(id).catch(() => undefined);
+      commit(current.current.filter((m) => m.id !== id));
+      armUndo({
+        kind: 'material',
+        material: removed,
+        message: `已删除「${removed.displayName}」。`,
       });
-      try {
-        await queue.current;
-      } catch (err) {
-        queue.current = Promise.resolve();
-        if (removed) commit([removed, ...current.current]);
-        setError(`删除失败：${String(err)}`);
-      }
     },
-    [commit],
+    [armUndo, commit, commitPendingDelete],
   );
 
   const createFolder = useCallback(async (name: string) => {
@@ -198,16 +273,59 @@ export function useLibrary(): LibraryState {
   /** Deleting a folder only unlabels its materials; nothing else is touched. */
   const removeFolder = useCallback(
     async (id: string) => {
-      flush();
-      await queue.current;
-      const moved = await deleteFolder(id, current.current);
-      foldersRef.current = foldersRef.current.filter((f) => f.id !== id);
+      await commitPendingDelete();
+      const folder = foldersRef.current.find((item) => item.id === id);
+      if (!folder) return;
+      const moved = current.current
+        .filter((material) => material.folderId === id)
+        .map((material) => ({ id: material.id, folderId: material.folderId }));
+      foldersRef.current = foldersRef.current.filter((item) => item.id !== id);
       setFolders(foldersRef.current);
-      const byId = new Map(moved.map((m) => [m.id, m]));
-      commit(current.current.map((m) => byId.get(m.id) ?? m));
+      commit(
+        current.current.map((material) =>
+          material.folderId === id ? { ...material, folderId: null } : material,
+        ),
+      );
+      armUndo({
+        kind: 'folder',
+        folder,
+        moved,
+        message: `已删除文件夹「${folder.name}」，其中素材已移到未分类。`,
+      });
     },
-    [commit, flush],
+    [armUndo, commit, commitPendingDelete],
   );
+
+  const undo = useCallback(async () => {
+    const entry = pendingUndoRef.current;
+    if (!entry) return;
+    undoGeneration.current += 1;
+    pendingUndoRef.current = null;
+    setPendingUndo(null);
+    window.clearTimeout(undoTimer.current);
+    if (entry.kind === 'material') {
+      commit([entry.material, ...current.current.filter((m) => m.id !== entry.material.id)]);
+      return;
+    }
+    if (!foldersRef.current.some((item) => item.id === entry.folder.id)) {
+      foldersRef.current = [...foldersRef.current, entry.folder];
+      setFolders(foldersRef.current);
+    }
+    const byId = new Map(entry.moved.map((item) => [item.id, item.folderId]));
+    const restored = current.current.map((material) =>
+      byId.has(material.id) ? { ...material, folderId: byId.get(material.id) ?? null } : material,
+    );
+    commit(restored);
+    for (const item of entry.moved) {
+      const material = restored.find((row) => row.id === item.id);
+      if (material) pending.current.set(material.id, material);
+    }
+    if (entry.moved.length) {
+      setSaving(true);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(flush, AUTOSAVE_MS);
+    }
+  }, [commit]);
 
   /**
    * Records real study behaviour. Only called by typing, checking or playing - never by
@@ -226,6 +344,7 @@ export function useLibrary(): LibraryState {
     error,
     materials,
     folders,
+    pendingUndo,
     update,
     rename,
     moveToFolder,
@@ -234,6 +353,7 @@ export function useLibrary(): LibraryState {
     createFolder,
     renameFolder,
     removeFolder,
+    undo,
     markStudied,
     flush,
   };

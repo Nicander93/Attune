@@ -140,32 +140,18 @@ export function LibraryPage(props: Props) {
     setMenuFor(null);
   }
 
-  async function confirmDelete(id: string) {
+  async function deleteMaterialRow(id: string) {
     const material = props.materials.find((m) => m.id === id);
     setMenuFor(null);
     if (!material) return;
-    if (
-      !window.confirm(
-        `删除「${material.displayName}」？音频、草稿和难句标记都会一并删除，无法恢复。`,
-      )
-    )
-      return;
     await props.onDelete(id);
-    props.onNotice(`已删除「${material.displayName}」。`);
   }
 
-  async function confirmDeleteFolder(id: string) {
+  async function deleteFolderRow(id: string) {
     const folder = props.folders.find((f) => f.id === id);
     if (!folder) return;
-    if (
-      !window.confirm(
-        `删除文件夹「${folder.name}」？其中的素材会移到「未分类」，音频和学习记录都会保留。`,
-      )
-    )
-      return;
     await props.onDeleteFolder(id);
     props.onSelectFolder(null);
-    props.onNotice(`已删除文件夹「${folder.name}」，其中素材已移到未分类。`);
   }
 
   return (
@@ -269,7 +255,7 @@ export function LibraryPage(props: Props) {
                   type="button"
                   className="quiet textbtn"
                   aria-label={`删除文件夹 ${activeFolder.name}`}
-                  onClick={() => void confirmDeleteFolder(activeFolder.id)}
+                  onClick={() => void deleteFolderRow(activeFolder.id)}
                 >
                   删除
                 </button>
@@ -397,7 +383,7 @@ export function LibraryPage(props: Props) {
                       >
                         素材准备
                       </button>
-                      <button role="menuitem" onClick={() => void confirmDelete(row.id)}>
+                      <button role="menuitem" onClick={() => void deleteMaterialRow(row.id)}>
                         删除
                       </button>
                     </MotionPop>

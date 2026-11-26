@@ -15,6 +15,7 @@ type Callbacks = {
   update: (transform: (material: Material) => Material) => void;
   onNeedRecognition: () => void;
   onNotice: (message: string) => void;
+  confirm: (message: string) => boolean | Promise<boolean>;
 };
 
 export type VideoChoice =
@@ -27,7 +28,13 @@ export type VideoChoice =
       detail: string;
     };
 
-export function useAutoVideoImport({ material, update, onNeedRecognition, onNotice }: Callbacks) {
+export function useAutoVideoImport({
+  material,
+  update,
+  onNeedRecognition,
+  onNotice,
+  confirm,
+}: Callbacks) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState<UserFacingError | null>(null);
@@ -36,10 +43,12 @@ export function useAutoVideoImport({ material, update, onNeedRecognition, onNoti
   const updateRef = useRef(update);
   const needRecognitionRef = useRef(onNeedRecognition);
   const noticeRef = useRef(onNotice);
+  const confirmRef = useRef(confirm);
   materialRef.current = material;
   updateRef.current = update;
   needRecognitionRef.current = onNeedRecognition;
   noticeRef.current = onNotice;
+  confirmRef.current = confirm;
 
   function begin() {
     setError(null);
@@ -103,7 +112,10 @@ export function useAutoVideoImport({ material, update, onNeedRecognition, onNoti
   async function startFromPath(path: string) {
     begin();
     try {
-      const tools = await ensureLocalMediaTools({ onProgress: setProgress });
+      const tools = await ensureLocalMediaTools({
+        onProgress: setProgress,
+        confirm: confirmRef.current,
+      });
       if (tools.status === 'cancelled') {
         noticeRef.current(COPY.toolsCancelled);
         end();
