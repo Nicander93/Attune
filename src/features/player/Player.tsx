@@ -1,4 +1,5 @@
 import type { RefObject, SyntheticEvent } from 'react';
+import { MOTION_MS, usePresence } from '../../app/motion';
 import type { Material } from '../../domain/types';
 import { formatTime } from '../../domain/types';
 import { PLAYBACK_RATES, useMediaPlayer } from './useMediaPlayer';
@@ -75,11 +76,14 @@ export function Player({
           ⏮
         </button>
         <button
-          className="player__play"
+          className={`player__play${player.playing ? ' is-playing' : ''}`}
           aria-label={player.playing ? '暂停' : '播放'}
+          aria-pressed={player.playing}
           onClick={player.toggle}
         >
-          {player.playing ? '❚❚' : '▶'}
+          <span className="player__glyph" key={player.playing ? 'pause' : 'play'}>
+            {player.playing ? '❚❚' : '▶'}
+          </span>
         </button>
         <button
           className="quiet"
@@ -179,10 +183,16 @@ const mediaEvents = (player: ReturnType<typeof useMediaPlayer>) => ({
  */
 export function MediaOutput({ player }: { player: ReturnType<typeof useMediaPlayer> }) {
   const events = mediaEvents(player);
-  if (player.kind === 'video' && player.videoSrc) {
-    const hidden = player.videoSurface === 'hidden';
+  const showVideo = player.kind === 'video' && Boolean(player.videoSrc);
+  const presence = usePresence(showVideo && player.videoSurface === 'visible', MOTION_MS.short);
+  if (showVideo) {
+    const hidden = presence === 'exited';
     return (
-      <div className={`media-output${hidden ? ' media-output--hidden' : ''}`} aria-hidden={hidden}>
+      <div
+        className={`media-output${hidden ? ' media-output--hidden' : ''}`}
+        data-motion={hidden ? undefined : presence}
+        aria-hidden={hidden || presence === 'leaving' || undefined}
+      >
         <video
           ref={player.mediaRef as RefObject<HTMLVideoElement>}
           className="media-output__video"

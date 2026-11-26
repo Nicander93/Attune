@@ -10,6 +10,7 @@ import { PLAYBACK_RATES, type AudioPlayer } from '../player/useMediaPlayer';
 import { WordFlowEditor } from '../dictation/WordFlowEditor';
 import { ReadingView, useActiveWord } from '../reading/ReadingView';
 import { MotionPop } from '../../app/MotionPop';
+import { MOTION_MS, prefersReducedMotion, usePresence } from '../../app/motion';
 
 type Props = {
   material: Material;
@@ -62,6 +63,9 @@ export function StudyPage({
   const [sentenceOpen, setSentenceOpen] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   const menuWrap = useRef<HTMLDivElement>(null);
+  const dictationWrap = useRef<HTMLDivElement>(null);
+  const resultSegmentRef = useRef(editingId);
+  const sentenceRef = useRef(editingId);
 
   function updateStudySettings(settings: NonNullable<Material['studySettings']>) {
     update((m) => ({ ...m, studySettings: { ...m.studySettings, ...settings } }));
@@ -118,6 +122,31 @@ export function StudyPage({
   );
   const summary = useMemo(() => summarizeDiff(diff), [diff]);
   const { missing, extra } = useMemo(() => countKinds(diff), [diff]);
+
+  const resultLeaveInstant = !checked && resultSegmentRef.current !== editingId;
+  resultSegmentRef.current = editingId;
+  const resultPresence = usePresence(
+    checked && view === 'dictation',
+    MOTION_MS.short,
+    resultLeaveInstant,
+  );
+  const shownResult = useRef({ diff, summary, missing, extra });
+  if (checked) shownResult.current = { diff, summary, missing, extra };
+
+  useLayoutEffect(() => {
+    if (sentenceRef.current === editingId) return;
+    sentenceRef.current = editingId;
+    const node = dictationWrap.current;
+    if (!node || prefersReducedMotion()) return;
+    for (const animation of node.getAnimations()) animation.cancel();
+    node.animate(
+      [
+        { opacity: 0.55, transform: 'translateY(6px)' },
+        { opacity: 1, transform: 'none' },
+      ],
+      { duration: MOTION_MS.micro, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+    );
+  }, [editingId]);
 
   const saveDraft = useCallback(
     (value: string) => {
@@ -677,7 +706,7 @@ export function StudyPage({
 
       {view === 'dictation' ? (
         segment ? (
-          <div className="dictation">
+          <div className="dictation" ref={dictationWrap}>
             <div className="dictation__head">
               <span className="muted">
                 {formatTime(segment.start)} — {formatTime(segment.end)}
@@ -700,48 +729,52 @@ export function StudyPage({
               inputRef={field}
             />
 
-            {checked ? (
-              <div className="diff" role="status">
+            {resultPresence !== 'exited' && (
+              <div className="diff" role="status" data-motion={resultPresence}>
                 <p className="caption">核对结果</p>
                 <p className="diff__text">
-                  {diff.map((word, i) => (
+                  {shownResult.current.diff.map((word, i) => (
                     <span key={i} className={`diff__word diff__word--${word.kind}`}>
                       {word.text}{' '}
                     </span>
                   ))}
                 </p>
                 <p className="muted">
-                  {missing === 0 && extra === 0 ? '和原文一致。' : null}
-                  {missing > 0 && `漏写：${summary.missing.join('、')} `}
-                  {extra > 0 && `多写或写错：${summary.extra.join('、')}`}
+                  {shownResult.current.missing === 0 && shownResult.current.extra === 0
+                    ? '和原文一致。'
+                    : null}
+                  {shownResult.current.missing > 0 &&
+                    `漏写：${shownResult.current.summary.missing.join('、')} `}
+                  {shownResult.current.extra > 0 &&
+                    `多写或写错：${shownResult.current.summary.extra.join('、')}`}
                   {' · Enter 下一句 · Esc 回到修改'}
                 </p>
-                {player.hasVideoSurface && (
-                  <p className="dictation__video-toggle">
-                    <button
-                      type="button"
-                      className="quiet"
-                      onClick={() =>
-                        player.setVideoSurface(
-                          player.videoSurface === 'visible' ? 'hidden' : 'visible',
-                        )
-                      }
-                    >
-                      {player.videoSurface === 'visible' ? '收起画面' : '显示画面'}
-                    </button>
-                  </p>
-                )}
-                <div className="dictation__actions">
-                  <button className="quiet" onClick={() => selectSentence(editingId)}>
-                    修改
-                  </button>
-                  <button className="quiet" onClick={player.replay}>
-                    ↻ 重听
-                  </button>
-                  <button className="primary" onClick={() => goTo(index + 1)}>
-                    下一句 →
-                  </button>
-                </div>
+              </div>
+            )}
+            {player.hasVideoSurface && (checked || player.videoSurface === 'visible') && (
+              <p className="dictation__video-toggle">
+                <button
+                  type="button"
+                  className="quiet"
+                  onClick={() =>
+                    player.setVideoSurface(player.videoSurface === 'visible' ? 'hidden' : 'visible')
+                  }
+                >
+                  {player.videoSurface === 'visible' ? '收起画面' : '显示画面'}
+                </button>
+              </p>
+            )}
+            {checked ? (
+              <div className="dictation__actions">
+                <button className="quiet" onClick={() => selectSentence(editingId)}>
+                  修改
+                </button>
+                <button className="quiet" onClick={player.replay}>
+                  ↻ 重听
+                </button>
+                <button className="primary" onClick={() => goTo(index + 1)}>
+                  下一句 →
+                </button>
               </div>
             ) : (
               <div className="dictation__actions">
