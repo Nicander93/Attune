@@ -1,5 +1,14 @@
 import { expect, test } from '@playwright/test';
-import { material, openStudy, openStudyMenu, seed, settled, storedMaterial, wav } from './support';
+import {
+  material,
+  openStudy,
+  openStudyMenu,
+  seed,
+  settled,
+  storedMaterial,
+  wav,
+  expectSentenceIndex,
+} from './support';
 test.describe('home', () => {
   test('shows an empty state when nothing has been studied', async ({ page }) => {
     await seed(page, [material({ audio: wav() })]);
@@ -36,6 +45,7 @@ test.describe('home', () => {
     // Resume is outside .home-recent; with only one studied item .recent is empty.
     await expect(page.locator('.home-recent')).not.toContainText('已听的.mp3');
     await expect(page.locator('.home-recent')).not.toContainText('只导入的.mp3');
+    await expect(page.getByText('暂无更多最近学习')).toHaveCount(0);
   });
 });
 
@@ -67,11 +77,7 @@ test.describe('library', () => {
   });
 
   test('keeps a material when its folder is deleted', async ({ page }) => {
-    await seed(
-      page,
-      [material({ audio: wav(), folderId: 'f1' })],
-      [{ id: 'f1', name: '播客' }],
-    );
+    await seed(page, [material({ audio: wav(), folderId: 'f1' })], [{ id: 'f1', name: '播客' }]);
     await page.getByRole('button', { name: '素材库' }).first().click();
     await page.locator('select[aria-label="文件夹"]').selectOption({ label: '播客' });
     await expect(page.locator('.materials__row')).toContainText('podcast.mp3');
@@ -79,8 +85,8 @@ test.describe('library', () => {
     page.once('dialog', (dialog) => void dialog.accept());
     await page.getByLabel('删除文件夹 播客').click();
 
-    // The folder is gone; the material falls back to 未分类 and keeps its audio.
-    await page.locator('select[aria-label="文件夹"]').selectOption({ label: '未分类' });
+    // The last folder is gone, so the folder filter leaves the main toolbar.
+    await expect(page.locator('select[aria-label="文件夹"]')).toHaveCount(0);
     await expect(page.locator('.materials__row')).toContainText('podcast.mp3');
     const kept = await storedMaterial(page, 'm1');
     expect(kept.displayName).toBe('podcast.mp3');
@@ -132,7 +138,7 @@ test.describe('library', () => {
 
     // Opening a material keeps it selected, so F2 works once the user comes back.
     await page.locator('.materials__row').first().click();
-    await expect(page.getByRole('heading', { name: '第 1 / 3 句' })).toBeVisible();
+    await expectSentenceIndex(page, 1, 3);
     await page.getByRole('button', { name: '← 返回' }).click();
     await page.keyboard.press('F2');
     await expect(page.getByLabel('重命名 podcast.mp3')).toBeFocused();
@@ -144,7 +150,7 @@ test.describe('focus shell S3', () => {
     await seed(page, [material({ audio: wav() })]);
     await page.getByRole('button', { name: '素材库' }).first().click();
     await page.locator('.materials__row').first().click();
-    await expect(page.getByRole('heading', { name: '第 1 / 3 句' })).toBeVisible();
+    await expectSentenceIndex(page, 1, 3);
     await expect(page.locator('.topbar')).toBeHidden();
     await expect(page.getByRole('navigation', { name: '主导航' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '听读', exact: true })).toBeVisible();
@@ -158,7 +164,7 @@ test.describe('dictation', () => {
     await seed(page, [material({ audio: wav() })]);
     await page.getByRole('button', { name: '素材库' }).first().click();
     await page.locator('.materials__row').first().click();
-    await expect(page.getByRole('heading', { name: '第 1 / 3 句' })).toBeVisible();
+    await expectSentenceIndex(page, 1, 3);
   };
 
   test('moves between sentences with the arrow keys only when not typing', async ({ page }) => {
@@ -168,13 +174,13 @@ test.describe('dictation', () => {
     await field.press('ArrowRight');
     await field.press('ArrowRight');
     // Inside the textarea the arrows still move the caret, not the sentence.
-    await expect(page.getByRole('heading', { name: '第 1 / 3 句' })).toBeVisible();
+    await expectSentenceIndex(page, 1, 3);
     await field.press('Escape');
-    await page.locator('h1').first().click();
+    await page.locator('.dictation__head').click();
     await page.keyboard.press('ArrowRight');
-    await expect(page.getByRole('heading', { name: '第 2 / 3 句' })).toBeVisible();
+    await expectSentenceIndex(page, 2, 3);
     await page.keyboard.press('ArrowLeft');
-    await expect(page.getByRole('heading', { name: '第 1 / 3 句' })).toBeVisible();
+    await expectSentenceIndex(page, 1, 3);
   });
 
   test('reveals nothing about correctness before 核对答案', async ({ page }) => {
@@ -198,7 +204,7 @@ test.describe('dictation', () => {
     await expect(page.locator('.diff')).toBeVisible();
     await expect(page.locator('.diff')).toContainText('和原文一致');
     await field.press('Enter');
-    await expect(page.getByRole('heading', { name: '第 2 / 3 句' })).toBeVisible();
+    await expectSentenceIndex(page, 2, 3);
   });
 
   test('marks a missing word without turning the whole sentence into errors', async ({ page }) => {
@@ -232,8 +238,8 @@ test.describe('dictation', () => {
     await field.click();
     await field.pressSequentially('Hello world');
     // A draft on its own is in progress, not dictated.
-    await page.locator('h1').first().click();
-    await page.locator('h1').first().click();
+    await page.locator('.dictation__head').click();
+    await page.locator('.dictation__head').click();
     await page.getByLabel('第 1 句听写').click();
     await page.getByLabel('第 1 句听写').press('Enter');
     await expect(page.getByText('已听写 1 / 3 句')).toBeVisible();
@@ -244,7 +250,7 @@ test.describe('dictation', () => {
     const field = page.getByLabel('第 1 句听写');
     await field.click();
     await field.pressSequentially('Hello world');
-    await page.locator('h1').first().click();
+    await page.locator('.dictation__head').click();
     await settled(page);
     await page.reload();
     await page.getByRole('button', { name: '素材库' }).first().click();
@@ -275,12 +281,18 @@ test.describe('player and views', () => {
     await page.getByRole('button', { name: '素材库' }).first().click();
     await page.locator('.materials__row').first().click();
     await page.getByRole('button', { name: '标记难句' }).click();
-    await expect(page.getByRole('button', { name: '标记难句' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: '标记难句' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
     await settled(page);
     await page.reload();
     await page.getByRole('button', { name: '素材库' }).first().click();
     await page.locator('.materials__row').first().click();
-    await expect(page.getByRole('button', { name: '标记难句' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: '标记难句' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 
   test('refuses to check a sentence with no reference text', async ({ page }) => {

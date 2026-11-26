@@ -132,12 +132,14 @@ export function Player({
         )}
         {focus && (
           <button
-            className="quiet"
+            type="button"
+            className="quiet player__replay"
             disabled={!player.canStep}
             onClick={player.replay}
             aria-label="重听本句"
+            title="重听本句"
           >
-            ↻ 重听本句
+            ↺
           </button>
         )}
       </div>

@@ -194,32 +194,34 @@ export function LibraryPage(props: Props) {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
-          <select
-            className="select"
-            aria-label="文件夹"
-            value={folderSelectValue}
-            onChange={(event) => {
-              const value = event.target.value;
-              props.onSelectFolder(
-                value === 'all' ? null : value === UNCATEGORIZED ? UNCATEGORIZED : value,
-              );
-            }}
-          >
-            {folders.map((row) => (
-              <option
-                key={row.id || 'all'}
-                value={
-                  row.virtual === 'all'
-                    ? 'all'
-                    : row.virtual === 'uncategorized'
-                      ? UNCATEGORIZED
-                      : row.id
-                }
-              >
-                {row.name}
-              </option>
-            ))}
-          </select>
+          {props.folders.length > 0 && (
+            <select
+              className="select"
+              aria-label="文件夹"
+              value={folderSelectValue}
+              onChange={(event) => {
+                const value = event.target.value;
+                props.onSelectFolder(
+                  value === 'all' ? null : value === UNCATEGORIZED ? UNCATEGORIZED : value,
+                );
+              }}
+            >
+              {folders.map((row) => (
+                <option
+                  key={row.id || 'all'}
+                  value={
+                    row.virtual === 'all'
+                      ? 'all'
+                      : row.virtual === 'uncategorized'
+                        ? UNCATEGORIZED
+                        : row.id
+                  }
+                >
+                  {row.name}
+                </option>
+              ))}
+            </select>
+          )}
           <select
             className="select"
             aria-label="排序"

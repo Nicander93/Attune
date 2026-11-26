@@ -93,7 +93,7 @@ export function HomePage(props: {
                 全部素材 →
               </button>
             </div>
-            {others.length > 0 ? (
+            {others.length > 0 && (
               <ul className="recent">
                 {others.map(({ material, progress, studiedAt }) => {
                   const when = studiedLabel(studiedAt);
@@ -118,8 +118,6 @@ export function HomePage(props: {
                   );
                 })}
               </ul>
-            ) : (
-              <p className="muted empty-row">暂无更多最近学习</p>
             )}
           </div>
         </>

@@ -2498,7 +2498,8 @@ h1 {
   font-variant-numeric: tabular-nums;
   font-size: 12px;
 }
-.player__loop {
+.player__loop,
+.player__replay {
   width: 34px;
   height: 34px;
   font-size: 16px;
@@ -2515,10 +2516,6 @@ h1 {
 .reading--light .reading__bar {
   justify-content: center;
   gap: 8px;
-}
-.study--focus .dictation__head h1 {
-  font-size: 15px;
-  font-weight: 600;
 }
 
 /* UX-1 import failure / choice */

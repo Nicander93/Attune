@@ -9,6 +9,7 @@ import {
   storedMaterial,
   vtt,
   wav,
+  expectSentenceIndex,
 } from './support';
 
 const goToPrep = async (page: Page) => {
@@ -274,7 +275,7 @@ test.describe('transcript and rounds', () => {
     await openStudy(page);
     await page.getByLabel('第 1 句听写').click();
     await page.getByLabel('第 1 句听写').pressSequentially('Hello world');
-    await page.locator('h1').first().click();
+    await page.locator('.dictation__head').click();
 
     await openStudyMenu(page, '完整原文');
     await expect(page.getByText('完整原文')).toBeVisible();
@@ -322,7 +323,7 @@ test.describe('transcript and rounds', () => {
     await seed(page, [material({ audio: wav(), bookmarkedSegmentIds: ['s2'] })]);
     await openStudy(page);
     await openStudyMenu(page, '只看难句');
-    await expect(page.getByRole('heading', { name: '第 1 / 1 句' })).toBeVisible();
+    await expectSentenceIndex(page, 1, 1);
     await expect(page.locator('.dictation__head')).toContainText('00:03');
   });
 });
@@ -332,13 +333,13 @@ test.describe('player navigation', () => {
     await seed(page, [material({ audio: wav() })]);
     await openStudy(page);
     await page.getByRole('button', { name: '下一句' }).click();
-    await expect(page.getByRole('heading', { name: '第 2 / 3 句' })).toBeVisible();
+    await expectSentenceIndex(page, 2, 3);
 
     // One press goes straight back a sentence; there is no intermediate
     // "rewind to this sentence's start" step.
     await expect(page.getByRole('button', { name: '上一句' })).toBeEnabled();
     await page.getByRole('button', { name: '上一句' }).click();
-    await expect(page.getByRole('heading', { name: '第 1 / 3 句' })).toBeVisible();
+    await expectSentenceIndex(page, 1, 3);
 
     // At the first sentence there is nowhere further back to go.
     await expect(page.getByRole('button', { name: '上一句' })).toBeDisabled();
