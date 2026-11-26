@@ -2780,3 +2780,159 @@ input[type='range'],
 .player__timeline {
   transition: none;
 }
+
+/* ---------- MOT-2 study motion ---------- */
+/* Check results travel to and from the dictation field. Leave is slightly faster. */
+.diff[data-motion='entering'],
+.diff[data-motion='leaving'] {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+  transition:
+    opacity var(--motion-short) var(--motion-ease-leave),
+    transform var(--motion-short) var(--motion-ease-leave);
+}
+.diff[data-motion='entering'] {
+  transition-timing-function: var(--motion-ease-enter);
+}
+.diff[data-motion='entered'] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--motion-short) var(--motion-ease-enter),
+    transform var(--motion-short) var(--motion-ease-enter);
+}
+
+/* Loading / success / failure share the short beat; a beat change retriggers enter. */
+.status-beat[data-swap],
+.import__status[data-swap],
+.banner[data-swap] {
+  animation: mot2-status-in var(--motion-short) var(--motion-ease-enter);
+}
+@keyframes mot2-status-in {
+  from {
+    opacity: 0.55;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.confirm-panel {
+  animation: mot2-status-in var(--motion-short) var(--motion-ease-enter) both;
+}
+
+/* Keep the sounding video element mounted; only the surface is shown or hidden. */
+.media-output[data-motion='entering'],
+.media-output[data-motion='leaving'] {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+  transition:
+    opacity var(--motion-short) var(--motion-ease-leave),
+    transform var(--motion-short) var(--motion-ease-leave);
+}
+.media-output[data-motion='entering'] {
+  transition-timing-function: var(--motion-ease-enter);
+}
+.media-output[data-motion='entered'] {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity var(--motion-short) var(--motion-ease-enter),
+    transform var(--motion-short) var(--motion-ease-enter);
+}
+
+/* Picture must not push the study chrome or primary actions out of the window. */
+.app[data-focus='study'] .page:has(.media-output:not(.media-output--hidden)) {
+  display: flex;
+  flex-direction: column;
+}
+.app[data-focus='study'] .page > audio {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  flex: none;
+}
+.app[data-focus='study'] .page:has(.media-output:not(.media-output--hidden)) .page__view {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.app[data-focus='study'] .page:has(.media-output:not(.media-output--hidden)) .page__view > .study {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.app[data-focus='study'] .media-output:not(.media-output--hidden) {
+  flex: 0 1 auto;
+  width: 100%;
+  max-height: min(32vh, 240px, calc(100% - 22rem));
+}
+.app[data-focus='study'] .media-output:not(.media-output--hidden) .media-output__video {
+  max-height: min(32vh, 240px, calc(100% - 22rem));
+}
+/* 1024x640: 32vh left the check result as a ~26px slit once the picture was open.
+   Keep 收起画面 and 修改/下一句 in the window, but leave room for the 核对结果
+   title, the comparison sentence, and one line of explanation. */
+@media (max-height: 660px) {
+  .app[data-focus='study'] .media-output:not(.media-output--hidden),
+  .app[data-focus='study'] .media-output:not(.media-output--hidden) .media-output__video {
+    max-height: min(16vh, 104px, calc(100% - 30rem));
+  }
+}
+
+.study--focus .dictation {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.study--focus .dictation__video-toggle,
+.study--focus .dictation__actions {
+  flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  z-index: 2;
+}
+.study--focus .dictation__video-toggle {
+  margin: 8px 0 0;
+  padding-bottom: 2px;
+}
+.study--focus .dictation__actions {
+  bottom: 0;
+}
+
+/* Play / pause and loop: visible press, no extra decoration. */
+.player__glyph {
+  display: inline-block;
+  animation: mot2-glyph-in var(--motion-micro) var(--motion-ease-enter);
+}
+@keyframes mot2-glyph-in {
+  from {
+    opacity: 0.4;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.player__play.is-playing,
+.player__loop.is-active {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+.player__loop.is-active {
+  box-shadow: inset 0 0 0 1px rgba(49, 88, 67, 0.18);
+}
+
+/* Word highlight stays instant so long reading follow-scroll does not jitter. */
+.reading__word,
+.reading__word.is-active {
+  transition: none;
+}

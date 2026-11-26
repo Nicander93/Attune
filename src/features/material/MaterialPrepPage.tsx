@@ -10,6 +10,7 @@ import { clearPlaybackPath } from '../../domain/video';
 import { clearAllMediaCache } from '../../media';
 import { VideoImportPanel } from './VideoImportPanel';
 import { ImportFailure } from './ImportFailure';
+import { StatusBeat } from '../../app/StatusBeat';
 import {
   COPY,
   readyToDictate,
@@ -510,7 +511,9 @@ export function MaterialPrepPage({
               </button>
             </div>
 
-            {statusText && <p className="import__status">{statusText}</p>}
+            <StatusBeat open={Boolean(statusText)} beat={statusText} className="import__status">
+              {statusText}
+            </StatusBeat>
 
             {choice?.kind === 'audio' && (
               <div className="import__choice">
@@ -602,19 +605,22 @@ export function MaterialPrepPage({
 
         {consent.panel}
 
-        {(recognition.task || (videoImport.busy && videoImport.progress)) && (
-          <p className="banner" role="status">
-            {progressLabel}
-            {recognition.task?.percent !== undefined && (
-              <progress max={100} value={recognition.task.percent} />
-            )}
-            {recognition.task?.cancel && (
-              <button type="button" className="quiet" onClick={recognition.task.cancel}>
-                取消
-              </button>
-            )}
-          </p>
-        )}
+        <StatusBeat
+          open={Boolean(recognition.task || (videoImport.busy && videoImport.progress))}
+          beat={progressLabel}
+          className="banner"
+          role="status"
+        >
+          {progressLabel}
+          {recognition.task?.percent !== undefined && (
+            <progress max={100} value={recognition.task.percent} />
+          )}
+          {recognition.task?.cancel && (
+            <button type="button" className="quiet" onClick={recognition.task.cancel}>
+              取消
+            </button>
+          )}
+        </StatusBeat>
 
         {advanced === 'settings' && (
           <section className="import__advanced" aria-label="识别设置">
