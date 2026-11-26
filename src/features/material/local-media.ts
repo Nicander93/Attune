@@ -34,6 +34,14 @@ export function fileNameFromPath(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
+/**
+ * Desktop "选择文件" must use the native dialog. WebView2's HTML file input
+ * gives a File blob but no filesystem path, and video import needs a real path.
+ */
+export function importPickerKind(desktop: boolean): 'native-path' | 'html-file' {
+  return desktop ? 'native-path' : 'html-file';
+}
+
 export async function pickLocalMediaPath(): Promise<string | null> {
   const selected = await open({
     multiple: false,

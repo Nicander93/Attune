@@ -1,4 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('@tauri-apps/plugin-dialog', () => ({ open: vi.fn(), save: vi.fn(), ask: vi.fn() }));
+vi.mock('@tauri-apps/plugin-fs', () => ({ readFile: vi.fn(), writeTextFile: vi.fn() }));
+vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn(), convertFileSrc: vi.fn() }));
+vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn() }));
+vi.mock('@tauri-apps/api/webview', () => ({ getCurrentWebview: vi.fn() }));
 import {
   COPY,
   MAIN_PATH_JARGON,
@@ -15,6 +21,7 @@ import {
   planVideoPrepare,
   shouldAutoPrepareSubtitles,
 } from '../src/features/material/prepare-video';
+import { importPickerKind } from '../src/features/material/local-media';
 import type { MediaProbe } from '../src/media';
 
 function probe(streams: MediaProbe['streams'], duration = 3600): MediaProbe {
@@ -155,5 +162,12 @@ describe('auto subtitle preparation', () => {
         processing: true,
       }),
     ).toBe(false);
+  });
+});
+
+describe('import file picker', () => {
+  it('uses a native path dialog on desktop so video import can see the file location', () => {
+    expect(importPickerKind(true)).toBe('native-path');
+    expect(importPickerKind(false)).toBe('html-file');
   });
 });

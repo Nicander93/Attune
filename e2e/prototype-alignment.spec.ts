@@ -73,3 +73,17 @@ test('ready subtitles use plain success copy and keep proofing under more', asyn
   await page.getByRole('button', { name: '更多 ···' }).click();
   await expect(page.getByRole('menuitem', { name: '校对字幕' })).toBeVisible();
 });
+
+test('browser choose-file button opens the hidden file input', async ({ page }) => {
+  await seed(page, []);
+  await page
+    .getByRole('button', { name: /导入素材/ })
+    .first()
+    .click();
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: '选择文件' }).click(),
+  ]);
+  await chooser.setFiles({ name: 'lesson.wav', mimeType: 'audio/wav', buffer: wav(9) });
+  await expect(page.locator('.import__file-info strong')).toHaveText('lesson');
+});

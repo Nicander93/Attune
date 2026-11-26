@@ -24,6 +24,7 @@ import {
   isVideoFileName,
   isVideoMedia,
   listenDesktopMediaDrop,
+  pickLocalMediaPath,
 } from './local-media';
 import { shouldAutoPrepareSubtitles } from './prepare-video';
 import { useAutoVideoImport } from './useAutoVideoImport';
@@ -228,6 +229,19 @@ export function MaterialPrepPage({
   }
   importFromPathRef.current = importFromPath;
 
+  async function chooseFile() {
+    if (isDesktop()) {
+      try {
+        const path = await pickLocalMediaPath();
+        if (path) await importFromPath(path);
+      } catch (err) {
+        setError(toUserFacingError(err, '没能打开文件选择。'));
+      }
+      return;
+    }
+    audioInput.current?.click();
+  }
+
   async function importSubtitles(file?: File) {
     if (!file) return;
     setError(null);
@@ -430,7 +444,7 @@ export function MaterialPrepPage({
               type="button"
               className="secondary"
               disabled={processing}
-              onClick={() => audioInput.current?.click()}
+              onClick={() => void chooseFile()}
             >
               {audioBusy ? COPY.readingFile : COPY.chooseFile}
             </button>
@@ -478,7 +492,7 @@ export function MaterialPrepPage({
                 type="button"
                 className="quiet"
                 disabled={processing}
-                onClick={() => audioInput.current?.click()}
+                onClick={() => void chooseFile()}
               >
                 更换
               </button>
