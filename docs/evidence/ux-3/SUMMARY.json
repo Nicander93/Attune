@@ -1,0 +1,203 @@
+{
+  "tip": "581df5dfed331d0258db1074396b059dccde19fc",
+  "branch": "feat/ux-3-notice-undo",
+  "when": "2026-11-26T08:12:02.526Z",
+  "all": "PASS",
+  "checks": {
+    "home_no_empty_recent": "PASS",
+    "toast_no_layout_push": "PASS",
+    "entered_study": "PASS",
+    "distinct_icons": "PASS",
+    "speed_label_only": "PASS",
+    "shortcuts_in_menu": "PASS",
+    "delete_undo_no_confirm": "PASS",
+    "cache_in_page_confirm": "PASS"
+  },
+  "detail": {
+    "size": {
+      "innerWidth": 1024,
+      "innerHeight": 640,
+      "dpr": 1.3899999856948853
+    },
+    "home_no_empty_recent": {
+      "hasLast": true,
+      "recentBlock": false,
+      "recentHeading": false,
+      "allMaterials": false,
+      "emptyCopy": false
+    },
+    "toast": {
+      "toast": {
+        "left": 644,
+        "top": 78,
+        "right": 1004,
+        "bottom": 127,
+        "text": "音频已导入：speech.wav\n\n×"
+      },
+      "toastText": "音频已导入：speech.wav\n\n×",
+      "hostPosition": "fixed",
+      "pagePadding": "0px",
+      "bannerCount": 0,
+      "field": null,
+      "player": null,
+      "check": null,
+      "count": null,
+      "head": null,
+      "menu": null,
+      "shortcuts": null,
+      "overlaps": {
+        "toastField": null,
+        "toastPlayer": null,
+        "toastCheck": null,
+        "toastCount": null,
+        "toastHead": null,
+        "shortcutsField": null,
+        "shortcutsPlayer": null,
+        "shortcutsCheck": null,
+        "shortcutsCount": null,
+        "shortcutsHead": null,
+        "shortcutsTopbar": null
+      }
+    },
+    "toast_no_layout_push": {
+      "imported": true,
+      "hostPosition": "fixed",
+      "toastText": "音频已导入：speech.wav\n\n×",
+      "overlaps": {
+        "toastField": null,
+        "toastPlayer": null,
+        "toastCheck": null,
+        "toastCount": null,
+        "toastHead": null,
+        "shortcutsField": null,
+        "shortcutsPlayer": null,
+        "shortcutsCheck": null,
+        "shortcutsCount": null,
+        "shortcutsHead": null,
+        "shortcutsTopbar": null
+      }
+    },
+    "distinct_icons": {
+      "replayAria": "重听本句",
+      "loopAria": "单句循环",
+      "replayHasIcon": true,
+      "loopHasIcon": true,
+      "sameIcon": false,
+      "focusText": "⏮ ▶ ⏭ 00:07 / 00:07"
+    },
+    "speed_label_only": {
+      "firstText": "语速",
+      "hasSelect": true,
+      "cycle": 0,
+      "menuText": "开启单句循环\n语速\n0.5×\n0.75×\n1×\n1.25×\n1.5×\n✓ 按句\n连续\n句子列表\n只看难句\n关闭自动跟随\n显示未听写的原文\n开启按键音\n练习轮次\n校对字幕\n完整原文\n素材设置\n快捷键"
+    },
+    "shortcuts": {
+      "toast": null,
+      "toastText": "",
+      "hostPosition": "",
+      "pagePadding": "0px",
+      "bannerCount": 0,
+      "field": {
+        "left": 103,
+        "top": 231,
+        "right": 922,
+        "bottom": 361,
+        "text": ""
+      },
+      "player": {
+        "left": 0,
+        "top": 106,
+        "right": 1024,
+        "bottom": 187,
+        "text": "⏮\n▶\n⏭\n00:07 / 00:07"
+      },
+      "check": {
+        "left": 790,
+        "top": 381,
+        "right": 922,
+        "bottom": 419,
+        "text": "核对答案 Enter"
+      },
+      "count": {
+        "left": 451,
+        "top": 69,
+        "right": 531,
+        "bottom": 99,
+        "text": "01 / 02 ⌄"
+      },
+      "head": {
+        "left": 0,
+        "top": 0,
+        "right": 1024,
+        "bottom": 56,
+        "text": "← 返回\nspeech\n听读\n···\n开启单句循环\n语速\n0.5×\n0.75×\n1×\n1.25×\n1.5×\n✓ 按句\n连续\n句子列表\n只看难句\n关闭自动跟随\n显示未听写的原文\n开启按键音\n练习轮次\n校对字幕\n完整原文\n素材设置\n快捷键\n\nEnter 核对或进入下一句\n\nSpace 播放或暂停（在输入框外）\n\n← → 切"
+      },
+      "menu": {
+        "left": 766,
+        "top": 53,
+        "right": 994,
+        "bottom": 361,
+        "text": "开启单句循环\n语速\n0.5×\n0.75×\n1×\n1.25×\n1.5×\n✓ 按句\n连续\n句子列表\n只看难句\n关闭自动跟随\n显示未听写的原文\n开启按键音\n练习轮次\n校对字幕\n完整原文\n素材设置\n快捷键\n\nEnter 核对或进入下一句\n\nSpace 播放或暂停（在输入框外）\n\n← → 切到上一句或下一句（在输入框外）\n\nEs"
+      },
+      "shortcuts": {
+        "left": 772,
+        "top": 220,
+        "right": 974,
+        "bottom": 360,
+        "text": "Enter 核对或进入下一句\n\nSpace 播放或暂停（在输入框外）\n\n← → 切到上一句或下一句（在输入框外）\n\nEsc 从核对返回修改"
+      },
+      "overlaps": {
+        "toastField": null,
+        "toastPlayer": null,
+        "toastCheck": null,
+        "toastCount": null,
+        "toastHead": null,
+        "shortcutsField": {
+          "width": 150,
+          "height": 129
+        },
+        "shortcutsPlayer": null,
+        "shortcutsCheck": null,
+        "shortcutsCount": null,
+        "shortcutsHead": null,
+        "shortcutsTopbar": null
+      }
+    },
+    "shortcuts_in_menu": {
+      "helpVisible": 1,
+      "fieldStillThere": true,
+      "overlaps": {
+        "toastField": null,
+        "toastPlayer": null,
+        "toastCheck": null,
+        "toastCount": null,
+        "toastHead": null,
+        "shortcutsField": {
+          "width": 150,
+          "height": 129
+        },
+        "shortcutsPlayer": null,
+        "shortcutsCheck": null,
+        "shortcutsCount": null,
+        "shortcutsHead": null,
+        "shortcutsTopbar": null
+      }
+    },
+    "delete_undo_no_confirm": {
+      "firstName": "h264_aac_subs",
+      "countBefore": 68,
+      "deletedState": {
+        "toast": "已删除「h264_aac_subs」。\n\n撤销\n×",
+        "hasUndo": true,
+        "rowGone": false,
+        "countAfter": 67,
+        "confirmCalls": 0
+      },
+      "undone": {
+        "rowBack": true,
+        "confirmCalls": 0
+      }
+    }
+  },
+  "evidence_dir": "docs/evidence/ux-3/"
+}
