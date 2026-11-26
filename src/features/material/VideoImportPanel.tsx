@@ -1,55 +1,44 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Material } from '../../domain/types';
 import { formatTime } from '../../domain/types';
-import { clearPlaybackPath, defaultClipEnd } from '../../domain/video';
-import { parseSrt } from '../../domain/subtitles';
-import { applySubtitleTimeline, hasProtectedSubtitles } from '../../domain/subtitle-edits';
-import {
-  isBitmapSubtitleCodec,
-  isTextSubtitleCodec,
-  toClipRelativeSegments,
-} from '../../domain/subtitle-source';
+import { clearPlaybackPath } from '../../domain/video';
+import { isBitmapSubtitleCodec, isTextSubtitleCodec } from '../../domain/subtitle-source';
 import { isDesktop } from '../../desktop';
 import {
   authorizeMediaPath,
   cancelFfmpegDownload,
   clearMediaCache,
-  downloadFfmpeg,
-  extractClipAudio,
-  extractEmbeddedSubtitles,
-  ffmpegBundle,
   ffmpegStatus,
-  loadSrtText,
-  ocrBurnedInSubtitles,
   ocrStatus,
   pickAndProbeVideo,
   pickDefaultAudioStream,
   pickDefaultSubtitleStream,
   preparePlayback,
-  type FfmpegBundleInfo,
   type FfmpegStatus,
   type MediaProbe,
   type OcrStatus,
 } from '../../media';
+import { COPY, toUserFacingError } from './import-messages';
+import { fileNameFromPath } from './local-media';
+import {
+  applyOcrSubtitles,
+  applyVideoImport,
+  ensureLocalMediaTools,
+  fullClipEnd,
+} from './prepare-video';
 
 type Props = {
   material: Material;
   update: (transform: (material: Material) => Material) => void;
   onNotice: (message: string) => void;
-  onError: (message: string) => void;
-  /** Called after video apply when no embedded text track was applied (ASR fallback). */
+  onError: (message: string, detail?: string) => void;
+  /** Called after video apply when no embedded text track was applied. */
   onNeedAsr?: () => void;
 };
 
-function fileName(path: string): string {
-  const parts = path.split(/[/\\]/);
-  return parts[parts.length - 1] || path;
-}
-
 /**
- * Desktop-only video import: probe → pick audio/range → extract Whisper-friendly audio
- * and a managed H.264 playback copy. Does not change study UX (P2).
- * P3: text subtitle extract. P4: optional burned-in/bitmap OCR (does not alter the text→ASR path).
+ * Advanced video tools under「更多」: re-import, reassociate, rebuild playback, and
+ * exception controls. The main import path does not open this panel.
  */
 export function VideoImportPanel({ material, update, onNotice, onError, onNeedAsr }: Props) {
   const [status, setStatus] = useState<FfmpegStatus | null>(null);
@@ -60,18 +49,13 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
   const [clipStart, setClipStart] = useState(0);
   const [clipEnd, setClipEnd] = useState(0);
   const [busy, setBusy] = useState(false);
-  /** Prefer burned-in/bitmap OCR over ASR when no text track was applied. */
-  const [wantOcr, setWantOcr] = useState(false);
-  const [bundle, setBundle] = useState<FfmpegBundleInfo | null>(null);
+  const [wantPictureText, setWantPictureText] = useState(false);
   const [downloadLabel, setDownloadLabel] = useState('');
 
   useEffect(() => {
     void ffmpegStatus()
       .then(setStatus)
       .catch((err) => setStatus({ available: false, source: 'error', hint: String(err) }));
-    void ffmpegBundle()
-      .then(setBundle)
-      .catch(() => setBundle(null));
     void ocrStatus()
       .then(setOcr)
       .catch((err) =>
@@ -85,71 +69,45 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
   }, []);
 
   const audioStreams = useMemo(
-    () => probe?.streams.filter((s) => s.codecType === 'audio') ?? [],
+    () => probe?.streams.filter((stream) => stream.codecType === 'audio') ?? [],
     [probe],
   );
   const subtitleStreams = useMemo(
     () =>
       probe?.streams.filter(
-        (s) => s.codecType === 'subtitle' && isTextSubtitleCodec(s.codecName),
+        (stream) => stream.codecType === 'subtitle' && isTextSubtitleCodec(stream.codecName),
       ) ?? [],
     [probe],
   );
   const bitmapSubtitleCount = useMemo(
     () =>
       probe?.streams.filter(
-        (s) => s.codecType === 'subtitle' && isBitmapSubtitleCodec(s.codecName),
+        (stream) => stream.codecType === 'subtitle' && isBitmapSubtitleCodec(stream.codecName),
       ).length ?? 0,
     [probe],
   );
 
-
-  async function installFfmpeg() {
+  async function installTools() {
     onError('');
-    const info = bundle ?? (await ffmpegBundle().catch(() => null));
-    const label = info?.label || 'BtbN LGPL ffmpeg';
-    const mb = info ? Math.round(info.sizeBytes / (1024 * 1024)) : 79;
-    const ok = window.confirm(
-      `\u5c06\u4e0b\u8f7d ${label}\uff08\u7ea6 ${mb} MB\uff09\u5230\u672c\u673a\u5e94\u7528\u6570\u636e\u76ee\u5f55 tools/ffmpeg/\u3002\n\n\u8be5\u6784\u5efa\u4e3a LGPL\uff08\u975e Gyan essentials / GPL\uff09\uff0c\u4ec5\u7528\u4e8e\u672c\u5730\u89c6\u9891\u5904\u7406\u3002\u662f\u5426\u540c\u610f\uff1f`,
-    );
-    if (!ok) {
-      onNotice('\u5df2\u53d6\u6d88\u4e0b\u8f7d\u3002');
-      return;
-    }
     setBusy(true);
-    setDownloadLabel('\u51c6\u5907\u4e0b\u8f7d\u2026');
-    try {
-      const next = await downloadFfmpeg((p) => {
-        const pct = p.totalBytes
-          ? Math.min(100, Math.floor((p.downloadedBytes / p.totalBytes) * 100))
-          : 0;
-        setDownloadLabel(`\u4e0b\u8f7d ffmpeg\uff1a${pct}%`);
-      });
-      setStatus(next);
-      setDownloadLabel('');
-      if (next.available) {
-        onNotice('\u5df2\u5b89\u88c5 LGPL ffmpeg\uff0c\u53ef\u4ee5\u5bfc\u5165\u89c6\u9891\u3002');
-      } else {
-        onError(next.hint || '\u4e0b\u8f7d\u5b8c\u6210\u4f46\u4ecd\u672a\u68c0\u6d4b\u5230 ffmpeg\u3002');
-      }
-    } catch (err) {
-      const message = String(err);
-      setDownloadLabel('');
-      if (message.includes('\u53d6\u6d88')) {
-        onNotice('\u5df2\u53d6\u6d88\u4e0b\u8f7d\uff1b\u4e0b\u6b21\u53ef\u7ee7\u7eed\u3002');
-      } else {
-        onError(
-          `\u4e0b\u8f7d ffmpeg \u5931\u8d25\uff1a${message}\u3002\u53ef\u68c0\u67e5\u7f51\u7edc\u540e\u91cd\u8bd5\uff0c\u6216\u624b\u52a8\u8bbe\u7f6e ATTUNE_FFMPEG_DIR\u3002`,
-        );
-      }
-    } finally {
-      setBusy(false);
+    const result = await ensureLocalMediaTools({
+      onProgress: setDownloadLabel,
+    });
+    if (result.status === 'cancelled') {
+      onNotice(COPY.toolsCancelled);
+    } else if (result.status === 'failed') {
+      onError(result.message, result.detail);
+    } else {
+      setStatus(result.toolsStatus);
+      onNotice('本地工具已安装，可以继续处理视频。');
     }
+    setDownloadLabel('');
+    setBusy(false);
   }
 
   async function rebuildPlayback() {
     if (!material.video?.sourcePath) {
-      onError('\u6e90\u6587\u4ef6\u8def\u5f84\u7f3a\u5931\uff0c\u8bf7\u5148\u300c\u91cd\u65b0\u5173\u8054\u6e90\u6587\u4ef6\u300d\u3002');
+      onError('找不到原来的视频文件，请先重新选择。');
       return;
     }
     onError('');
@@ -160,20 +118,15 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
         sourcePath,
         materialId: material.id,
       });
-      update((m) =>
-        m.video
-          ? { ...m, video: { ...m.video, playbackPath: playback.playbackPath } }
-          : m,
+      update((current) =>
+        current.video
+          ? { ...current, video: { ...current.video, playbackPath: playback.playbackPath } }
+          : current,
       );
-      onNotice(
-        playback.transcoded
-          ? '\u5df2\u91cd\u5efa\u64ad\u653e\u526f\u672c\uff08\u5df2\u8f6c\u7801\uff09\u3002'
-          : '\u5df2\u91cd\u5efa\u64ad\u653e\u526f\u672c\u3002',
-      );
+      onNotice(playback.transcoded ? '已重新准备可播放的画面。' : '已重新准备可播放的画面。');
     } catch (err) {
-      onError(
-        `\u91cd\u5efa\u64ad\u653e\u526f\u672c\u5931\u8d25\uff1a${String(err)}\u3002\u82e5\u6e90\u6587\u4ef6\u5df2\u79fb\u52a8\uff0c\u8bf7\u5148\u91cd\u65b0\u5173\u8054\u3002`,
-      );
+      const failed = toUserFacingError(err, '没能重新准备画面。若文件已移动，请先重新选择。');
+      onError(failed.message, failed.detail);
     } finally {
       setBusy(false);
     }
@@ -181,17 +134,18 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
 
   async function clearThisCache() {
     const ok = window.confirm(
-      '\u6e05\u7406\u672c\u7d20\u6750\u7684\u5a92\u4f53\u7f13\u5b58\uff08\u64ad\u653e\u526f\u672c / \u62bd\u8f68 WAV / OCR \u5e27\uff09\uff1f\u97f3\u9891 Blob \u4e0e\u5b57\u5e55\u4ecd\u4fdd\u7559\u5728 IndexedDB\u3002',
+      '清理本条素材的临时文件？音频和字幕会保留。需要画面时可以再准备一次。',
     );
     if (!ok) return;
     onError('');
     setBusy(true);
     try {
       await clearMediaCache(material.id);
-      update((m) => clearPlaybackPath(m));
-      onNotice('\u5df2\u6e05\u7406\u672c\u7d20\u6750\u5a92\u4f53\u7f13\u5b58\u3002\u9700\u8981\u89c6\u9891\u753b\u9762\u65f6\u8bf7\u300c\u91cd\u5efa\u64ad\u653e\u526f\u672c\u300d\u3002');
+      update((current) => clearPlaybackPath(current));
+      onNotice('已清理本条素材的临时文件。需要画面时请再准备一次。');
     } catch (err) {
-      onError(String(err));
+      const failed = toUserFacingError(err, '清理缓存失败。');
+      onError(failed.message, failed.detail);
     } finally {
       setBusy(false);
     }
@@ -206,15 +160,15 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
       setAudioStream(pickDefaultAudioStream(next));
       setSubtitleStream(pickDefaultSubtitleStream(next));
       setClipStart(0);
-      setClipEnd(defaultClipEnd(next.duration));
-      const hasBitmap = next.streams.some(
-        (s) => s.codecType === 'subtitle' && isBitmapSubtitleCodec(s.codecName),
-      );
-      setWantOcr(hasBitmap);
-      onNotice(`\u5df2\u63a2\u6d4b\uff1a${fileName(next.path)}`);
+      setClipEnd(fullClipEnd(next.duration));
+      setWantPictureText(false);
+      onNotice(`已选中：${fileNameFromPath(next.path)}`);
     } catch (err) {
       const message = String(err);
-      if (!message.includes('\u53d6\u6d88')) onError(message);
+      if (!message.includes('取消')) {
+        const failed = toUserFacingError(err, '没能打开这个视频。');
+        onError(failed.message, failed.detail);
+      }
     } finally {
       setBusy(false);
     }
@@ -223,132 +177,63 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
   async function applyVideo() {
     if (!probe) return;
     if (audioStream === undefined) {
-      onError('\u8fd9\u8def\u89c6\u9891\u6ca1\u6709\u53ef\u7528\u97f3\u8f68\u3002');
+      onError(COPY.noAudioTrack);
       return;
     }
     if (clipEnd <= clipStart) {
-      onError('\u65f6\u95f4\u8303\u56f4\u65e0\u6548\u3002');
+      onError('时间范围无效。');
       return;
     }
     onError('');
     setBusy(true);
     try {
-      const extracted = await extractClipAudio({
-        sourcePath: probe.path,
-        materialId: material.id,
+      const result = await applyVideoImport({
+        probe,
+        material,
+        update,
         audioStream,
+        subtitleStream,
         clipStart,
         clipEnd,
+        onProgress: () => undefined,
       });
-      let playbackPath: string | undefined;
-      let playbackNote = '';
-      try {
-        const playback = await preparePlayback({
-          sourcePath: probe.path,
-          materialId: material.id,
-          forceTranscode: probe.needsTranscode,
-        });
-        playbackPath = playback.playbackPath;
-        playbackNote = playback.transcoded
-          ? '\u5df2\u8f6c\u7801\u4e3a H.264 \u64ad\u653e\u526f\u672c\u3002'
-          : '\u5df2\u7f13\u5b58\u53ef\u64ad\u653e\u526f\u672c\u3002';
-      } catch (err) {
-        playbackNote = `\u97f3\u9891\u5df2\u63d0\u53d6\uff0c\u4f46\u64ad\u653e\u526f\u672c\u5931\u8d25\uff1a${String(err)}`;
+      if (result.status === 'ready') {
+        onNotice(`已准备好 ${result.segmentCount} 句，可以开始听写`);
+        setProbe(null);
+        return;
       }
-
-      const originalName = fileName(probe.path);
-      const clipDuration = clipEnd - clipStart;
-      update((m) => ({
-        ...m,
-        audio: extracted.blob,
-        duration: extracted.duration,
-        displayName: m.originalFileName ? m.displayName : originalName.replace(/\.[^.]+$/, ''),
-        originalFileName: originalName,
-        playbackPosition: 0,
-        video: {
-          originalName,
+      if (result.status === 'protected') {
+        onNotice('视频已写入。已有听写记录，未覆盖现有字幕。');
+        setProbe(null);
+        return;
+      }
+      if (result.status === 'failed') {
+        onError(result.message, result.detail);
+        return;
+      }
+      if (wantPictureText) {
+        const ocrResult = await applyOcrSubtitles({
           sourcePath: probe.path,
-          playbackPath,
+          material,
+          update,
           clipStart,
           clipEnd,
-          selectedAudioStream: audioStream,
-          selectedSubtitleStream: subtitleStream,
-          subtitleOrigin: subtitleStream !== undefined ? 'embedded' : undefined,
-        },
-      }));
-
-      let embeddedApplied = false;
-      if (subtitleStream !== undefined && !hasProtectedSubtitles(material)) {
-        try {
-          const sub = await extractEmbeddedSubtitles({
-            sourcePath: probe.path,
-            materialId: material.id,
-            subtitleStream,
-            clipStart,
-            clipEnd,
-          });
-          const srtText = await loadSrtText(sub.srtPath);
-          const segments = toClipRelativeSegments(
-            parseSrt(srtText, clipDuration),
-            clipStart,
-            clipDuration,
-          );
-          if (segments.length > 0) {
-            update((m) => applySubtitleTimeline(m, segments, 'embedded', 'unreviewed'));
-            onNotice(
-              `\u89c6\u9891\u5df2\u5199\u5165\uff08\u7247\u6bb5 ${formatTime(clipStart)}\u2013${formatTime(clipEnd)}\uff09\u3002${playbackNote} \u5df2\u4ece\u5185\u5d4c\u5b57\u5e55\u8f68\u63d0\u53d6 ${segments.length} \u53e5\uff08${sub.codecName}\uff09\uff0c\u8bf7\u6821\u5bf9\u540e\u518d\u542c\u5199\u3002 ${probe.compatibilityNote}`,
-            );
-            embeddedApplied = true;
-          }
-        } catch (err) {
-          onNotice(
-            `\u89c6\u9891\u5df2\u5199\u5165\u3002${playbackNote} \u5185\u5d4c\u5b57\u5e55\u63d0\u53d6\u5931\u8d25\uff0c\u5c06\u5c1d\u8bd5\u8bed\u97f3\u8bc6\u522b\uff1a${String(err)}`,
-          );
+        });
+        if (ocrResult.status === 'ready') {
+          onNotice(`已准备好 ${ocrResult.segmentCount} 句，可以开始听写`);
+          setProbe(null);
+          return;
         }
+        onNotice(ocrResult.message);
+        onNeedAsr?.();
+        setProbe(null);
+        return;
       }
-
-      if (!embeddedApplied) {
-        if (hasProtectedSubtitles(material)) {
-          onNotice(
-            `\u89c6\u9891\u5df2\u5199\u5165\uff08\u7247\u6bb5 ${formatTime(clipStart)}\u2013${formatTime(clipEnd)}\uff09\u3002${playbackNote} \u5df2\u6709\u7528\u6237\u6821\u5bf9/\u7ec3\u4e60\u8bb0\u5f55\uff0c\u672a\u8986\u76d6\u5b57\u5e55\u3002 ${probe.compatibilityNote}`,
-          );
-        } else if (wantOcr) {
-          try {
-            const ocrResult = await ocrBurnedInSubtitles({
-              sourcePath: probe.path,
-              materialId: material.id,
-              clipStart,
-              clipEnd,
-            });
-            const srtText = await loadSrtText(ocrResult.srtPath);
-            const segments = toClipRelativeSegments(
-              parseSrt(srtText, clipDuration),
-              clipStart,
-              clipDuration,
-            );
-            if (segments.length === 0) {
-              throw new Error('\u672a\u5f97\u5230\u53ef\u7528 OCR \u5b57\u5e55\u53e5');
-            }
-            update((m) => applySubtitleTimeline(m, segments, 'ocr', 'unreviewed'));
-            onNotice(
-              `\u89c6\u9891\u5df2\u5199\u5165\uff08\u7247\u6bb5 ${formatTime(clipStart)}\u2013${formatTime(clipEnd)}\uff09\u3002${playbackNote} OCR\uff08${ocrResult.backend}\uff09\u8bc6\u522b ${segments.length} \u53e5\uff08${ocrResult.sampleCount} \u5e27\uff09\uff0c\u8bf7\u6821\u5bf9\u540e\u518d\u542c\u5199\u3002 ${probe.compatibilityNote}`,
-            );
-          } catch (err) {
-            onNotice(
-              `\u89c6\u9891\u5df2\u5199\u5165\u3002${playbackNote} OCR \u5931\u8d25\uff0c\u5c06\u5c1d\u8bd5\u8bed\u97f3\u8bc6\u522b\uff1a${String(err)}`,
-            );
-            onNeedAsr?.();
-          }
-        } else {
-          onNotice(
-            `\u89c6\u9891\u7d20\u6750\u5df2\u7ecf\u5199\u5165\uff08\u7247\u6bb5 ${formatTime(clipStart)}\u2013${formatTime(clipEnd)}\uff09\u3002${playbackNote} ${probe.compatibilityNote}`,
-          );
-          onNeedAsr?.();
-        }
-      }
+      onNeedAsr?.();
       setProbe(null);
     } catch (err) {
-      onError(String(err));
+      const failed = toUserFacingError(err, COPY.videoProcessFailed);
+      onError(failed.message, failed.detail);
     } finally {
       setBusy(false);
     }
@@ -364,27 +249,28 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
         setAudioStream(pickDefaultAudioStream(next));
         setSubtitleStream(pickDefaultSubtitleStream(next));
         setClipStart(0);
-        setClipEnd(defaultClipEnd(next.duration));
+        setClipEnd(fullClipEnd(next.duration));
         return;
       }
-      update((m) =>
-        m.video
+      update((current) =>
+        current.video
           ? {
-              ...m,
+              ...current,
               video: {
-                ...m.video,
+                ...current.video,
                 sourcePath: next.path,
-                originalName: fileName(next.path) || m.video.originalName,
+                originalName: fileNameFromPath(next.path) || current.video.originalName,
               },
             }
-          : m,
+          : current,
       );
-      onNotice(
-        '\u5df2\u91cd\u65b0\u5173\u8054\u89c6\u9891\u6e90\u6587\u4ef6\u3002\u5982\u9700\u91cd\u65b0\u63d0\u53d6\u97f3\u8f68\uff0c\u8bf7\u518d\u8d70\u4e00\u904d\u5bfc\u5165\u3002',
-      );
+      onNotice('已重新关联视频文件。如需重新提取声音，请再导入一次。');
     } catch (err) {
       const message = String(err);
-      if (!message.includes('\u53d6\u6d88')) onError(message);
+      if (!message.includes('取消')) {
+        const failed = toUserFacingError(err, '没能重新关联这个文件。');
+        onError(failed.message, failed.detail);
+      }
     } finally {
       setBusy(false);
     }
@@ -394,75 +280,71 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
     return (
       <article className="prep__section">
         <div className="prep__summary">
-          <h2>{'\u89c6\u9891'}</h2>
-          <p className="muted">
-            {
-              '\u89c6\u9891\u5bfc\u5165\u3001\u63a2\u6d4b\u4e0e\u62bd\u8f68\u4ec5\u684c\u9762\u7248\u652f\u6301\uff1b\u6d4f\u89c8\u5668\u8bf7\u7ee7\u7eed\u7528\u97f3\u9891\u6587\u4ef6\u3002'
-            }
-          </p>
+          <h2>视频</h2>
+          <p className="muted">{COPY.videoNeedsDesktop}</p>
         </div>
       </article>
     );
   }
 
+  const toolsMissing = status && !status.available;
+  const toolsDetail = toolsMissing
+    ? toUserFacingError(status.hint, '这台电脑还没有安装处理视频所需的本地工具。')
+    : null;
+
   return (
     <article className="prep__section prep__section--video">
       <div className="prep__summary">
-        <h2>{'\u89c6\u9891'}</h2>
+        <h2>视频</h2>
         <p className="muted">
           {material.video
-            ? `${material.video.originalName} \u00b7 \u7247\u6bb5 ${formatTime(material.video.clipStart)}\u2013${formatTime(material.video.clipEnd)}`
-            : '\u53ef\u9009\uff1a\u4ece\u672c\u5730\u89c6\u9891\u63d0\u53d6\u97f3\u8f68\uff0c\u6cbf\u7528\u73b0\u6709\u542c\u5199\u6d41\u7a0b'}
+            ? `${material.video.originalName} · 片段 ${formatTime(material.video.clipStart)}–${formatTime(material.video.clipEnd)}`
+            : '可从本机视频提取声音，沿用现有听写流程'}
         </p>
-        {status && !status.available && (
-          <p className="banner banner--error" role="alert">
-            {status.hint || '\u672a\u627e\u5230 ffmpeg/ffprobe'}
-          </p>
+        {toolsMissing && toolsDetail && (
+          <div className="banner banner--error import__failure" role="alert">
+            <div className="import__failure-body">
+              <p>{toolsDetail.message}</p>
+              {toolsDetail.detail ? (
+                <details>
+                  <summary>详情</summary>
+                  <pre>{toolsDetail.detail}</pre>
+                </details>
+              ) : status.hint && status.hint !== toolsDetail.message ? (
+                <details>
+                  <summary>详情</summary>
+                  <pre>{status.hint}</pre>
+                </details>
+              ) : null}
+            </div>
+          </div>
         )}
         {downloadLabel && (
           <p className="banner" role="status">
             {downloadLabel}{' '}
             <button className="quiet" type="button" onClick={() => void cancelFfmpegDownload()}>
-              {'\u53d6\u6d88'}
+              取消
             </button>
           </p>
         )}
-        {status?.available && (
-          <p className="muted prep__hint">ffmpeg\uff1a{status.source}</p>
-        )}
         {material.video && !material.video.playbackPath && (
           <p className="banner banner--error" role="alert">
-            {
-              '\u64ad\u653e\u526f\u672c\u7f3a\u5931\uff08\u53ef\u80fd\u88ab\u6e05\u7406\u6216\u5bfc\u5165\u65f6\u5931\u8d25\uff09\u3002\u53ef\u300c\u91cd\u5efa\u64ad\u653e\u526f\u672c\u300d\uff1b\u82e5\u6e90\u6587\u4ef6\u5df2\u79fb\u52a8\u8bf7\u5148\u91cd\u65b0\u5173\u8054\u3002'
-            }
-          </p>
-        )}
-        {ocr && (
-          <p className="muted prep__hint">
-            OCR\uff08{ocr.backend}\uff09\uff1a
-            {ocr.available
-              ? `\u53ef\u7528 \u00b7 ${ocr.preferredLanguage ?? (ocr.languages.join(', ') || '\u8bed\u8a00\u5305\u5df2\u88c5')}`
-              : ''}
-            {ocr.hint ? ` — ${ocr.hint}` : ''}
+            这段视频的画面暂时无法播放。可以「重新准备画面」；若文件已移动，请先重新选择。
           </p>
         )}
       </div>
       <div className="prep__actions">
-        {status && !status.available && (
-          <button className="primary" disabled={busy} onClick={() => void installFfmpeg()}>
-            {downloadLabel ? '\u4e0b\u8f7d\u4e2d\u2026' : '\u4e0b\u8f7d LGPL ffmpeg'}
+        {toolsMissing && (
+          <button className="primary" disabled={busy} onClick={() => void installTools()}>
+            {downloadLabel ? '安装中…' : '安装本地工具'}
           </button>
         )}
         <button disabled={busy || status?.available === false} onClick={() => void chooseVideo()}>
-          {busy && !downloadLabel
-            ? '\u5904\u7406\u4e2d\u2026'
-            : material.video
-              ? '\u91cd\u65b0\u5bfc\u5165\u89c6\u9891'
-              : '\u5bfc\u5165\u89c6\u9891'}
+          {busy && !downloadLabel ? '处理中…' : material.video ? '重新导入视频' : '导入视频'}
         </button>
         {material.video && (
           <button className="quiet" disabled={busy} onClick={() => void reassociate()}>
-            {'\u91cd\u65b0\u5173\u8054\u6e90\u6587\u4ef6'}
+            重新选择源文件
           </button>
         )}
         {material.video && (
@@ -471,52 +353,48 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
             disabled={busy || status?.available === false}
             onClick={() => void rebuildPlayback()}
           >
-            {'\u91cd\u5efa\u64ad\u653e\u526f\u672c'}
+            重新准备画面
           </button>
         )}
         {material.video && (
           <button className="quiet" disabled={busy} onClick={() => void clearThisCache()}>
-            {'\u6e05\u7406\u672c\u7d20\u6750\u7f13\u5b58'}
+            清理本条素材缓存
           </button>
         )}
       </div>
 
       {probe && (
         <div className="video-probe">
-          <p className="muted">{probe.compatibilityNote}</p>
-          <p className="muted">
-            {'\u5bb9\u5668'} {probe.formatName || 'unknown'} \u00b7 {'\u603b\u65f6\u957f'}{' '}
-            {formatTime(probe.duration)}
-          </p>
+          {probe.compatibilityNote ? (
+            <details className="import__probe-detail">
+              <summary>详情</summary>
+              <p className="muted">{probe.compatibilityNote}</p>
+              <p className="muted">
+                容器 {probe.formatName || 'unknown'} · 总时长 {formatTime(probe.duration)}
+              </p>
+            </details>
+          ) : null}
           <label className="video-probe__field">
-            {'\u97f3\u8f68'}
+            音轨
             <select
               value={audioStream ?? ''}
               onChange={(event) => setAudioStream(Number(event.target.value))}
             >
-              {audioStreams.map((s) => (
-                <option key={s.index} value={s.index}>
-                  #{s.index} {s.codecName}
-                  {s.channels ? ` \u00b7 ${s.channels}ch` : ''}
-                  {s.language ? ` \u00b7 ${s.language}` : ''}
+              {audioStreams.map((stream, index) => (
+                <option key={stream.index} value={stream.index}>
+                  第 {index + 1} 条{stream.language ? ` · ${stream.language}` : ''}
                 </option>
               ))}
             </select>
           </label>
           {bitmapSubtitleCount > 0 && (
             <p className="muted prep__hint">
-              {'\u8fd8\u6709 '}
-              {bitmapSubtitleCount}
-              {
-                ' \u6761\u56fe\u5f62\u5b57\u5e55\u8f68\uff08PGS/DVD\uff09\uff1b\u6587\u672c\u8f68\u4ecd\u8d70 P3\uff0c\u56fe\u5f62/\u70e7\u5f55\u53ef\u7528\u4e0b\u65b9 OCR\u3002'
-              }
+              还有 {bitmapSubtitleCount} 条画面字幕；文本字幕会优先使用，画面识别放在下方备选。
             </p>
           )}
           {subtitleStreams.length > 0 && (
             <label className="video-probe__field">
-              {
-                '\u5b57\u5e55\u8f68\uff08\u6587\u672c\u8f68\u63d0\u53d6\uff1b\u65e0\u6587\u672c\u8f68\u65f6\u53ef\u6539\u7528 OCR\uff09'
-              }
+              字幕
               <select
                 value={subtitleStream ?? ''}
                 onChange={(event) =>
@@ -525,11 +403,11 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
                   )
                 }
               >
-                <option value="">{'\u4e0d\u9009'}</option>
-                {subtitleStreams.map((s) => (
-                  <option key={s.index} value={s.index}>
-                    #{s.index} {s.codecName}
-                    {s.language ? ` \u00b7 ${s.language}` : ''}
+                <option value="">不选</option>
+                {subtitleStreams.map((stream, index) => (
+                  <option key={stream.index} value={stream.index}>
+                    字幕 {index + 1}
+                    {stream.language ? ` · ${stream.language}` : ''}
                   </option>
                 ))}
               </select>
@@ -538,17 +416,15 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
           <label className="video-probe__field video-probe__check">
             <input
               type="checkbox"
-              checked={wantOcr}
+              checked={wantPictureText}
               disabled={ocr?.available === false}
-              onChange={(event) => setWantOcr(event.target.checked)}
+              onChange={(event) => setWantPictureText(event.target.checked)}
             />{' '}
-            {
-              'OCR \u70e7\u5f55/\u56fe\u5f62\u5b57\u5e55\uff08WinRT\uff1b\u65e0\u6587\u672c\u8f68\u4e14\u672a\u4fdd\u62a4\u65f6\u4f18\u5148\u4e8e ASR\uff09'
-            }
+            {COPY.tryPictureText}
           </label>
           <div className="row video-probe__range">
             <label>
-              {'\u5f00\u59cb\uff08\u79d2\uff09'}
+              开始（秒）
               <input
                 type="number"
                 min={0}
@@ -559,7 +435,7 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
               />
             </label>
             <label>
-              {'\u7ed3\u675f\uff08\u79d2\uff09'}
+              结束（秒）
               <input
                 type="number"
                 min={0}
@@ -571,7 +447,7 @@ export function VideoImportPanel({ material, update, onNotice, onError, onNeedAs
             </label>
           </div>
           <button className="primary" disabled={busy} onClick={() => void applyVideo()}>
-            {'\u63d0\u53d6\u97f3\u8f68\u5e76\u5199\u5165\u7d20\u6750'}
+            写入素材
           </button>
         </div>
       )}

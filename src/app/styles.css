@@ -2499,3 +2499,54 @@ h1 {
   font-size: 15px;
   font-weight: 600;
 }
+
+
+/* UX-1 import failure / choice */
+.import__failure {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 16px;
+  border-radius: 10px;
+}
+.import__failure-body {
+  flex: 1;
+  min-width: 0;
+}
+.import__failure-body p {
+  margin: 0;
+}
+.import__failure details {
+  margin-top: 8px;
+}
+.import__failure summary {
+  cursor: pointer;
+  color: var(--sub);
+}
+.import__failure pre {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+}
+.import__choice {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.import__choice-actions,
+.import__settings-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.import__settings-actions {
+  margin-top: 12px;
+}
+.import__probe-detail {
+  margin-bottom: 10px;
+}

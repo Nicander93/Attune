@@ -2,6 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { sentencesToSegments } from './domain/subtitles';
 import type { Material, SubtitleSegment } from './domain/types';
 import {
+  COPY,
+  downloadingModelProgress,
+  megabytesLabel,
+  modelConsentMessage,
+} from './features/material/import-messages';
+import {
   CANCELLED,
   cancelDownload,
   cancelRecognition,
@@ -44,12 +50,15 @@ export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
     return items;
   }
   async function download(model: ModelStatus): Promise<void> {
-    setTask({ label: `正在下载模型 ${model.label}…`, cancel: () => void cancelDownload() });
+    setTask({ label: COPY.downloadingModel, cancel: () => void cancelDownload() });
     try {
-      await downloadModel(model.id, settings.modelUrl, (p) =>
+      await downloadModel(model.id, settings.modelUrl, (progress) =>
         setTask({
-          label: `正在下载模型：${megabytes(p.downloadedBytes)} / ${megabytes(p.totalBytes)} MB`,
-          percent: (p.downloadedBytes / p.totalBytes) * 100,
+          label: downloadingModelProgress(
+            megabytes(progress.downloadedBytes),
+            megabytes(progress.totalBytes),
+          ),
+          percent: (progress.downloadedBytes / progress.totalBytes) * 100,
           cancel: () => void cancelDownload(),
         }),
       );
@@ -72,12 +81,12 @@ export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
     }
   }
   function downloadSelected() {
-    const model = models.find((m) => m.id === settings.modelId);
+    const model = models.find((item) => item.id === settings.modelId);
     if (!model || task || busy.current) return;
     cancelTask.current = () => void cancelDownload();
     void run(async () => {
       await download(model);
-      onNotice('模型已下载并通过校验。');
+      onNotice('识别数据已下载并准备好。');
     }, '已暂停下载，下次会从断点继续。');
   }
   function importLocal() {
@@ -85,11 +94,11 @@ export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
     void run(async () => {
       const path = await pickModelFile();
       if (!path) return;
-      setTask({ label: '正在导入并检查模型文件…' });
+      setTask({ label: COPY.importingModel });
       const model = await importModel(path);
       await refreshModels();
       changeSettings({ ...settings, modelId: model.id });
-      onNotice(`已导入模型：${model.label}`);
+      onNotice('已导入识别数据。');
     }, '已取消导入。');
   }
   function start(material: Material) {
@@ -102,28 +111,33 @@ export function useRecognition({ onRecognized, onError, onNotice }: Callbacks) {
     };
     cancelTask.current = stop;
     void run(async () => {
-      const model = (await refreshModels()).find((m) => m.id === settings.modelId);
-      if (!model) throw new Error('请先在识别设置中选择模型。');
+      const model = (await refreshModels()).find((item) => item.id === settings.modelId);
+      if (!model) throw new Error(COPY.recognitionNoModel);
       if (!model.installed) {
-        if (!window.confirm(`模型 ${model.label} 尚未安装，下载并校验后开始识别？`))
-          throw CANCELLED;
+        const sizeMb = Number(megabytesLabel(model.sizeBytes - model.downloadedBytes));
+        if (!window.confirm(modelConsentMessage(sizeMb))) throw CANCELLED;
         await download(model);
       }
-      setTask({ label: '正在解码音频…', cancel: stop });
+      setTask({ label: COPY.preparingSubtitles, cancel: stop });
       const sentences = await recognize(
         material.audio,
         model.id,
-        (percent) => setTask({ label: `正在识别：${percent}%`, percent, cancel: stop }),
+        (percent) =>
+          setTask({
+            label: `正在准备字幕… ${percent}%`,
+            percent,
+            cancel: stop,
+          }),
         controller.signal,
       );
       if (controller.signal.aborted) throw CANCELLED;
       const segments = sentencesToSegments(sentences, material.duration);
       if (!segments.length) {
-        onNotice('没有识别出英文语音，片段保持不变。');
+        onError(COPY.recognitionNoSpeech);
         return;
       }
       onRecognized(material.id, segments);
-    }, '已取消，片段没有改动。');
+    }, COPY.recognitionCancelled);
   }
   return {
     settings,

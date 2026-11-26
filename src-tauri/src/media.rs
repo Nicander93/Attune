@@ -197,7 +197,7 @@ pub(crate) fn allow_input(app: &AppHandle, state: &MediaState, path: &Path) -> R
     if allowed.iter().any(|p| p == &full) {
         return Ok(full);
     }
-    Err("该文件路径未授权。请通过「导入视频」对话框重新选择。".into())
+    Err("该文件尚未授权，请重新选择或拖入。".into())
 }
 
 pub(crate) fn allow_output(app: &AppHandle, path: &Path) -> Result<PathBuf, String> {
@@ -414,6 +414,54 @@ pub fn media_authorize_path(state: State<'_, MediaState>, path: String) -> Resul
         guard.push(full.clone());
     }
     Ok(full.display().to_string())
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StageImportRequest {
+    pub path: String,
+    pub material_id: String,
+}
+
+fn looks_safe_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() < 80
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+/// Copy a user-chosen source into the material media cache so the UI can read it.
+#[tauri::command]
+pub fn media_stage_import(
+    app: AppHandle,
+    state: State<'_, MediaState>,
+    request: StageImportRequest,
+) -> Result<String, String> {
+    if !looks_safe_id(&request.material_id) {
+        return Err("素材编号无效".into());
+    }
+    let src = canonicalize_existing(Path::new(&request.path))?;
+    {
+        let mut guard = state
+            .allowed_inputs
+            .lock()
+            .map_err(|_| "媒体状态不可用".to_string())?;
+        if !guard.iter().any(|p| p == &src) {
+            guard.push(src.clone());
+        }
+    }
+    let ext = src
+        .extension()
+        .and_then(|e| e.to_str())
+        .filter(|e| e.chars().all(|c| c.is_ascii_alphanumeric()))
+        .unwrap_or("bin");
+    let dest_dir = app_data(&app)?.join("media").join(&request.material_id);
+    fs::create_dir_all(&dest_dir).map_err(|e| format!("无法准备导入目录：{e}"))?;
+    let dest = dest_dir.join(format!("import-source.{ext}"));
+    fs::copy(&src, &dest).map_err(|e| format!("无法复制导入文件：{e}"))?;
+    let dest = allow_output(&app, &dest)?;
+    Ok(dest.display().to_string())
 }
 
 #[tauri::command]
@@ -1017,6 +1065,14 @@ mod tests {
     fn rejects_shell_metacharacters() {
         assert!(looks_dangerous("a;rm"));
         assert!(!looks_dangerous(r"D:\videos\lesson.mp4"));
+    }
+
+    #[test]
+    fn stage_import_request_accepts_camel_case() {
+        let req: StageImportRequest =
+            serde_json::from_str(r#"{"path":"C:\\a.wav","materialId":"abc-123"}"#).unwrap();
+        assert_eq!(req.path, r"C:\a.wav");
+        assert_eq!(req.material_id, "abc-123");
     }
 
     #[test]

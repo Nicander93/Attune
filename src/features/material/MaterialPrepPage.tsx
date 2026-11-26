@@ -9,6 +9,25 @@ import { useRecognition } from '../../useRecognition';
 import { clearPlaybackPath } from '../../domain/video';
 import { clearAllMediaCache } from '../../media';
 import { VideoImportPanel } from './VideoImportPanel';
+import { ImportFailure } from './ImportFailure';
+import {
+  COPY,
+  readyToDictate,
+  toUserFacingError,
+  type UserFacingError,
+  audioTrackLabel,
+  subtitleTrackLabel,
+} from './import-messages';
+import {
+  droppedFilePath,
+  fileFromLocalPath,
+  isVideoFileName,
+  isVideoMedia,
+  listenDesktopMediaDrop,
+  pickLocalMediaPath,
+} from './local-media';
+import { shouldAutoPrepareSubtitles } from './prepare-video';
+import { useAutoVideoImport } from './useAutoVideoImport';
 
 type Props = {
   material: Material;
@@ -40,15 +59,6 @@ async function readAudioDuration(file: File): Promise<number> {
   }
 }
 
-function isVideoFile(file: File): boolean {
-  if (file.type.startsWith('video/')) return true;
-  return /\.(mp4|mkv|mov|webm|avi|m4v)$/i.test(file.name);
-}
-
-/**
- * S4 import empty: upload icon + unified「音频或视频」copy. Drag/choose still accepts video
- * (desktop routes into VideoImportPanel). Advanced items stay under「更多」.
- */
 export function MaterialPrepPage({
   material,
   update,
@@ -61,47 +71,71 @@ export function MaterialPrepPage({
   const subtitleInput = useRef<HTMLInputElement>(null);
   const renameInput = useRef<HTMLInputElement>(null);
   const moreWrap = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState('');
+  const pendingPrepare = useRef(false);
+  const handledNativeDrop = useRef(0);
+  const importFromPathRef = useRef<(path: string) => Promise<void>>(async () => undefined);
+  const [error, setError] = useState<UserFacingError | null>(null);
   const [audioBusy, setAudioBusy] = useState(false);
   const [advanced, setAdvanced] = useState<AdvancedPanel>(null);
   const [renaming, setRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState(material.displayName);
   const [dragging, setDragging] = useState(false);
-  const pendingAsr = useRef(false);
+  const [audioChoice, setAudioChoice] = useState<number | undefined>();
+  const [subtitleChoice, setSubtitleChoice] = useState<number | undefined>();
 
   const recognition = useRecognition({
     onRecognized: (_id, segments) => {
       try {
-        update((m) => applySubtitleTimeline(m, segments, 'asr', 'unreviewed'));
-        onNotice(
-          `识别完成，共 ${segments.length} 句。ASR 结果仅供参考，请校对后再开始听写。`,
-        );
+        update((current) => applySubtitleTimeline(current, segments, 'asr', 'unreviewed'));
       } catch (err) {
-        setError(String(err));
+        setError(toUserFacingError(err, COPY.recognitionFailed));
+        setAdvanced('settings');
       }
     },
-    onError: setError,
+    onError: (message) => {
+      setError(toUserFacingError(message, COPY.recognitionFailed));
+      setAdvanced('settings');
+    },
     onNotice,
   });
 
+  const videoImport = useAutoVideoImport({
+    material,
+    update,
+    onNotice,
+    onNeedRecognition: () => {
+      pendingPrepare.current = true;
+    },
+  });
+
   const hasAudio = material.duration > 0;
-  const hasSubtitles = material.segments.some((s) => s.reference.trim());
-  const needsReview =
-    !hasSubtitles || material.subtitleReviewStatus === 'unreviewed';
-  const processing = audioBusy || !!recognition.task;
+  const hasSubtitles = material.segments.some((segment) => segment.reference.trim());
+  const sentenceCount = material.segments.filter((segment) => segment.reference.trim()).length;
+  const processing = audioBusy || !!recognition.task || videoImport.busy || !!videoImport.progress;
   const kind = material.video ? 'video' : 'audio';
+  const progressLabel =
+    recognition.task?.label || videoImport.progress || (processing ? COPY.preparingMedia : '');
   const statusText = processing
-    ? recognition.task?.label || '正在准备…'
+    ? progressLabel || COPY.preparingSubtitles
     : !hasAudio
       ? ''
-      : needsReview
-        ? '字幕待校对'
-        : '已就绪';
+      : hasSubtitles
+        ? readyToDictate(sentenceCount)
+        : COPY.noSubtitlesYet;
+  const shownError = error || videoImport.error;
 
   useEffect(() => {
-    if (!pendingAsr.current) return;
-    if (!hasAudio || hasSubtitles || recognition.task || !isDesktop()) return;
-    pendingAsr.current = false;
+    if (!pendingPrepare.current) return;
+    if (
+      !shouldAutoPrepareSubtitles({
+        desktop: isDesktop(),
+        hasAudio,
+        hasSubtitles,
+        processing: !!recognition.task,
+      })
+    )
+      return;
+    pendingPrepare.current = false;
     recognition.start(material);
   }, [material, hasAudio, hasSubtitles, recognition]);
 
@@ -121,56 +155,108 @@ export function MaterialPrepPage({
     };
   }, [advanced]);
 
-  async function importAudio(file?: File) {
-    if (!file) return;
-    if (isVideoFile(file)) {
-      if (!isDesktop()) {
-        setError('视频导入需要桌面版；请用「更多 → 导入视频」或改用音频文件。');
-        return;
-      }
-      setAdvanced('video');
-      onNotice('请在下方视频面板选择本地视频（桌面版走 ffmpeg 探测与抽轨）。');
-      return;
-    }
-    setError('');
+  useEffect(() => {
+    return listenDesktopMediaDrop({
+      onHover: setDragging,
+      onDrop: (path) => {
+        handledNativeDrop.current = Date.now();
+        void importFromPathRef.current(path);
+      },
+    });
+  }, []);
+
+  async function importAudioFile(file: File) {
+    setError(null);
     setAudioBusy(true);
     try {
       const duration = await readAudioDuration(file);
-      if (material.segments.some((s) => s.end > duration + 0.01))
+      if (material.segments.some((segment) => segment.end > duration + 0.01))
         throw new Error('新音频短于现有字幕时间轴，请新建素材再导入。');
-      update((m) => ({
-        ...m,
+      update((current) => ({
+        ...current,
         audio: file,
         duration,
-        // A material created empty takes the audio's name; a rename the user already
-        // made is left alone.
-        displayName: m.originalFileName ? m.displayName : file.name.replace(/\.[^.]+$/, ''),
+        displayName: current.originalFileName
+          ? current.displayName
+          : file.name.replace(/\.[^.]+$/, ''),
         originalFileName: file.name,
         playbackPosition: 0,
       }));
       onNotice(`音频已导入：${file.name}`);
+      if (isDesktop() && !material.segments.some((segment) => segment.reference.trim())) {
+        pendingPrepare.current = true;
+      }
     } catch (err) {
-      setError(String(err));
+      setError(toUserFacingError(err, '这个音频没能导入。'));
     } finally {
       setAudioBusy(false);
     }
   }
 
+  async function importPickedFile(file?: File) {
+    if (!file) return;
+    if (isVideoMedia(file)) {
+      if (!isDesktop()) {
+        setError({ message: COPY.videoNeedsDesktop });
+        return;
+      }
+      const path = droppedFilePath(file);
+      if (!path) {
+        setError({ message: COPY.videoPathMissing });
+        return;
+      }
+      await videoImport.startFromPath(path);
+      return;
+    }
+    await importAudioFile(file);
+  }
+
+  async function importFromPath(path: string) {
+    if (isVideoFileName(path)) {
+      if (!isDesktop()) {
+        setError({ message: COPY.videoNeedsDesktop });
+        return;
+      }
+      await videoImport.startFromPath(path);
+      return;
+    }
+    try {
+      const file = await fileFromLocalPath(path, material.id);
+      await importAudioFile(file);
+    } catch (err) {
+      setError(toUserFacingError(err, '这个文件没能导入。'));
+    }
+  }
+  importFromPathRef.current = importFromPath;
+
+  async function chooseFile() {
+    if (isDesktop()) {
+      try {
+        const path = await pickLocalMediaPath();
+        if (path) await importFromPath(path);
+      } catch (err) {
+        setError(toUserFacingError(err, '没能打开文件选择。'));
+      }
+      return;
+    }
+    audioInput.current?.click();
+  }
+
   async function importSubtitles(file?: File) {
     if (!file) return;
-    setError('');
+    setError(null);
     try {
       const text = await file.text();
       const segments: SubtitleSegment[] = file.name.toLowerCase().endsWith('.vtt')
         ? parseVtt(text, material.duration)
         : parseSrt(text, material.duration);
-      update((m) => applySubtitleTimeline(m, segments, 'external', 'reviewed'));
-      const translated = segments.filter((s) => s.translation?.trim()).length;
+      update((current) => applySubtitleTimeline(current, segments, 'external', 'reviewed'));
+      const translated = segments.filter((segment) => segment.translation?.trim()).length;
       onNotice(
         `字幕已导入 ${segments.length} 句${translated ? `，其中 ${translated} 句带中文` : '（没有中文译文）'}。`,
       );
     } catch (err) {
-      setError(String(err));
+      setError(toUserFacingError(err, '这个字幕文件没能导入。'));
     }
   }
 
@@ -187,103 +273,123 @@ export function MaterialPrepPage({
   function saveRename() {
     const name = renameValue.trim();
     if (!name) {
-      setError('素材名称不能为空。');
+      setError({ message: '素材名称不能为空。' });
       renameInput.current?.focus();
       return;
     }
-    update((m) => ({ ...m, displayName: name }));
-    setError('');
+    update((current) => ({ ...current, displayName: name }));
+    setError(null);
     setRenaming(false);
   }
 
   function cancelRename() {
     setRenameValue(material.displayName);
-    setError('');
+    setError(null);
     setRenaming(false);
   }
 
   function openAdvanced(panel: Exclude<AdvancedPanel, 'more' | null>) {
     setAdvanced(panel);
     if (panel === 'settings') {
-      void recognition.refreshModels().catch((err) => setError(String(err)));
+      void recognition
+        .refreshModels()
+        .catch((err) => setError(toUserFacingError(err, COPY.recognitionFailed)));
     }
   }
 
   function clearAllCache() {
-    if (!window.confirm('清理全部媒体缓存？视频素材需要时请在「更多 → 导入视频」中重建播放副本。'))
-      return;
+    if (!window.confirm('清理全部媒体缓存？需要画面时，可以在「更多」里重新准备这段视频。')) return;
     void clearAllMediaCache()
       .then(() => {
-        update((m) => clearPlaybackPath(m));
+        update((current) => clearPlaybackPath(current));
         onNotice('已清理全部媒体缓存。');
         setAdvanced(null);
       })
-      .catch((err) => setError(String(err)));
+      .catch((err) => setError(toUserFacingError(err, '清理缓存失败。')));
   }
 
-  const moreMenu = (
-    <div className="menu-wrap" ref={moreWrap}>
-      <button
-        type="button"
-        className="quiet"
-        aria-expanded={advanced === 'more'}
-        aria-haspopup="menu"
-        onClick={() => setAdvanced(advanced === 'more' ? null : 'more')}
-      >
-        更多 ···
-      </button>
-      {advanced === 'more' && (
-        <div className="menu menu--right" role="menu">
-          {hasSubtitles && (
-            <button type="button" role="menuitem" onClick={() => { setAdvanced(null); onSubtitles(); }}>
-              校对字幕
-            </button>
-          )}
+  const moreItems = hasAudio
+    ? [
+        hasSubtitles ? (
           <button
             type="button"
             role="menuitem"
+            key="proof"
             onClick={() => {
               setAdvanced(null);
-              subtitleInput.current?.click();
+              onSubtitles();
             }}
           >
-            导入字幕文件
+            校对字幕
           </button>
-          <button type="button" role="menuitem" onClick={() => openAdvanced('settings')}>
-            识别设置
+        ) : null,
+        <button
+          type="button"
+          role="menuitem"
+          key="import-subs"
+          onClick={() => {
+            setAdvanced(null);
+            subtitleInput.current?.click();
+          }}
+        >
+          导入字幕文件
+        </button>,
+        <button
+          type="button"
+          role="menuitem"
+          key="settings"
+          onClick={() => openAdvanced('settings')}
+        >
+          识别设置
+        </button>,
+        isDesktop() ? (
+          <button type="button" role="menuitem" key="video" onClick={() => openAdvanced('video')}>
+            导入视频
           </button>
-          {isDesktop() && (
-            <button type="button" role="menuitem" onClick={() => openAdvanced('video')}>
-              导入视频
-            </button>
-          )}
-          {isDesktop() && (
-            <button type="button" role="menuitem" onClick={() => openAdvanced('cache')}>
-              缓存管理
-            </button>
-          )}
-          {hasAudio && (
-            <button type="button" role="menuitem" onClick={beginRename}>
-              重命名
-            </button>
-          )}
-          {hasAudio && (
-            <button
-              type="button"
-              role="menuitem"
-              disabled={!hasAudio}
-              onClick={() => {
-                setAdvanced(null);
-                onStudy('reading');
-              }}
-            >
-              开始听读
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
+        ) : null,
+        isDesktop() ? (
+          <button type="button" role="menuitem" key="cache" onClick={() => openAdvanced('cache')}>
+            缓存管理
+          </button>
+        ) : null,
+        <button type="button" role="menuitem" key="rename" onClick={beginRename}>
+          重命名
+        </button>,
+        <button
+          type="button"
+          role="menuitem"
+          key="reading"
+          onClick={() => {
+            setAdvanced(null);
+            onStudy('reading');
+          }}
+        >
+          开始听读
+        </button>,
+      ].filter(Boolean)
+    : [];
+
+  const moreMenu =
+    moreItems.length === 0 ? null : (
+      <div className="menu-wrap" ref={moreWrap}>
+        <button
+          type="button"
+          className="quiet"
+          aria-expanded={advanced === 'more'}
+          aria-haspopup="menu"
+          onClick={() => setAdvanced(advanced === 'more' ? null : 'more')}
+        >
+          更多 ···
+        </button>
+        {advanced === 'more' && (
+          <div className="menu menu--right" role="menu">
+            {moreItems}
+          </div>
+        )}
+      </div>
+    );
+
+  const choice = videoImport.choice;
 
   return (
     <section className="prep import">
@@ -293,13 +399,15 @@ export function MaterialPrepPage({
         </button>
         <h1 className="import__heading">导入素材</h1>
 
-        {error && (
-          <p className="banner banner--error" role="alert">
-            {error}
-            <button type="button" className="quiet" onClick={() => setError('')}>
-              关闭
-            </button>
-          </p>
+        {shownError && (
+          <ImportFailure
+            message={shownError.message}
+            detail={shownError.detail}
+            onClose={() => {
+              setError(null);
+              videoImport.clearError();
+            }}
+          />
         )}
 
         {!hasAudio && (
@@ -313,7 +421,8 @@ export function MaterialPrepPage({
             onDrop={(event) => {
               event.preventDefault();
               setDragging(false);
-              void importAudio(event.dataTransfer.files[0]);
+              if (Date.now() - handledNativeDrop.current < 800) return;
+              void importPickedFile(event.dataTransfer.files[0]);
             }}
           >
             <svg
@@ -330,17 +439,16 @@ export function MaterialPrepPage({
             >
               <path d="M12 16V3m0 0L7.7 7.3M12 3l4.3 4.3M4 15.5v4A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5v-4" />
             </svg>
-            <div className="import__upload-title">音频或视频</div>
+            <div className="import__upload-title">{COPY.dropTitle}</div>
             <button
               type="button"
               className="secondary"
-              disabled={audioBusy}
-              onClick={() => audioInput.current?.click()}
+              disabled={processing}
+              onClick={() => void chooseFile()}
             >
-              {audioBusy ? '正在读取…' : '选择文件'}
+              {audioBusy ? COPY.readingFile : COPY.chooseFile}
             </button>
-            <p className="muted import__hint">或拖入文件</p>
-            <div className="import__empty-more">{moreMenu}</div>
+            <p className="muted import__hint">{COPY.dropHint}</p>
           </div>
         )}
 
@@ -383,49 +491,94 @@ export function MaterialPrepPage({
               <button
                 type="button"
                 className="quiet"
-                disabled={audioBusy}
-                onClick={() => audioInput.current?.click()}
+                disabled={processing}
+                onClick={() => void chooseFile()}
               >
                 更换
               </button>
             </div>
 
-            {statusText && (
-              <p className={`import__status${needsReview && !processing ? ' import__status--warn' : ''}`}>
-                {statusText}
-              </p>
+            {statusText && <p className="import__status">{statusText}</p>}
+
+            {choice?.kind === 'audio' && (
+              <div className="import__choice">
+                <p>{COPY.multipleAudioTracks}</p>
+                <label>
+                  音轨
+                  <select
+                    value={audioChoice ?? choice.plan.audioStream ?? ''}
+                    onChange={(event) => setAudioChoice(Number(event.target.value))}
+                  >
+                    {choice.plan.audioStreams.map((stream, index) => (
+                      <option key={stream.index} value={stream.index}>
+                        {audioTrackLabel(stream.language, index)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={videoImport.busy}
+                  onClick={() =>
+                    void videoImport.confirmAudioStream(
+                      audioChoice ?? choice.plan.audioStream ?? choice.plan.audioStreams[0].index,
+                    )
+                  }
+                >
+                  {COPY.continueWithTrack}
+                </button>
+              </div>
             )}
 
-            {material.subtitleOrigin &&
-              material.subtitleReviewStatus === 'unreviewed' &&
-              hasSubtitles && (
-                <p className="banner" role="status">
-                  {material.subtitleOrigin === 'asr'
-                    ? '当前字幕来自语音识别（ASR），尚未校对，不应作为最终答案。'
-                    : material.subtitleOrigin === 'embedded'
-                      ? '当前字幕来自内嵌轨，尚未校对。'
-                      : material.subtitleOrigin === 'ocr'
-                        ? '当前字幕来自 OCR（烧录/图形），尚未校对，不应作为最终答案。'
-                        : '字幕尚未校对。'}
-                  <button type="button" onClick={onSubtitles}>
-                    去校对
+            {choice?.kind === 'subtitle' && (
+              <div className="import__choice">
+                <p>{COPY.subtitlePickAfterFailure}</p>
+                <label>
+                  字幕
+                  <select
+                    value={subtitleChoice ?? choice.remaining[0]?.index ?? ''}
+                    onChange={(event) => setSubtitleChoice(Number(event.target.value))}
+                  >
+                    {choice.remaining.map((stream, index) => (
+                      <option key={stream.index} value={stream.index}>
+                        {subtitleTrackLabel(stream.language, index)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="import__choice-actions">
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={videoImport.busy || !choice.remaining.length}
+                    onClick={() =>
+                      void videoImport.confirmSubtitleStream(
+                        subtitleChoice ?? choice.remaining[0].index,
+                      )
+                    }
+                  >
+                    {COPY.continueWithTrack}
                   </button>
-                </p>
-              )}
+                  <button
+                    type="button"
+                    className="secondary"
+                    onClick={videoImport.recognizeInstead}
+                  >
+                    {COPY.recognizeInstead}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="import__actions">
               {moreMenu}
               <div className="import__actions-right">
-                {needsReview && hasSubtitles && !processing && (
-                  <button type="button" className="secondary" onClick={onSubtitles}>
-                    校对字幕
-                  </button>
-                )}
                 <button
                   type="button"
                   className="primary"
                   disabled={!hasSubtitles || !hasAudio || processing}
-                  title={!hasSubtitles ? '请先导入字幕或完成识别' : undefined}
+                  title={!hasSubtitles ? COPY.startDictationNeedsText : undefined}
                   onClick={() => onStudy('dictation')}
                 >
                   开始听写 →
@@ -435,13 +588,13 @@ export function MaterialPrepPage({
           </>
         )}
 
-        {recognition.task && (
+        {(recognition.task || (videoImport.busy && videoImport.progress)) && (
           <p className="banner" role="status">
-            {recognition.task.label}
-            {recognition.task.percent !== undefined && (
+            {progressLabel}
+            {recognition.task?.percent !== undefined && (
               <progress max={100} value={recognition.task.percent} />
             )}
-            {recognition.task.cancel && (
+            {recognition.task?.cancel && (
               <button type="button" className="quiet" onClick={recognition.task.cancel}>
                 取消
               </button>
@@ -457,7 +610,6 @@ export function MaterialPrepPage({
                 收起
               </button>
             </div>
-            <p className="muted">仅在默认识别失败时才需要调整音轨、OCR 或语音识别选项。</p>
             <RecognitionSettings
               settings={recognition.settings}
               models={recognition.models}
@@ -467,15 +619,27 @@ export function MaterialPrepPage({
               onImport={recognition.importLocal}
               onClose={() => setAdvanced(null)}
             />
-            <button
-              type="button"
-              className="primary"
-              disabled={!isDesktop() || !!recognition.task || !hasAudio}
-              title={isDesktop() ? undefined : '语音识别需要桌面版'}
-              onClick={() => recognition.start(material)}
-            >
-              开始识别
-            </button>
+            <div className="import__settings-actions">
+              <button
+                type="button"
+                className="primary"
+                disabled={!isDesktop() || !!recognition.task || !hasAudio}
+                title={isDesktop() ? undefined : '语音识别需要桌面版'}
+                onClick={() => recognition.start(material)}
+              >
+                开始识别
+              </button>
+              {material.video?.sourcePath && (
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={processing}
+                  onClick={() => void videoImport.tryPictureText()}
+                >
+                  {COPY.tryPictureText}
+                </button>
+              )}
+            </div>
           </section>
         )}
 
@@ -487,9 +651,7 @@ export function MaterialPrepPage({
                 收起
               </button>
             </div>
-            <p className="muted">
-              清理应用数据目录下 media/ 中的播放副本与抽轨临时文件。IndexedDB 中的音频 Blob、字幕与练习记录不受影响。
-            </p>
+            <p className="muted">清理本机为播放和导入准备的临时文件。听写记录和字幕会保留。</p>
             <button type="button" className="quiet" onClick={clearAllCache}>
               清理全部媒体缓存
             </button>
@@ -508,9 +670,9 @@ export function MaterialPrepPage({
               material={material}
               update={update}
               onNotice={onNotice}
-              onError={setError}
+              onError={(message, detail) => setError({ message, detail })}
               onNeedAsr={() => {
-                pendingAsr.current = true;
+                pendingPrepare.current = true;
               }}
             />
           </section>
@@ -522,7 +684,7 @@ export function MaterialPrepPage({
           accept="audio/*,video/*,.mp3,.wav,.m4a,.ogg,.flac,.mp4,.mkv,.mov,.webm"
           hidden
           onChange={(event) => {
-            void importAudio(event.target.files?.[0]);
+            void importPickedFile(event.target.files?.[0]);
             event.target.value = '';
           }}
         />

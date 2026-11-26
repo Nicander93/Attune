@@ -73,9 +73,13 @@ export async function pickAndProbeVideo(): Promise<MediaProbe> {
   return invoke<MediaProbe>('media_probe', { path });
 }
 
-
 export async function authorizeMediaPath(path: string): Promise<string> {
   return invoke<string>('media_authorize_path', { path });
+}
+
+/** Copy an authorized user file into the material media cache and return that path. */
+export async function stageImportFile(path: string, materialId: string): Promise<string> {
+  return invoke<string>('media_stage_import', { request: { path, materialId } });
 }
 
 export async function probeAuthorizedPath(path: string): Promise<MediaProbe> {
@@ -251,4 +255,3 @@ export async function clearAllMediaCache(): Promise<void> {
   if (!isDesktop()) return;
   await invoke('media_clear_all_cache');
 }
-
