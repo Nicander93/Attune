@@ -90,7 +90,10 @@ async function connectPage() {
 
 async function clickBtn(page, re) {
   // DOM click avoids hit-testing an overlay notice that sits on the same pixels.
-  await page.getByRole('button', { name: re }).first().evaluate((el) => el.click());
+  await page
+    .getByRole('button', { name: re })
+    .first()
+    .evaluate((el) => el.click());
 }
 
 async function domClick(locator) {
@@ -127,7 +130,16 @@ async function setInnerSize(page, client, width, height) {
     innerHeight: window.innerHeight,
     dpr: window.devicePixelRatio,
   }));
-  log('size target=' + width + 'x' + height + ' inner=' + finalInner.innerWidth + 'x' + finalInner.innerHeight);
+  log(
+    'size target=' +
+      width +
+      'x' +
+      height +
+      ' inner=' +
+      finalInner.innerWidth +
+      'x' +
+      finalInner.innerHeight,
+  );
   return { target: { width, height }, ...finalInner, outer: last.outer };
 }
 
@@ -137,23 +149,35 @@ async function layoutAudit(page) {
     const app = document.querySelector('.app');
     const appBox = app?.getBoundingClientRect();
     const overflowX = html.scrollWidth > html.clientWidth + 2;
-    const overflowYDoc = html.scrollHeight > html.clientHeight + 2 && getComputedStyle(html).overflowY !== 'hidden';
+    const overflowYDoc =
+      html.scrollHeight > html.clientHeight + 2 && getComputedStyle(html).overflowY !== 'hidden';
     const clipped = [];
-    const nodes = document.querySelectorAll('button, a, h1, h2, nav, header, .page-heading, .import__heading, .study__head, .topbar, .banner, .materials__row, .dropzone');
+    const nodes = document.querySelectorAll(
+      'button, a, h1, h2, nav, header, .page-heading, .import__heading, .study__head, .topbar, .banner, .materials__row, .dropzone',
+    );
     for (const el of nodes) {
       const style = getComputedStyle(el);
-      if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0) continue;
+      if (style.visibility === 'hidden' || style.display === 'none' || Number(style.opacity) === 0)
+        continue;
       const r = el.getBoundingClientRect();
       if (r.width < 2 || r.height < 2) continue;
       // Only horizontal overflow counts as a layout leak; list rows below the
       // fold in a scrolling pane are expected.
       if (r.right > window.innerWidth + 3 || r.left < -3) {
-        const text = (el.innerText || el.getAttribute('aria-label') || el.className || '').toString().trim().slice(0, 80);
+        const text = (el.innerText || el.getAttribute('aria-label') || el.className || '')
+          .toString()
+          .trim()
+          .slice(0, 80);
         clipped.push({
           tag: el.tagName,
           className: String(el.className).slice(0, 80),
           text,
-          rect: { left: Math.round(r.left), top: Math.round(r.top), right: Math.round(r.right), bottom: Math.round(r.bottom) },
+          rect: {
+            left: Math.round(r.left),
+            top: Math.round(r.top),
+            right: Math.round(r.right),
+            bottom: Math.round(r.bottom),
+          },
         });
       }
     }
@@ -168,13 +192,26 @@ async function layoutAudit(page) {
       return {
         text: (el.innerText || '').trim().slice(0, 120),
         hidden: style.visibility === 'hidden' || Number(style.opacity) === 0,
-        rect: { left: Math.round(r.left), top: Math.round(r.top), right: Math.round(r.right), bottom: Math.round(r.bottom), width: Math.round(r.width), height: Math.round(r.height) },
+        rect: {
+          left: Math.round(r.left),
+          top: Math.round(r.top),
+          right: Math.round(r.right),
+          bottom: Math.round(r.bottom),
+          width: Math.round(r.width),
+          height: Math.round(r.height),
+        },
       };
     };
     const overlap = (a, b) => {
       if (!a || !b || a.hidden || b.hidden) return null;
-      const w = Math.max(0, Math.min(a.rect.right, b.rect.right) - Math.max(a.rect.left, b.rect.left));
-      const h = Math.max(0, Math.min(a.rect.bottom, b.rect.bottom) - Math.max(a.rect.top, b.rect.top));
+      const w = Math.max(
+        0,
+        Math.min(a.rect.right, b.rect.right) - Math.max(a.rect.left, b.rect.left),
+      );
+      const h = Math.max(
+        0,
+        Math.min(a.rect.bottom, b.rect.bottom) - Math.max(a.rect.top, b.rect.top),
+      );
       return w > 2 && h > 2 ? { width: w, height: h } : null;
     };
     const bannerBox = box(banner);
@@ -203,7 +240,9 @@ async function layoutAudit(page) {
 
 async function goHome(page) {
   for (let i = 0; i < 5; i++) {
-    const focus = await page.evaluate(() => document.querySelector('.app')?.getAttribute('data-focus') === 'study');
+    const focus = await page.evaluate(
+      () => document.querySelector('.app')?.getAttribute('data-focus') === 'study',
+    );
     if (focus) {
       const back = page.getByRole('button', { name: /返回/ }).first();
       if (await back.count()) await domClick(back);
@@ -243,7 +282,14 @@ async function main() {
   await shot(page, '01-home.png');
   const homeAudit = await layoutAudit(page);
   summary.detail.home = homeAudit;
-  log('1 home ' + JSON.stringify({ overflowX: homeAudit.overflowX, clipped: homeAudit.clipped.length, size: homeAudit.innerWidth + 'x' + homeAudit.innerHeight }));
+  log(
+    '1 home ' +
+      JSON.stringify({
+        overflowX: homeAudit.overflowX,
+        clipped: homeAudit.clipped.length,
+        size: homeAudit.innerWidth + 'x' + homeAudit.innerHeight,
+      }),
+  );
 
   const midPromise = (async () => {
     await sleep(90);
@@ -255,7 +301,14 @@ async function main() {
   await shot(page, '03-library.png');
   const libAudit = await layoutAudit(page);
   summary.detail.library = libAudit;
-  log('1 library ' + JSON.stringify({ overflowX: libAudit.overflowX, clipped: libAudit.clipped.length, heading: libAudit.heading?.text }));
+  log(
+    '1 library ' +
+      JSON.stringify({
+        overflowX: libAudit.overflowX,
+        clipped: libAudit.clipped.length,
+        heading: libAudit.heading?.text,
+      }),
+  );
 
   await clickBtn(page, /导入素材/);
   await sleep(80);
@@ -264,7 +317,14 @@ async function main() {
   await shot(page, '05-import.png');
   const importAudit = await layoutAudit(page);
   summary.detail.importEmpty = importAudit;
-  log('1 import ' + JSON.stringify({ overflowX: importAudit.overflowX, clipped: importAudit.clipped.length, heading: importAudit.heading?.text }));
+  log(
+    '1 import ' +
+      JSON.stringify({
+        overflowX: importAudit.overflowX,
+        clipped: importAudit.clipped.length,
+        heading: importAudit.heading?.text,
+      }),
+  );
 
   const importHeadingTop = importAudit.heading?.rect?.top;
   await clickBtn(page, /返回/);
@@ -308,7 +368,9 @@ async function main() {
     shots.import = await layoutAudit(page);
     await clickBtn(page, /返回/).catch(() => goHome(page));
     await sleep(300);
-    const fail = [shots.home, shots.library, shots.import].some((a) => a.overflowX || a.clipped.length > 0);
+    const fail = [shots.home, shots.library, shots.import].some(
+      (a) => a.overflowX || a.clipped.length > 0,
+    );
     viewportResults.push({
       id: vp.id,
       label: vp.label,
@@ -321,7 +383,9 @@ async function main() {
         import: shots.import.clipped,
       },
     });
-    log('3 ' + vp.label + ' overflow=' + fail + ' inner=' + size.innerWidth + 'x' + size.innerHeight);
+    log(
+      '3 ' + vp.label + ' overflow=' + fail + ' inner=' + size.innerWidth + 'x' + size.innerHeight,
+    );
     summary.detail['vp_' + vp.id] = shots;
   }
   summary.detail.viewportResults = viewportResults;
@@ -354,7 +418,9 @@ async function main() {
       if (await start.isEnabled()) {
         await start.click();
         await sleep(600);
-        enteredStudy = /第\s*\d+\s*\/\s*\d+\s*句|听完这句|核对答案/.test(await page.evaluate(() => document.body.innerText));
+        enteredStudy = /第\s*\d+\s*\/\s*\d+\s*句|听完这句|核对答案/.test(
+          await page.evaluate(() => document.body.innerText),
+        );
       }
     }
   }
@@ -405,7 +471,9 @@ async function main() {
       await shot(page, '39-imported-ready.png');
       await clickBtn(page, /开始听写/);
       await sleep(600);
-      enteredStudy = /第\s*\d+\s*\/\s*\d+\s*句|听完这句|核对答案/.test(await page.evaluate(() => document.body.innerText));
+      enteredStudy = /第\s*\d+\s*\/\s*\d+\s*句|听完这句|核对答案/.test(
+        await page.evaluate(() => document.body.innerText),
+      );
     }
   }
 
@@ -418,9 +486,12 @@ async function main() {
     await shot(page, '40-study-entered.png');
     const enteredAudit = await layoutAudit(page);
     summary.detail.studyEntered = enteredAudit;
-    const topbarHidden = enteredAudit.topbar?.hidden !== false && (enteredAudit.topbar == null || enteredAudit.topbar.hidden);
+    const topbarHidden =
+      enteredAudit.topbar?.hidden !== false &&
+      (enteredAudit.topbar == null || enteredAudit.topbar.hidden);
     // topbar may still be in DOM; hidden/visibility after transition
-    const topbarOk = !enteredAudit.topbar || enteredAudit.topbar.hidden || enteredAudit.topbar.rect.height === 0;
+    const topbarOk =
+      !enteredAudit.topbar || enteredAudit.topbar.hidden || enteredAudit.topbar.rect.height === 0;
     log('2 entered topbarHidden=' + topbarOk + ' studyHead=' + !!enteredAudit.studyHead);
 
     // Open ··· menu
@@ -439,8 +510,14 @@ async function main() {
         present: true,
         nearButton: Math.abs(m.right - b.right) < 80 && m.top >= b.bottom - 12,
         menu: { top: Math.round(m.top), right: Math.round(m.right), width: Math.round(m.width) },
-        button: { top: Math.round(b.top), right: Math.round(b.right), bottom: Math.round(b.bottom) },
-        items: [...menu.querySelectorAll('[role=menuitem]')].map((el) => el.textContent.trim()).slice(0, 8),
+        button: {
+          top: Math.round(b.top),
+          right: Math.round(b.right),
+          bottom: Math.round(b.bottom),
+        },
+        items: [...menu.querySelectorAll('[role=menuitem]')]
+          .map((el) => el.textContent.trim())
+          .slice(0, 8),
       };
     });
     summary.detail.menuOpen = menuOpen;
@@ -454,7 +531,11 @@ async function main() {
     await shot(page, '43-menu-interrupt.png');
     const afterInterrupt = await page.evaluate(() => {
       const menu = document.querySelector('[role="menu"]');
-      const visible = !!(menu && getComputedStyle(menu).opacity !== '0' && getComputedStyle(menu).visibility !== 'hidden');
+      const visible = !!(
+        menu &&
+        getComputedStyle(menu).opacity !== '0' &&
+        getComputedStyle(menu).visibility !== 'hidden'
+      );
       return { visible, text: menu?.innerText?.slice(0, 80) || '' };
     });
     summary.detail.menuInterrupt = afterInterrupt;
@@ -483,7 +564,8 @@ async function main() {
         const b = btn.getBoundingClientRect();
         return {
           present: true,
-          nearButton: Math.abs(p.left + p.width / 2 - (b.left + b.width / 2)) < 120 && p.top >= b.top - 8,
+          nearButton:
+            Math.abs(p.left + p.width / 2 - (b.left + b.width / 2)) < 120 && p.top >= b.top - 8,
           count: pop.querySelectorAll('button, [role=option]').length,
         };
       });
@@ -513,10 +595,9 @@ async function main() {
       await shot(page, '51-notice-study.png');
       const noticeAudit = await layoutAudit(page);
       summary.detail.noticeStudy = noticeAudit;
-      const blocksToolbar = !!(noticeAudit.bannerOverlapsStudyHead || noticeAudit.bannerOverlapsTopbar);
+      const blocksStudyToolbar = !!noticeAudit.bannerOverlapsStudyHead;
       const blocksHeading = !!noticeAudit.bannerOverlapsHeading;
-      const headingShifted = false;
-      summary.notice_blocks_title_or_toolbar = blocksToolbar || blocksHeading;
+      summary.notice_blocks_title_or_toolbar = blocksStudyToolbar || blocksHeading;
       summary.detail.noticeOverlap = {
         heading: noticeAudit.bannerOverlapsHeading,
         topbar: noticeAudit.bannerOverlapsTopbar,
@@ -533,8 +614,18 @@ async function main() {
       // Overlay is OK even if it covers the head; "挡住" is a report, not auto-fail
       // unless the page was pushed down.
       const noticeVisible = !!noticeAudit.banner && !noticeAudit.banner.hidden;
-      summary.item4_notice_overlay = noticeVisible && !pushed ? 'PASS' : 'FAIL';
-      log('4 notice visible=' + noticeVisible + ' pushed=' + pushed + ' blocks=' + summary.notice_blocks_title_or_toolbar + ' => ' + summary.item4_notice_overlay);
+      summary.item4_notice_overlay =
+        noticeVisible && !pushed && !blocksStudyToolbar && !blocksHeading ? 'PASS' : 'FAIL';
+      log(
+        '4 notice visible=' +
+          noticeVisible +
+          ' pushed=' +
+          pushed +
+          ' blocksStudyToolbar=' +
+          blocksStudyToolbar +
+          ' => ' +
+          summary.item4_notice_overlay,
+      );
     } else {
       summary.detail.noticeBlocker = 'no 快捷键 menu item';
       await shot(page, '50-notice-missing.png');

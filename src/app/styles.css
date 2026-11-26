@@ -2191,6 +2191,8 @@ h1 {
   background: #fff;
 }
 .study__head--focus {
+  position: relative;
+  z-index: 60;
   height: 56px;
   min-height: 56px;
   padding: 0 28px;
@@ -2198,6 +2200,7 @@ h1 {
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
+  background: #fff;
 }
 .study__file {
   font-size: 13px;
@@ -2561,6 +2564,9 @@ h1 {
 
 /* ---------- MOT-1 motion language ---------- */
 .topbar {
+  position: relative;
+  z-index: 60;
+  background: var(--paper);
   visibility: visible;
   transition:
     opacity var(--motion-page) var(--motion-ease-enter),
@@ -2595,6 +2601,10 @@ h1 {
 }
 .app:not([data-focus='study']) .banner {
   top: 54px;
+}
+.app[data-focus='study'] .banner {
+  /* Sit below the 56px study head, same idea as the global topbar offset. */
+  top: 56px;
 }
 .banner[data-motion='entering'],
 .banner[data-motion='leaving'] {
