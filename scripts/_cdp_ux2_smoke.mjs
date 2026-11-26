@@ -229,8 +229,10 @@ async function studyAudit(page) {
     const focus = document.querySelector('.player--focus');
     const replay = document.querySelector('.player--focus .player__replay');
     const loop = document.querySelector('.player--focus .player__loop');
-    const overlapOf = (a, b) => {
-      if (!a || !b) return null;
+    const overlapOf = (aEl, bEl) => {
+      if (!aEl || !bEl || aEl.hidden || bEl.hidden) return null;
+      const a = aEl.rect;
+      const b = bEl.rect;
       const width = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left));
       const height = Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
       if (width <= 1 || height <= 1) return null;
@@ -251,22 +253,55 @@ async function studyAudit(page) {
       focusText: (focus?.innerText || '').replace(/\s+/g, ' ').trim(),
       replay: box(replay),
       loop: box(loop),
-      menuOverlapsCheck: overlapOf(box(menu)?.rect, box(check)?.rect),
-      bannerOverlapsCount: overlapOf(box(banner)?.rect, box(count)?.rect),
-      bannerOverlapsHead: overlapOf(box(banner)?.rect, box(head)?.rect),
-      bannerOverlapsTopbar: overlapOf(box(banner)?.rect, box(topbar)?.rect),
+      menuOverlapsCheck: overlapOf(box(menu), box(check)),
+      bannerOverlapsCount: overlapOf(box(banner), box(count)),
+      bannerOverlapsHead: overlapOf(box(banner), box(head)),
+      bannerOverlapsTopbar: overlapOf(box(banner), box(topbar)),
       emptyRecent: (document.body.innerText || '').includes('暂无更多最近学习'),
       folderSelect: !!document.querySelector('select[aria-label="文件夹"]'),
     };
   });
 }
 
+async function ensureDictation(page) {
+  const toDictation = page.getByRole('button', { name: '听写', exact: true });
+  if (await toDictation.count()) {
+    await domClick(toDictation);
+    await sleep(400);
+  }
+}
+
 async function enterStudy(page) {
-  const start = page.getByRole('button', { name: /开始听写/ }).first();
-  if (await start.count()) {
-    await domClick(start);
-    await sleep(600);
-    if (await page.locator('.study__count').count()) return true;
+  await clickBtn(page, /^素材库$/).catch(() => {});
+  await sleep(300);
+  const speech = page.locator('.materials__row').filter({ hasText: 'speech' }).first();
+  if (await speech.count()) {
+    await domClick(speech);
+    await sleep(500);
+    const start = page.getByRole('button', { name: /开始听写/ }).first();
+    if (await start.count()) {
+      await domClick(start);
+      await sleep(600);
+    }
+    if (await page.locator('.study__count').count()) {
+      await ensureDictation(page);
+      return true;
+    }
+  }
+  await goHome(page);
+  const candidates = [
+    page.getByRole('button', { name: /开始听写/ }).first(),
+    page.getByRole('button', { name: /^继续/ }).first(),
+  ];
+  for (const start of candidates) {
+    if (await start.count()) {
+      await domClick(start);
+      await sleep(600);
+      if (await page.locator('.study__count').count()) {
+        await ensureDictation(page);
+        return true;
+      }
+    }
   }
   return false;
 }
@@ -372,12 +407,7 @@ async function main() {
       .filter((row) => row.lastStudiedAt)
       .sort((a, b) => String(b.lastStudiedAt).localeCompare(String(a.lastStudiedAt)));
     const keepId = studied[0]?.id || materialBackup[0]?.id;
-    const homeRows = materialBackup.map((row) => {
-      if (row.id === keepId) return row;
-      const next = { ...row };
-      delete next.lastStudiedAt;
-      return next;
-    });
+    const homeRows = materialBackup.filter((row) => row.id === keepId);
     await putStore(page, 'folders', []);
     await putStore(page, 'materials', homeRows);
     await reloadApp(page);
@@ -400,6 +430,8 @@ async function main() {
 
     await clickBtn(page, /^素材库$/);
     await sleep(400);
+    await page.keyboard.press('Escape');
+    await sleep(200);
     await shot(page, '20-library-no-folders.png');
     const lib = await page.evaluate(() => ({
       folderSelect: !!document.querySelector('select[aria-label="文件夹"]'),
@@ -419,6 +451,12 @@ async function main() {
 
     await restore();
     await reloadApp(page);
+
+    await clickBtn(page, /^素材库$/);
+    await sleep(400);
+    await page.keyboard.press('Escape');
+    await sleep(200);
+    await shot(page, '21-library-full-no-folders.png');
 
     await goHome(page);
     let inStudy = await enterStudy(page);

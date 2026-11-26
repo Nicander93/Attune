@@ -1,0 +1,255 @@
+page http://localhost:1420/
+size {"innerWidth":1024,"innerHeight":640,"dpr":1.3899999856948853}
+backup folders=0 materials=67
+primed backup folders=0 materials=67
+shot 10-home-one-recent.png
+home emptyRecent=false hasLast=true => PASS
+shot 20-library-no-folders.png
+library folderSelect=false newFolder=true => PASS
+restored folders=0 materials=67
+shot 21-library-full-no-folders.png
+shot 40-study-entered.png
+shot 42-menu-open.png
+dictation speedCycle=0 select=true replay={"text":"↺","aria":"重听本句","hidden":false,"opacity":"1","background":"rgba(0, 0, 0, 0)","rect":{"left":621,"top":118,"right":655,"bottom":152}} focusText=⏮ ▶ ⏭ 00:00 / 00:07 ↻ ↺ count=01 / 02 ⌄ headings=[] overlapCheck=null checkVisible=true
+shot 43-listen-read.png
+shot 44-back-to-dictation.png
+view switch => PASS
+shot 45-checked.png
+shot 46-esc-back-to-edit.png
+esc => PASS
+shot 50-notice-appearing.png
+shot 51-notice-study.png
+mid {"menuPresent":false,"opacity":null,"mixedText":false} banner {"banner":{"text":"Enter：核对 / 下一句；Space：播放 / 暂停（输入框外）；左右方向键：切句（输入框外）；Esc：从核对返回修改。","aria":"","hidden":false,"opacity":"1","background":"rgb(237, 243, 238)","rect":{"left":0,"top":56,"right":1024,"bottom":92}},"count":{"text":"01 / 02 ⌄","aria":"","hidden":false,"opacity":"1","background":"rgba(0, 0, 0, 0)","rect":{"left":451,"top":105,"right":531,"bottom":135}},"head":{"text":"← 返回\nspeech\n听读\n···","aria":"","hidden":false,"opacity":"1","background":"rgb(255, 255, 255)","rect":{"left":0,"top":0,"right":1024,"bottom":56}},"overlaps":{"count":null,"head":null,"topbar":null}}
+ALL PASS
+
+SUMMARY {
+  "tip": "5c3dc34b3a0f3ba36e999f52249a7ff4024ba6d4",
+  "branch": "feat/ux-2-study-declutter",
+  "when": "2026-11-26T04:59:03.185Z",
+  "all": "PASS",
+  "checks": {
+    "home_no_empty_recent": "PASS",
+    "library_folder_select_hidden": "PASS",
+    "one_speed_control": "PASS",
+    "replay_icon": "PASS",
+    "one_sentence_index": "PASS",
+    "menu_keeps_check": "PASS",
+    "view_switch": "PASS",
+    "esc_from_check": "PASS",
+    "no_mixed_text": "PASS",
+    "banner_clear": "PASS"
+  },
+  "detail": {
+    "size": {
+      "innerWidth": 1024,
+      "innerHeight": 640,
+      "dpr": 1.3899999856948853
+    },
+    "home": {
+      "emptyRecent": false,
+      "hasLast": true,
+      "keepId": "059a10b8-243c-41d0-8cce-affd8d38ead6"
+    },
+    "library": {
+      "folderSelect": false,
+      "newFolder": true,
+      "text": "Attune\n首页\n素材库\n素材库\n＋ 导入素材\n最近学习\n名称\n时长\n\n当前文件夹 · 1 段\n\n＋ 文件夹\n♫\nspeech\n未分类 · 00:07\n待校对\n···\nspeech.wav\n\n快捷键：Ctrl+F 搜索 · F2 重命名 · Esc 关闭菜单"
+    },
+    "menuOpen": {
+      "menu": {
+        "text": "开启单句循环\n语速 · 1×\n0.5×\n0.75×\n1×\n1.25×\n1.5×\n✓ 按句\n连续\n句子列表\n只看难句\n关闭自动跟随\n显示未听写的原文\n开启按键音\n练习轮次\n校对字幕\n完整原文\n素材设置\n快捷键",
+        "aria": "",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgb(255, 255, 255)",
+        "rect": {
+          "left": 818,
+          "top": 53,
+          "right": 994,
+          "bottom": 361
+        }
+      },
+      "check": {
+        "text": "核对答案 Enter",
+        "aria": "核对答案",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgb(49, 88, 67)",
+        "rect": {
+          "left": 790,
+          "top": 381,
+          "right": 922,
+          "bottom": 419
+        }
+      },
+      "count": {
+        "text": "01 / 02 ⌄",
+        "aria": "",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "rect": {
+          "left": 451,
+          "top": 69,
+          "right": 531,
+          "bottom": 99
+        }
+      },
+      "head": {
+        "text": "← 返回\nspeech\n听读\n···\n开启单句循环\n语速 · 1×\n0.5×\n0.75×\n1×\n1.25×\n1.5×\n✓ 按句\n连续\n句子列表\n只看难句\n关闭自动跟随\n显示未听写的原文\n开启按键音\n练习轮次\n校对字幕\n完整原文\n素材设置\n快捷键",
+        "aria": "",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgb(255, 255, 255)",
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "right": 1024,
+          "bottom": 56
+        }
+      },
+      "status": {
+        "text": "01 / 02 ⌄\n☆\n已听写 1 / 2 句",
+        "aria": "",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "rect": {
+          "left": 0,
+          "top": 66,
+          "right": 1024,
+          "bottom": 102
+        }
+      },
+      "banner": null,
+      "topbar": {
+        "text": "",
+        "aria": "",
+        "hidden": true,
+        "opacity": "0",
+        "background": "rgb(255, 255, 255)",
+        "rect": {
+          "left": 0,
+          "top": -8,
+          "right": 1024,
+          "bottom": 58
+        }
+      },
+      "title": null,
+      "headings": [],
+      "speedCycle": 0,
+      "speedSelect": {
+        "text": "0.5×\n0.75×\n1×\n1.25×\n1.5×",
+        "aria": "播放速度",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgb(255, 255, 255)",
+        "rect": {
+          "left": 891,
+          "top": 103,
+          "right": 962,
+          "bottom": 137
+        }
+      },
+      "focusText": "⏮ ▶ ⏭ 00:00 / 00:07 ↻ ↺",
+      "replay": {
+        "text": "↺",
+        "aria": "重听本句",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "rect": {
+          "left": 621,
+          "top": 118,
+          "right": 655,
+          "bottom": 152
+        }
+      },
+      "loop": {
+        "text": "↻",
+        "aria": "单句循环",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "rect": {
+          "left": 578,
+          "top": 118,
+          "right": 611,
+          "bottom": 152
+        }
+      },
+      "menuOverlapsCheck": null,
+      "bannerOverlapsCount": null,
+      "bannerOverlapsHead": null,
+      "bannerOverlapsTopbar": null,
+      "emptyRecent": false,
+      "folderSelect": false
+    },
+    "viewSwitch": {
+      "reading": {
+        "listenWrite": true,
+        "hasDiff": false
+      },
+      "backDictation": 1
+    },
+    "esc": {
+      "checked": 1,
+      "afterEsc": {
+        "diff": false,
+        "field": true
+      }
+    },
+    "midClick": {
+      "menuPresent": false,
+      "opacity": null,
+      "mixedText": false
+    },
+    "banner": {
+      "banner": {
+        "text": "Enter：核对 / 下一句；Space：播放 / 暂停（输入框外）；左右方向键：切句（输入框外）；Esc：从核对返回修改。",
+        "aria": "",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgb(237, 243, 238)",
+        "rect": {
+          "left": 0,
+          "top": 56,
+          "right": 1024,
+          "bottom": 92
+        }
+      },
+      "count": {
+        "text": "01 / 02 ⌄",
+        "aria": "",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgba(0, 0, 0, 0)",
+        "rect": {
+          "left": 451,
+          "top": 105,
+          "right": 531,
+          "bottom": 135
+        }
+      },
+      "head": {
+        "text": "← 返回\nspeech\n听读\n···",
+        "aria": "",
+        "hidden": false,
+        "opacity": "1",
+        "background": "rgb(255, 255, 255)",
+        "rect": {
+          "left": 0,
+          "top": 0,
+          "right": 1024,
+          "bottom": 56
+        }
+      },
+      "overlaps": {
+        "count": null,
+        "head": null,
+        "topbar": null
+      }
+    }
+  },
+  "evidence_dir": "docs/evidence/ux-2/"
+}
