@@ -125,7 +125,7 @@ export function material(overrides: Record<string, unknown> = {}) {
 export async function openStudy(page: Page) {
   await page.getByRole('button', { name: '素材库' }).first().click();
   await page.locator('.materials__row').first().click();
-  await expect(page.getByRole('heading', { name: /第 1 \/ 3 句/ })).toBeVisible();
+  await expectSentenceIndex(page, 1, 3);
 }
 
 /** Opens the focus-shell ··· menu and clicks a menuitem by accessible name. */
@@ -144,3 +144,10 @@ export const vtt = [
   '\n00:00:00.000 --> 00:00:03.000\nHello world\n你好，世界\n',
   '\n00:00:03.000 --> 00:00:06.000\nNice to meet you\n很高兴见到你\n',
 ].join('\n');
+
+export async function expectSentenceIndex(page: Page, index: number, total: number) {
+  const current = String(index).padStart(2, '0');
+  const count = String(total).padStart(2, '0');
+  await expect(page.locator('.study__count')).toContainText(`${current} / ${count}`);
+  await expect(page.getByRole('heading', { name: `第 ${index} / ${total} 句` })).toHaveCount(0);
+}

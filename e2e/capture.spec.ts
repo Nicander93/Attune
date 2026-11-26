@@ -1,7 +1,7 @@
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import { material, openStudyMenu, wav } from './support';
+import { expectSentenceIndex, material, openStudyMenu, wav } from './support';
 
 const shot = (name: string) => resolve(process.cwd(), 'screenshots', `${name}.png`);
 
@@ -117,7 +117,7 @@ test('capture every page at 1280x720 and 1024x640', async ({ page }) => {
   await page.screenshot({ path: shot('library') });
 
   await page.locator('.materials__row').first().click();
-  await expect(page.getByRole('heading', { name: /第 1 \/ 2 句/ })).toBeVisible();
+  await expectSentenceIndex(page, 1, 2);
   await page.waitForTimeout(300);
   await page.screenshot({ path: shot('dictation') });
 

@@ -29,11 +29,6 @@ function navigationScope(material: Material, bookmarkedOnly: boolean) {
   return material.segments.filter((s) => marks.has(s.id));
 }
 
-function nextPlaybackRate(current: number) {
-  const index = PLAYBACK_RATES.findIndex((rate) => rate === current);
-  return PLAYBACK_RATES[(index + 1) % PLAYBACK_RATES.length] ?? 1;
-}
-
 export function StudyPage({
   material,
   player,
@@ -430,18 +425,8 @@ export function StudyPage({
             >
               {player.loop ? '关闭单句循环' : '开启单句循环'}
             </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                player.setSpeed(nextPlaybackRate(player.speed));
-                closeMenu();
-              }}
-            >
-              语速 · {player.speed}×
-            </button>
             <label className="study__menu-volume" role="none">
-              语速
+              语速 · {player.speed}×
               <select
                 aria-label="播放速度"
                 value={player.speed}
@@ -669,16 +654,12 @@ export function StudyPage({
         onStepSentence={stepSentence}
         hasPrevious={index > 0}
         hasNext={index >= 0 && index < scope.length - 1}
-        status={`第 ${index + 1} / ${scope.length} 句`}
       />
 
       {view === 'dictation' ? (
         segment ? (
           <div className="dictation">
             <div className="dictation__head">
-              <h1>
-                第 {index + 1} / {scope.length} 句
-              </h1>
               <span className="muted">
                 {formatTime(segment.start)} — {formatTime(segment.end)}
                 {stale.has(segment.id) ? ' · 待重新核对' : ''}
