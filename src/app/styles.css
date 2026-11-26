@@ -22,6 +22,8 @@
   --motion-page: 240ms;
   --motion-ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-ease-leave: cubic-bezier(0.4, 0, 1, 1);
+  --shell-topbar-height: 66px;
+  --study-head-height: 56px;
 }
 
 * {
@@ -2193,8 +2195,8 @@ h1 {
 .study__head--focus {
   position: relative;
   z-index: 60;
-  height: 56px;
-  min-height: 56px;
+  height: var(--study-head-height);
+  min-height: var(--study-head-height);
   padding: 0 28px;
   gap: 16px;
   border-bottom: 1px solid var(--line);
@@ -2242,10 +2244,17 @@ h1 {
   top: calc(100% + 8px);
   z-index: 40;
   min-width: 176px;
+  max-height: var(
+    --study-menu-max-height,
+    min(52vh, calc(100vh - var(--study-head-height) - 108px))
+  );
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 5px;
   border: 1px solid var(--line);
   border-radius: 11px;
   background: #fff;
+  background-clip: padding-box;
   box-shadow: 0 12px 32px rgba(32, 42, 35, 0.08);
 }
 .study__menu button[role='menuitem'] {
@@ -2354,7 +2363,7 @@ h1 {
 
 /* ---------- S4 shell visual: paper palette + quieter library meta ---------- */
 .topbar {
-  height: 66px;
+  height: var(--shell-topbar-height);
   padding-inline: max(32px, calc((100vw - 1000px) / 2));
 }
 .page-heading {
@@ -2593,29 +2602,30 @@ h1 {
   position: absolute;
   left: 0;
   right: 0;
-  top: 0;
+  top: var(--banner-top, var(--shell-topbar-height));
   z-index: 50;
-  transition:
-    opacity var(--motion-short) var(--motion-ease-enter),
-    transform var(--motion-short) var(--motion-ease-enter);
-}
-.app:not([data-focus='study']) .banner {
-  top: 54px;
+  transition: opacity var(--motion-short) var(--motion-ease-enter);
 }
 .app[data-focus='study'] .banner {
-  /* Sit below the 56px study head, same idea as the global topbar offset. */
-  top: 56px;
+  top: var(--banner-top, var(--study-head-height));
 }
+/* Keep the banner in its slot; a vertical shift would collide with the chrome. */
 .banner[data-motion='entering'],
 .banner[data-motion='leaving'] {
   opacity: 0;
-  transform: translateY(-6px);
+  transform: none;
   pointer-events: none;
   transition-timing-function: var(--motion-ease-leave);
 }
 .banner[data-motion='entered'] {
   opacity: 1;
   transform: none;
+}
+.app:not([data-focus='study']):has(.banner) .page {
+  padding-top: max(36px, var(--shell-banner-height, 36px));
+}
+.app[data-focus='study']:has(.banner) .study__status {
+  margin-top: calc(10px + max(36px, var(--shell-banner-height, 36px)));
 }
 
 @keyframes motion-page-in {
@@ -2641,6 +2651,14 @@ h1 {
   transition:
     opacity var(--motion-short) var(--motion-ease-leave),
     transform var(--motion-short) var(--motion-ease-leave);
+}
+[data-motion][data-origin][data-motion='entering'] {
+  opacity: 1;
+}
+[data-motion][data-origin][data-motion='leaving'] {
+  opacity: 0;
+  visibility: hidden;
+  transition: none;
 }
 [data-motion='entered'] {
   opacity: 1;

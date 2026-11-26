@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { usePresence, type Presence } from './motion';
+import { MOTION_MS, usePresence, type Presence } from './motion';
 
 interface Props {
   open: boolean;
@@ -22,7 +22,7 @@ export function MotionPop({
   children,
   ...rest
 }: Props) {
-  const presence = usePresence(open);
+  const presence = usePresence(open, MOTION_MS.short, true);
   if (hidden.includes(presence)) return null;
   const leaving = presence === 'leaving';
   return (
