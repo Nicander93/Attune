@@ -24,6 +24,7 @@
   --motion-ease-leave: cubic-bezier(0.4, 0, 1, 1);
   --shell-topbar-height: 66px;
   --study-head-height: 56px;
+  --page-heading-row: 66px;
 }
 
 * {
@@ -2367,7 +2368,7 @@ h1 {
 }
 .page-heading {
   height: auto;
-  min-height: 66px;
+  min-height: var(--page-heading-row);
   align-items: center;
   padding: 18px max(32px, calc((100% - 900px) / 2));
   margin-bottom: 0;
@@ -2601,20 +2602,23 @@ h1 {
     visibility 0s linear var(--motion-short);
 }
 
-/* UX-3: overlay toasts do not reserve layout space or push the page down. */
+/* UX-3: overlay toasts do not reserve layout space or push the page down.
+   On library/home they sit below the page-heading action row so 「导入素材」
+   stays fully visible and clickable for the whole undo window. */
 .toast-host {
   position: fixed;
   z-index: 80;
-  top: calc(var(--shell-topbar-height) + 12px);
+  top: calc(var(--shell-topbar-height) + var(--page-heading-row) + 12px);
   right: 20px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
-  width: min(360px, calc(100vw - 40px));
+  width: min(360px, calc(100% - 40px));
   pointer-events: none;
 }
 .app[data-focus='study'] .toast-host {
+  /* Study has no import CTA in the heading row; keep clear of the study head. */
   top: calc(var(--study-head-height) + 12px);
 }
 .toast {

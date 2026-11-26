@@ -218,6 +218,17 @@ async function layoutSnapshot(page) {
     const shortcuts = document.querySelector('.study__shortcuts');
     const pageEl = document.querySelector('.page');
     const banner = document.querySelector('.app > .banner, .toast-host + .banner');
+    const importCta = [...document.querySelectorAll('button')].find((el) =>
+      /导入素材/.test(el.textContent || ''),
+    );
+    const importHit = (() => {
+      if (!toast || !importCta) return null;
+      const b = importCta.getBoundingClientRect();
+      const el = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+      const centerIsButton = !!(el && importCta.contains(el));
+      const centerIsToast = !!(el && toast.contains(el));
+      return { centerIsButton, centerIsToast, blockedCount: centerIsButton && !centerIsToast ? 0 : 1 };
+    })();
     return {
       toast: box(toast),
       toastText: toast ? (toast.innerText || '').trim() : '',
@@ -231,12 +242,15 @@ async function layoutSnapshot(page) {
       head: box(head),
       menu: box(menu),
       shortcuts: box(shortcuts),
+      importCta: box(importCta),
+      importHit,
       overlaps: {
         toastField: intersects(box(toast), box(field)),
         toastPlayer: intersects(box(toast), box(player)),
         toastCheck: intersects(box(toast), box(check)),
         toastCount: intersects(box(toast), box(count)),
         toastHead: intersects(box(toast), box(head)),
+        toastImportCta: intersects(box(toast), box(importCta)),
         shortcutsField: intersects(box(shortcuts), box(field)),
         shortcutsPlayer: intersects(box(shortcuts), box(player)),
         shortcutsCheck: intersects(box(menu), box(check)),
@@ -321,6 +335,34 @@ async function importWav(page) {
   return ready;
 }
 
+async function stubFfmpegMissing(page) {
+  await page.evaluate(() => {
+    const internals = window.__TAURI_INTERNALS__;
+    if (!internals?.invoke) throw new Error('no tauri invoke');
+    window.__ATTUNE_ORIG_INVOKE ??= internals.invoke.bind(internals);
+    internals.invoke = (cmd, args, extra) => {
+      if (cmd === 'media_ffmpeg_status') {
+        return Promise.resolve({
+          available: false,
+          source: 'missing',
+          hint: '这台电脑还没有安装处理视频所需的本地工具。',
+        });
+      }
+      return window.__ATTUNE_ORIG_INVOKE(cmd, args, extra);
+    };
+  });
+}
+
+async function restoreFfmpegInvoke(page) {
+  await page.evaluate(() => {
+    const internals = window.__TAURI_INTERNALS__;
+    if (internals && window.__ATTUNE_ORIG_INVOKE) {
+      internals.invoke = window.__ATTUNE_ORIG_INVOKE;
+      delete window.__ATTUNE_ORIG_INVOKE;
+    }
+  });
+}
+
 async function main() {
   if (!(await waitCdp())) throw new Error('CDP 9222 not up');
   const { browser, page, client } = await connectPage();
@@ -388,7 +430,11 @@ async function main() {
     await shot(page, '20-import-toast.png');
     let toastLayout = await layoutSnapshot(page);
     if (toastLayout.toast && toastLayout.hostPosition === 'fixed') {
-      toastOk = !toastLayout.overlaps.toastField && toastLayout.pagePadding !== '36px';
+      toastOk =
+        !toastLayout.overlaps.toastField &&
+        !toastLayout.overlaps.toastImportCta &&
+        !(toastLayout.importHit && toastLayout.importHit.blockedCount) &&
+        toastLayout.pagePadding !== '36px';
     }
     if (!toastLayout.toast) {
       // Fall back: enter study and trigger the “write something first” toast.
@@ -518,6 +564,8 @@ async function main() {
     await domClick(del);
     await sleep(400);
     await shot(page, '60-delete-undo-toast.png');
+    const deleteLayout = await layoutSnapshot(page);
+    summary.detail.delete_toast_layout = deleteLayout;
     const deletedState = await page.evaluate((name) => {
       const toast = document.querySelector('.toast');
       const rows = Array.from(document.querySelectorAll('.materials__row'));
@@ -529,6 +577,9 @@ async function main() {
         confirmCalls: window.__confirmCalls || 0,
       };
     }, firstName);
+    deletedState.importVisible = !!deleteLayout.importCta;
+    deletedState.toastImportCta = deleteLayout.overlaps.toastImportCta;
+    deletedState.importHit = deleteLayout.importHit;
     const undoBtn = page.getByRole('button', { name: '撤销' });
     if (await undoBtn.count()) {
       await domClick(undoBtn.first());
@@ -543,6 +594,10 @@ async function main() {
         confirmCalls: window.__confirmCalls || 0,
       };
     }, firstName);
+    const importClear =
+      !!deleteLayout.importCta &&
+      !deleteLayout.overlaps.toastImportCta &&
+      !(deleteLayout.importHit && deleteLayout.importHit.blockedCount);
     pass(
       'delete_undo_no_confirm',
       confirmCalls &&
@@ -550,8 +605,9 @@ async function main() {
         deletedState.confirmCalls === 0 &&
         (deletedState.rowGone || (deletedState.countAfter !== undefined && deletedState.countAfter === countBefore - 1)) &&
         undone.rowBack &&
-        undone.confirmCalls === 0,
-      { firstName, countBefore, deletedState, undone },
+        undone.confirmCalls === 0 &&
+        importClear,
+      { firstName, countBefore, deletedState, undone, importClear, deleteLayout },
     );
 
     // --- Cache in-page confirm, if reachable ---
@@ -594,6 +650,58 @@ async function main() {
     if (!cacheShot) {
       summary.checks.cache_in_page_confirm = 'SKIP';
       log('cache_in_page_confirm => SKIP');
+    }
+
+    // --- In-page local-tool install consent (「同意安装」) ---
+    let installShot = false;
+    try {
+      await goHome(page);
+      const inStudy3 = await enterStudy(page);
+      if (inStudy3) {
+        await clickBtn(page, /^更多$/);
+        await sleep(200);
+        const settings = page.getByRole('menuitem', { name: '素材设置' });
+        if (await settings.count()) {
+          await stubFfmpegMissing(page);
+          await domClick(settings);
+          await sleep(500);
+          const morePrep = page.getByRole('button', { name: '更多 ···' });
+          if (await morePrep.count()) {
+            await domClick(morePrep);
+            await sleep(200);
+            const videoItem = page.getByRole('menuitem', { name: '导入视频' });
+            if (await videoItem.count()) {
+              await domClick(videoItem);
+              await sleep(500);
+              const installBtn = page.getByRole('button', { name: '安装本地工具' });
+              if (await installBtn.count()) {
+                await domClick(installBtn.first());
+                await sleep(400);
+                const panelVisible = (await page.locator('.confirm-panel').count()) > 0;
+                const hasAgree = (await page.getByRole('button', { name: '同意安装' }).count()) > 0;
+                if (panelVisible && hasAgree) {
+                  await shot(page, '80-install-consent.png');
+                  installShot = true;
+                  const copy = await page.locator('.confirm-panel').innerText();
+                  pass('install_in_page_consent', /同意安装/.test(copy) && /本地工具/.test(copy), {
+                    copy: copy.slice(0, 200),
+                  });
+                  const cancel = page.getByRole('button', { name: '取消' });
+                  if (await cancel.count()) await domClick(cancel.first());
+                }
+              }
+            }
+          }
+          await restoreFfmpegInvoke(page);
+        }
+      }
+    } catch (err) {
+      log('install consent path skipped ' + err);
+      await restoreFfmpegInvoke(page).catch(() => {});
+    }
+    if (!installShot) {
+      summary.checks.install_in_page_consent = 'FAIL';
+      log('install_in_page_consent => FAIL (panel not reached)');
     }
 
     const failed = Object.entries(summary.checks).filter(([, v]) => v === 'FAIL');
